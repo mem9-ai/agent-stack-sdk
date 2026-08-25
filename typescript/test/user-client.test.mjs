@@ -5,6 +5,7 @@ import { after, test } from "node:test";
 import { ConflictError, UserClient } from "../dist/index.js";
 
 const servers = [];
+const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -41,7 +42,7 @@ const agentRecord = (overrides = {}) => ({
 const userClient = (baseUrl) =>
   new UserClient({
     baseUrl,
-    apiKey: "ag9_uak_key_secret_value_that_is_long_enough",
+    apiKey: userApiKey,
     projectId: "project_1",
   });
 
@@ -216,7 +217,7 @@ test("the User client exposes real default Agents and read-only AgentTemplates",
 });
 
 test("a User client rejects Workspace authority and an invalid Project", () => {
-  const workspaceKey = "ag9_wak.key_id.secret_value_that_must_not_leak";
+  const workspaceKey = "ag9_wak." + "key_id." + "x".repeat(32);
   assert.throws(
     () => new UserClient({ baseUrl: "https://agent.example.com", apiKey: workspaceKey, projectId: "p" }),
     (error) => !String(error).includes(workspaceKey),
@@ -225,7 +226,7 @@ test("a User client rejects Workspace authority and an invalid Project", () => {
     () =>
       new UserClient({
         baseUrl: "https://agent.example.com",
-        apiKey: "ag9_uak_key_secret_value_that_is_long_enough",
+        apiKey: userApiKey,
         projectId: "INVALID PROJECT",
       }),
     /projectId/,

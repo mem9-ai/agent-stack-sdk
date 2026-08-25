@@ -5,6 +5,7 @@ import { after, test } from "node:test";
 import { ConflictError, OutcomeUnknownError, UserClient } from "../dist/index.js";
 
 const servers = [];
+const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -22,7 +23,7 @@ const serve = async (handler) => {
 const clientFor = (baseUrl) =>
   new UserClient({
     baseUrl,
-    apiKey: "ag9_uak_key_secret_value_that_is_long_enough",
+    apiKey: userApiKey,
     projectId: "project_1",
   });
 

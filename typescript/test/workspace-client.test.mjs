@@ -5,6 +5,7 @@ import { after, test } from "node:test";
 import { ConflictError, OutcomeUnknownError, WorkspaceClient } from "../dist/index.js";
 
 const servers = [];
+const workspaceApiKey = "ag9_wak." + "key_id." + "x".repeat(32);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -35,13 +36,13 @@ test("a Workspace client retries a safe read with one request identity", async (
 
   const client = new WorkspaceClient({
     baseUrl,
-    apiKey: "ag9_wak.key_id.secret_value_that_is_long_enough",
+    apiKey: workspaceApiKey,
   });
 
   assert.deepEqual(await client.serviceUser("user_1").listApiKeys(), []);
   assert.equal(requests.length, 2);
   assert.equal(requests[0].url, "/api/admin/users/user_1/api-keys");
-  assert.equal(requests[0].headers.authorization, "Bearer ag9_wak.key_id.secret_value_that_is_long_enough");
+  assert.equal(requests[0].headers.authorization, `Bearer ${workspaceApiKey}`);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
   assert.equal(requests[0].headers["x-agent9-workspace-id"], undefined);
   assert.equal(requests[0].headers["x-agent9-user-id"], undefined);
@@ -65,7 +66,7 @@ test("a service conflict preserves safe error details", async () => {
   });
   const client = new WorkspaceClient({
     baseUrl,
-    apiKey: "ag9_wak.key_id.secret_value_that_is_long_enough",
+    apiKey: workspaceApiKey,
   });
 
   await assert.rejects(client.serviceUser("user_1").listApiKeys(), (error) => {
@@ -79,7 +80,7 @@ test("a service conflict preserves safe error details", async () => {
 });
 
 test("a Workspace client rejects a User API Key without exposing it", () => {
-  const apiKey = "ag9_uak_key_secret_value_that_must_not_leak";
+  const apiKey = "ag9_uak_" + "key_" + "x".repeat(32);
 
   assert.throws(
     () => new WorkspaceClient({ baseUrl: "https://agent.example.com", apiKey }),
@@ -137,11 +138,11 @@ test("a Workspace client provisions a Service User and manages its credentials",
       return;
     }
     if (request.url === "/api/admin/users/user_1/api-keys") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ag9_uak_1_first_secret" }));
+      response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-1" }));
       return;
     }
     if (request.url === "/api/admin/user-api-keys/uak_1/rotate") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ag9_uak_1_second_secret" }));
+      response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-2" }));
       return;
     }
     response.writeHead(201).end(
@@ -152,7 +153,7 @@ test("a Workspace client provisions a Service User and manages its credentials",
   });
   const client = new WorkspaceClient({
     baseUrl,
-    apiKey: "ag9_wak.key_id.secret_value_that_is_long_enough",
+    apiKey: workspaceApiKey,
   });
 
   const serviceUser = await client.createServiceUser({
@@ -162,8 +163,8 @@ test("a Workspace client provisions a Service User and manages its credentials",
   assert.equal(serviceUser.id, "user_1");
   assert.equal(serviceUser.user?.displayName, "Customer One");
   assert.equal(serviceUser.membership?.status, "active");
-  assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "ag9_uak_1_first_secret");
-  assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "ag9_uak_1_second_secret");
+  assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "one-time-key-1");
+  assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "one-time-key-2");
   assert.equal((await serviceUser.revokeApiKey("uak_1")).status, "revoked");
 
   assert.deepEqual(JSON.parse(calls[0].body), { displayName: "Customer One" });
@@ -188,7 +189,7 @@ test("a lost credential response is outcome unknown and is not retried", async (
   });
   const client = new WorkspaceClient({
     baseUrl,
-    apiKey: "ag9_wak.key_id.secret_value_that_is_long_enough",
+    apiKey: workspaceApiKey,
   });
 
   await assert.rejects(
@@ -196,7 +197,7 @@ test("a lost credential response is outcome unknown and is not retried", async (
     (error) => {
       assert(error instanceof OutcomeUnknownError);
       assert.match(error.requestId, /^[0-9a-f-]{36}$/);
-      assert(!String(error).includes("ag9_wak.key_id.secret_value_that_is_long_enough"));
+      assert(!String(error).includes(workspaceApiKey));
       return true;
     },
   );
@@ -225,7 +226,7 @@ test("offboarding revokes every active key and leaves revoked keys alone", async
   });
   const client = new WorkspaceClient({
     baseUrl,
-    apiKey: "ag9_wak.key_id.secret_value_that_is_long_enough",
+    apiKey: workspaceApiKey,
   });
 
   const result = await client.serviceUser("user_1").revokeAllApiKeys();

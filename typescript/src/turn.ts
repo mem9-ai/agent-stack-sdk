@@ -93,14 +93,8 @@ const clarification = (value: unknown): value is ClarificationItem => {
     !isRecord(value) ||
     typeof value.prompt !== "string" ||
     value.prompt.length === 0 ||
-    !strings(value.answerChoices, 2, 8)
-  ) {
-    return false;
-  }
-  if (
-    value.selectionMode !== undefined &&
-    value.selectionMode !== "single" &&
-    value.selectionMode !== "multiple"
+    !oneOf(value.selectionMode, ["single", "multiple"]) ||
+    !strings(value.answerChoices, 2, value.selectionMode === "single" ? 3 : 8)
   ) {
     return false;
   }
@@ -109,7 +103,7 @@ const clarification = (value: unknown): value is ClarificationItem => {
     isRecord(value.response) &&
     typeof value.response.text === "string" &&
     typeof value.response.responseTurnId === "string" &&
-    (value.response.answers === undefined || strings(value.response.answers, 1))
+    strings(value.response.answers, 1, value.selectionMode === "single" ? 1 : 9)
   );
 };
 

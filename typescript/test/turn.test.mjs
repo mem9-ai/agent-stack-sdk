@@ -81,19 +81,49 @@ test("the Turn stream validates ordered events across chunks and heartbeats", as
   assert.equal(requests[0].headers["x-agent9-project-id"], "project_1");
 });
 
-test("malformed Turn events are rejected at the package boundary", async () => {
+test("malformed Turn payloads are rejected at the package boundary", async () => {
+  const invalid = [
+    event("progress", 0, { text: 42 }),
+    event("assistant_message", 0, {
+      messageId: "message_1",
+      text: "Choose one",
+      clarificationItem: { prompt: "Choose one", answerChoices: ["A", "B"] },
+    }),
+    event("assistant_message", 0, {
+      messageId: "message_1",
+      text: "Choose one",
+      clarificationItem: {
+        prompt: "Choose one",
+        selectionMode: "single",
+        answerChoices: ["A", "B", "C", "D"],
+      },
+    }),
+    event("assistant_message", 0, {
+      messageId: "message_1",
+      text: "Choose one",
+      clarificationItem: {
+        prompt: "Choose one",
+        selectionMode: "single",
+        answerChoices: ["A", "B"],
+        response: { text: "A", responseTurnId: "turn_2" },
+      },
+    }),
+  ];
+  let request = 0;
   const baseUrl = await serve((_request, response) => {
-    writeEvents(response, [event("progress", 0, { text: 42 })]);
+    writeEvents(response, [invalid[request++]]);
   });
 
-  await assert.rejects(
-    async () => {
-      for await (const _item of sessionFor(baseUrl).streamTurn({ text: "Hello" })) {
-        // consume
-      }
-    },
-    InvalidTurnEventError,
-  );
+  for (let attempt = 0; attempt < invalid.length; attempt += 1) {
+    await assert.rejects(
+      async () => {
+        for await (const _item of sessionFor(baseUrl).streamTurn({ text: "Hello" })) {
+          // consume
+        }
+      },
+      InvalidTurnEventError,
+    );
+  }
 });
 
 test("a stream ending without a terminal event is outcome unknown and is not replayed", async () => {

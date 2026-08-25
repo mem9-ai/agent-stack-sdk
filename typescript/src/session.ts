@@ -40,16 +40,19 @@ export interface MessageRecord {
   createdAt: string;
 }
 
-export interface ClarificationItem {
-  prompt: string;
-  selectionMode?: "single" | "multiple";
-  answerChoices: [string, string, ...string[]];
-  response?: {
-    text: string;
-    answers?: [string, ...string[]];
-    responseTurnId: string;
-  };
-}
+export type ClarificationItem =
+  | {
+      prompt: string;
+      selectionMode: "single";
+      answerChoices: [string, string, string?];
+      response?: { text: string; answers: [string]; responseTurnId: string };
+    }
+  | {
+      prompt: string;
+      selectionMode: "multiple";
+      answerChoices: [string, string, ...string[]];
+      response?: { text: string; answers: [string, ...string[]]; responseTurnId: string };
+    };
 
 export interface TurnRecord {
   id: string;

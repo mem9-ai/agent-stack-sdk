@@ -6,6 +6,13 @@ export {
   AgentStackError,
   ConflictError,
   ConnectionError,
+  OutcomeUnknownError,
 } from "./errors.js";
 export { ServiceUser, WorkspaceClient } from "./workspace.js";
-export type { UserApiKey, WorkspaceClientOptions } from "./workspace.js";
+export type {
+  IssuedUserApiKey,
+  ServiceUserRecord,
+  UserApiKey,
+  WorkspaceClientOptions,
+  WorkspaceMembership,
+} from "./workspace.js";

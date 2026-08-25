@@ -3,6 +3,7 @@ import {
   AgentStackError,
   ConflictError,
   ConnectionError,
+  OutcomeUnknownError,
 } from "./errors.js";
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
@@ -16,9 +17,11 @@ interface RequestOptions {
   requestId?: string;
   retry?: RetryMode;
   signal?: AbortSignal;
+  outcomeUnknown?: boolean;
 }
 
 const requestId = (): string => crypto.randomUUID();
+const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 
 const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => {
   if (signal?.aborted) return Promise.reject(signal.reason);
@@ -90,8 +93,26 @@ export class HttpClient {
     return this.request(path, { ...options, retry: "safe" });
   }
 
+  post<T>(
+    path: string,
+    body: unknown,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal"> & {
+      idempotent?: boolean;
+    },
+  ): Promise<T> {
+    return this.request(path, {
+      ...options,
+      method: "POST",
+      body,
+      retry: options?.idempotent ? "safe" : "never",
+    });
+  }
+
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const stableRequestId = options.requestId ?? requestId();
+    if (!REQUEST_ID.test(stableRequestId)) {
+      throw new TypeError("requestId must be 1-64 safe characters");
+    }
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
@@ -114,10 +135,16 @@ export class HttpClient {
           await sleep(100 * 2 ** (attempt - 1), options.signal);
           continue;
         }
-        throw new ConnectionError("Could not reach Agent Service", {
-          requestId: stableRequestId,
-          cause,
-        });
+        const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : ConnectionError;
+        throw new ErrorClass(
+          options.outcomeUnknown
+            ? "Agent Service request outcome is unknown; do not repeat it automatically"
+            : "Could not reach Agent Service",
+          {
+            requestId: stableRequestId,
+            cause,
+          },
+        );
       }
 
       if (response.ok) {

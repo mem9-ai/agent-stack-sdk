@@ -30,3 +30,6 @@ export class AgentStackApiError extends AgentStackError {
 export class ConflictError extends AgentStackApiError {}
 
 export class ConnectionError extends AgentStackError {}
+
+/** The request may have succeeded, so repeating it could create another effect. */
+export class OutcomeUnknownError extends AgentStackError {}

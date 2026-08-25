@@ -1,0 +1,40 @@
+{
+  "name": "@mem9/agent-stack",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for Agent Stack",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "agentServiceApiVersion": "0.0.1",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mem9-ai/agent-stack-sdk.git",
+    "directory": "typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/mem9-ai/agent-stack-sdk/issues"
+  },
+  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme"
+}

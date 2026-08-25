@@ -1,0 +1,20 @@
+{
+  "name": "agent-stack-sdks",
+  "private": true,
+  "workspaces": [
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "packageManager": "npm@11.6.2",
+  "scripts": {
+    "build": "npm run build --workspace @mem9/agent-stack",
+    "typecheck": "npm run typecheck --workspace @mem9/agent-stack",
+    "test": "npm run test --workspace @mem9/agent-stack",
+    "pack:check": "npm run pack:check --workspace @mem9/agent-stack"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

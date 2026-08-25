@@ -1,0 +1,33 @@
+name: Bug report
+description: Report reproducible incorrect SDK behavior without credentials.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Never include API Keys, Authorization headers, or customer data.
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+    validations:
+      required: true
+  - type: input
+    id: service-version
+    attributes:
+      label: Agent Service API version
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Reproduction and observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true

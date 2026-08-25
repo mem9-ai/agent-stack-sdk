@@ -1,0 +1,20 @@
+name: Feature request
+description: Propose a focused addition to the supported SDK surface.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Product problem
+      description: Describe the public Agent Service workflow this should support.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Existing public service contract
+      description: Link the authoritative OpenAPI route or coordinated service change.
+    validations:
+      required: true

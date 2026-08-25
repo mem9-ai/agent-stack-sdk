@@ -113,7 +113,7 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
         JSON.stringify({
           agent: agentRecord({
             name: "Renamed",
-            config: { runtime: { backend: "codex" } },
+            config: { delegation: { enabled: true } },
             configVersion: 3,
           }),
         }),
@@ -128,8 +128,8 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
 
   await agent.rename("Renamed");
   assert.equal(agent.name, "Renamed");
-  await agent.configure({ runtime: { backend: "codex" } });
-  assert.deepEqual(agent.config, { runtime: { backend: "codex" } });
+  await agent.configure({ delegation: { enabled: true } });
+  assert.deepEqual(agent.config, { delegation: { enabled: true } });
   await agent.archive();
   assert.equal(agent.status, "archived");
 

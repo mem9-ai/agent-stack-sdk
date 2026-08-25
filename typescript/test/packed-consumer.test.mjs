@@ -49,6 +49,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     path.join(temporary, "consumer.ts"),
     `import type {
       Agent,
+      AgentConfigPatch,
       ServiceUser,
       Session,
       TurnResult,
@@ -68,6 +69,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const user = new UserClient({ baseUrl, apiKey: token, projectId: "project_1" });
       const agents: Agent[] = await user.listAgents();
       const agent = agents[0] ?? await user.createAgent({ name: "Customer Agent" });
+      const config: AgentConfigPatch = { delegation: { enabled: true } };
+      await agent.configure(config);
       const session: Session = await agent.createSession();
       return session.turn({ text: "Hello" });
     }

@@ -21,10 +21,18 @@ export type {
 } from "./workspace.js";
 export { Agent, UserClient } from "./user.js";
 export type {
+  AgentConfigInput,
+  AgentConfigPatch,
   AgentRecord,
+  AgentRuntimeConfigInput,
   AgentTemplate,
   AgentTemplateProvenance,
   CreateAgentInput,
+  EnabledAgentCapability,
+  ManagedToolReference,
+  PublicAgentConfig,
+  PublicAgentLarkConfig,
+  PublicAgentRuntimeConfig,
   UserClientOptions,
 } from "./user.js";
 export { Session } from "./session.js";

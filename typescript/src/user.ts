@@ -7,6 +7,80 @@ export interface UserClientOptions {
   projectId: string;
 }
 
+export type AgentRuntimeConfigInput =
+  | { backend: "pi" }
+  | {
+      backend: "codex";
+      authId: string;
+      modelReasoningEffort?: "low" | "medium" | "high" | "xhigh";
+    };
+
+export type PublicAgentRuntimeConfig =
+  | { backend: "pi" }
+  | {
+      backend: "codex";
+      authId?: string;
+      modelReasoningEffort?: "low" | "medium" | "high" | "xhigh";
+    };
+
+export interface EnabledAgentCapability {
+  enabled: boolean;
+}
+
+export interface PublicAgentLarkConfig {
+  apiBaseUrl: "https://open.feishu.cn" | "https://open.larksuite.com";
+  appId: string;
+  hasAppSecret: boolean;
+  toolNames?: string[];
+  coverageItemIds?: string[];
+  enabled: boolean;
+  hasLarkAuth: boolean;
+  status: "configured" | "authorized" | "needs_reauth" | "error";
+}
+
+export interface ManagedToolReference {
+  name: string;
+  version: number;
+  packageDigest: string;
+}
+
+export interface AgentConfigInput {
+  runtime?: AgentRuntimeConfigInput;
+  delegation?: EnabledAgentCapability;
+  sessionRecall?: EnabledAgentCapability;
+  knowledgeBase?: EnabledAgentCapability;
+  generatedMedia?: EnabledAgentCapability;
+}
+
+export interface AgentConfigPatch extends AgentConfigInput {
+  sandboxProfile?: string;
+}
+
+export interface PublicAgentConfig {
+  runtime: PublicAgentRuntimeConfig;
+  delegation: EnabledAgentCapability;
+  lark?: PublicAgentLarkConfig;
+  memory: {
+    enabled: boolean;
+    provider: "mem9";
+    mem9: {
+      hasKey: boolean;
+      ownershipState:
+        | "admin_not_configured"
+        | "not_provisioned"
+        | "pending"
+        | "claimed"
+        | "rejected"
+        | "outcome_unknown";
+    };
+  };
+  sessionRecall: EnabledAgentCapability;
+  knowledgeBase: EnabledAgentCapability;
+  generatedMedia: EnabledAgentCapability;
+  notion?: EnabledAgentCapability;
+  tools?: { managed: ManagedToolReference[]; mcp: { serverId: string }[] };
+}
+
 export interface AgentTemplateProvenance {
   agentTemplateId: string;
   name: string | null;
@@ -27,7 +101,7 @@ export interface AgentRecord {
   /** @deprecated Use agentTemplateId. */
   agentDefinitionId: string | null;
   agentTemplate: AgentTemplateProvenance | null;
-  config: Record<string, unknown>;
+  config: PublicAgentConfig;
   configVersion: number;
   status: string;
   createdAt: string;
@@ -52,7 +126,7 @@ export interface AgentTemplate {
 export interface CreateAgentInput {
   name?: string;
   agentTemplateId?: string;
-  config?: Record<string, unknown>;
+  config?: AgentConfigInput;
   idempotencyKey?: string;
   signal?: AbortSignal;
 }
@@ -76,7 +150,7 @@ export class Agent {
     return this.#record.name;
   }
 
-  get config(): Readonly<Record<string, unknown>> {
+  get config(): Readonly<PublicAgentConfig> {
     return this.#record.config;
   }
 
@@ -111,7 +185,7 @@ export class Agent {
   }
 
   async configure(
-    config: Record<string, unknown>,
+    config: AgentConfigPatch,
     options?: { signal?: AbortSignal },
   ): Promise<this> {
     const etag = await this.#currentEtag(options);

@@ -16,3 +16,11 @@ export type {
   WorkspaceClientOptions,
   WorkspaceMembership,
 } from "./workspace.js";
+export { Agent, UserClient } from "./user.js";
+export type {
+  AgentRecord,
+  AgentTemplate,
+  AgentTemplateProvenance,
+  CreateAgentInput,
+  UserClientOptions,
+} from "./user.js";

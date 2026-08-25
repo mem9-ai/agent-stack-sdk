@@ -12,12 +12,20 @@ const MAX_ATTEMPTS = 3;
 type RetryMode = "never" | "safe";
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
+  idempotencyKey?: string;
+  ifMatch?: string;
   requestId?: string;
   retry?: RetryMode;
   signal?: AbortSignal;
   outcomeUnknown?: boolean;
+}
+
+export interface HttpResult<T> {
+  data: T;
+  etag: string | undefined;
+  requestId: string;
 }
 
 const requestId = (): string => crypto.randomUUID();
@@ -93,6 +101,10 @@ export class HttpClient {
     return this.request(path, { ...options, retry: "safe" });
   }
 
+  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<HttpResult<T>> {
+    return this.response(path, { ...options, retry: "safe" });
+  }
+
   post<T>(
     path: string,
     body: unknown,
@@ -108,10 +120,52 @@ export class HttpClient {
     });
   }
 
+  postResponse<T>(
+    path: string,
+    body: unknown,
+    options?: Pick<
+      RequestOptions,
+      "idempotencyKey" | "ifMatch" | "outcomeUnknown" | "requestId" | "signal"
+    > & { idempotent?: boolean },
+  ): Promise<HttpResult<T>> {
+    return this.response(path, {
+      ...options,
+      method: "POST",
+      body,
+      retry: options?.idempotent ? "safe" : "never",
+    });
+  }
+
+  patchResponse<T>(
+    path: string,
+    body: unknown,
+    options: Pick<RequestOptions, "ifMatch" | "outcomeUnknown" | "signal">,
+  ): Promise<HttpResult<T>> {
+    return this.response(path, { ...options, method: "PATCH", body });
+  }
+
+  put<T>(
+    path: string,
+    body: unknown,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+  ): Promise<T> {
+    return this.request(path, { ...options, method: "PUT", body });
+  }
+
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    return (await this.response<T>(path, options)).data;
+  }
+
+  async response<T>(path: string, options: RequestOptions = {}): Promise<HttpResult<T>> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
+    }
+    if (
+      options.idempotencyKey !== undefined &&
+      (options.idempotencyKey.length > 255 || !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
+    ) {
+      throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
     }
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -124,6 +178,8 @@ export class HttpClient {
             authorization: `Bearer ${this.#apiKey}`,
             "x-request-id": stableRequestId,
             ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
+            ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+            ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
             ...(options.body === undefined ? {} : { "content-type": "application/json" }),
           },
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
@@ -148,15 +204,24 @@ export class HttpClient {
       }
 
       if (response.ok) {
-        if (response.status === 204) return undefined as T;
-        try {
-          return (await response.json()) as T;
-        } catch (cause) {
-          throw new AgentStackError("Agent Service returned invalid JSON", {
-            requestId: response.headers.get("x-request-id") ?? stableRequestId,
-            cause,
-          });
+        let data: T;
+        if (response.status === 204) {
+          data = undefined as T;
+        } else {
+          try {
+            data = (await response.json()) as T;
+          } catch (cause) {
+            throw new AgentStackError("Agent Service returned invalid JSON", {
+              requestId: response.headers.get("x-request-id") ?? stableRequestId,
+              cause,
+            });
+          }
         }
+        return {
+          data,
+          etag: response.headers.get("etag") ?? undefined,
+          requestId: response.headers.get("x-request-id") ?? stableRequestId,
+        };
       }
 
       if (attempt < attempts && RETRYABLE_STATUS.has(response.status)) {

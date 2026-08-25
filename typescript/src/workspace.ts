@@ -1,3 +1,4 @@
+import { OutcomeUnknownError } from "./errors.js";
 import { HttpClient } from "./http.js";
 
 export interface WorkspaceClientOptions {
@@ -46,6 +47,25 @@ export interface IssuedUserApiKey {
   token: string;
 }
 
+const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey => {
+  const result = value as { apiKey?: unknown; token?: unknown };
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    typeof result.apiKey !== "object" ||
+    result.apiKey === null ||
+    Array.isArray(result.apiKey) ||
+    typeof result.token !== "string" ||
+    result.token.length === 0
+  ) {
+    throw new OutcomeUnknownError(
+      "Agent Service accepted the credential request but omitted the one-time credential",
+      { requestId },
+    );
+  }
+  return result as IssuedUserApiKey;
+};
+
 export class ServiceUser {
   readonly #http: HttpClient;
   readonly id: string;
@@ -73,23 +93,25 @@ export class ServiceUser {
     return response.apiKeys;
   }
 
-  createApiKey(input: { name: string; signal?: AbortSignal }): Promise<IssuedUserApiKey> {
-    return this.#http.post(
+  async createApiKey(input: { name: string; signal?: AbortSignal }): Promise<IssuedUserApiKey> {
+    const result = await this.#http.postResponse<unknown>(
       `/api/admin/users/${encodeURIComponent(this.id)}/api-keys`,
       { name: input.name },
       { ...(input.signal ? { signal: input.signal } : {}), outcomeUnknown: true },
     );
+    return issuedUserApiKey(result.data, result.requestId);
   }
 
-  rotateApiKey(
+  async rotateApiKey(
     apiKeyId: string,
     options?: { signal?: AbortSignal },
   ): Promise<IssuedUserApiKey> {
-    return this.#http.post(
+    const result = await this.#http.postResponse<unknown>(
       `/api/admin/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
       undefined,
       { ...(options?.signal ? { signal: options.signal } : {}), outcomeUnknown: true },
     );
+    return issuedUserApiKey(result.data, result.requestId);
   }
 
   async revokeApiKey(

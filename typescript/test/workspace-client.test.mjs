@@ -204,16 +204,20 @@ test("a lost credential response is outcome unknown and is not retried", async (
   assert.equal(attempts, 1);
 });
 
-test("an unusable credential response is outcome unknown", async () => {
+test("unusable credential responses are outcome unknown", async () => {
+  const bodies = ["not-json", JSON.stringify({ apiKey: { apiKeyId: "uak_1" } })];
+  let request = 0;
   const baseUrl = await serve((_request, response) => {
-    response.writeHead(201, { "content-type": "application/json" }).end("not-json");
+    response.writeHead(201, { "content-type": "application/json" }).end(bodies[request++]);
   });
   const client = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey });
 
-  await assert.rejects(
-    client.serviceUser("user_1").createApiKey({ name: "backend" }),
-    OutcomeUnknownError,
-  );
+  for (let attempt = 0; attempt < bodies.length; attempt += 1) {
+    await assert.rejects(
+      client.serviceUser("user_1").createApiKey({ name: "backend" }),
+      OutcomeUnknownError,
+    );
+  }
 });
 
 test("offboarding revokes every active key and leaves revoked keys alone", async () => {

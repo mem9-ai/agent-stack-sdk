@@ -20,7 +20,7 @@ export type PublicAgentRuntimeConfig =
   | {
       backend: "codex";
       authId?: string;
-      modelReasoningEffort?: "low" | "medium" | "high" | "xhigh";
+      modelReasoningEffort: "low" | "medium" | "high" | "xhigh";
     };
 
 export interface EnabledAgentCapability {
@@ -77,7 +77,6 @@ export interface PublicAgentConfig {
   sessionRecall: EnabledAgentCapability;
   knowledgeBase: EnabledAgentCapability;
   generatedMedia: EnabledAgentCapability;
-  notion?: EnabledAgentCapability;
   tools?: { managed: ManagedToolReference[]; mcp: { serverId: string }[] };
 }
 

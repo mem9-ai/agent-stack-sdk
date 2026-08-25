@@ -50,6 +50,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     `import type {
       Agent,
       AgentConfigPatch,
+      PublicAgentConfig,
       ServiceUser,
       Session,
       TurnResult,
@@ -63,6 +64,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     declare const workspaceApiKey: string;
     const workspace = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey });
     const serviceUser: ServiceUser = workspace.serviceUser("user_1");
+    type CodexRuntime = Extract<PublicAgentConfig["runtime"], { backend: "codex" }>;
+    const effort: CodexRuntime["modelReasoningEffort"] = "high";
     async function quickStart(): Promise<TurnResult> {
       const created: ServiceUser = await workspace.createServiceUser({ displayName: "Customer" });
       const { token } = await created.createApiKey({ name: "backend" });
@@ -74,7 +77,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const session: Session = await agent.createSession();
       return session.turn({ text: "Hello" });
     }
-    void serviceUser; void quickStart;
+    void effort; void serviceUser; void quickStart;
     `,
   );
   const tsc = path.join(repositoryRoot, "node_modules", "typescript", "bin", "tsc");

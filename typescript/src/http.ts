@@ -278,10 +278,16 @@ export class HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (cause) {
-            throw new AgentStackError("Agent Service returned invalid JSON", {
-              requestId: response.headers.get("x-request-id") ?? stableRequestId,
-              cause,
-            });
+            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : AgentStackError;
+            throw new ErrorClass(
+              options.outcomeUnknown
+                ? "Agent Service accepted the request but returned an unusable response"
+                : "Agent Service returned invalid JSON",
+              {
+                requestId: response.headers.get("x-request-id") ?? stableRequestId,
+                cause,
+              },
+            );
           }
         }
         return {

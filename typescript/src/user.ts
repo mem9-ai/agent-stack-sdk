@@ -1,5 +1,5 @@
-import { AgentStackError } from "./errors.js";
-import { HttpClient, type HttpResult } from "./http.js";
+import { HttpClient, requireEtag } from "./http.js";
+import { createSessionForAgent, Session } from "./session.js";
 
 export interface UserClientOptions {
   baseUrl: string;
@@ -57,15 +57,6 @@ export interface CreateAgentInput {
   signal?: AbortSignal;
 }
 
-const etagFrom = <T>(result: HttpResult<T>): string => {
-  if (!result.etag) {
-    throw new AgentStackError("Agent Service response omitted a required ETag", {
-      requestId: result.requestId,
-    });
-  }
-  return result.etag;
-};
-
 export class Agent {
   readonly #http: HttpClient;
   #etag: string | undefined;
@@ -103,7 +94,7 @@ export class Agent {
       options,
     );
     this.#record = result.data.agent;
-    this.#etag = etagFrom(result);
+    this.#etag = requireEtag(result);
     return this;
   }
 
@@ -115,7 +106,7 @@ export class Agent {
       { ifMatch: etag, outcomeUnknown: true, ...(options?.signal ? { signal: options.signal } : {}) },
     );
     this.#record = result.data.agent;
-    this.#etag = etagFrom(result);
+    this.#etag = requireEtag(result);
     return this;
   }
 
@@ -130,7 +121,7 @@ export class Agent {
       { ifMatch: etag, outcomeUnknown: true, ...(options?.signal ? { signal: options.signal } : {}) },
     );
     this.#record = result.data.agent;
-    this.#etag = etagFrom(result);
+    this.#etag = requireEtag(result);
     return this;
   }
 
@@ -152,6 +143,10 @@ export class Agent {
     );
     this.#record = { ...this.#record, status: "archived" };
     this.#etag = undefined;
+  }
+
+  createSession(options?: { signal?: AbortSignal }): Promise<Session> {
+    return createSessionForAgent(this.#http, this.id, options);
   }
 
   async #currentEtag(options?: { signal?: AbortSignal }): Promise<string> {
@@ -195,7 +190,7 @@ export class UserClient {
         ...(input.signal ? { signal: input.signal } : {}),
       },
     );
-    return new Agent(this.#http, result.data.agent, etagFrom(result));
+    return new Agent(this.#http, result.data.agent, requireEtag(result));
   }
 
   async getAgent(id: string, options?: { signal?: AbortSignal }): Promise<Agent> {
@@ -203,7 +198,7 @@ export class UserClient {
       `/api/agents/${encodeURIComponent(id)}`,
       options,
     );
-    return new Agent(this.#http, result.data.agent, etagFrom(result));
+    return new Agent(this.#http, result.data.agent, requireEtag(result));
   }
 
   async getOrCreateDefaultAgent(options?: { signal?: AbortSignal }): Promise<Agent> {
@@ -212,7 +207,7 @@ export class UserClient {
       undefined,
       { idempotent: true, ...(options?.signal ? { signal: options.signal } : {}) },
     );
-    return new Agent(this.#http, result.data.agent, etagFrom(result));
+    return new Agent(this.#http, result.data.agent, requireEtag(result));
   }
 
   async listAgentTemplates(options?: { signal?: AbortSignal }): Promise<AgentTemplate[]> {
@@ -221,5 +216,13 @@ export class UserClient {
       options,
     );
     return response.agentTemplates;
+  }
+
+  session(id: string): Session {
+    return new Session(this.#http, id);
+  }
+
+  getSession(id: string, options?: { signal?: AbortSignal }): Promise<Session> {
+    return this.session(id).refresh(options);
   }
 }

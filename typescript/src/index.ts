@@ -24,3 +24,10 @@ export type {
   CreateAgentInput,
   UserClientOptions,
 } from "./user.js";
+export { Session } from "./session.js";
+export type {
+  ClarificationItem,
+  MessageRecord,
+  SessionRecord,
+  TurnRecord,
+} from "./session.js";

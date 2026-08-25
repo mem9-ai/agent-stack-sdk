@@ -28,6 +28,15 @@ export interface HttpResult<T> {
   requestId: string;
 }
 
+export const requireEtag = <T>(result: HttpResult<T>): string => {
+  if (!result.etag) {
+    throw new AgentStackError("Agent Service response omitted a required ETag", {
+      requestId: result.requestId,
+    });
+  }
+  return result.etag;
+};
+
 const requestId = (): string => crypto.randomUUID();
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 

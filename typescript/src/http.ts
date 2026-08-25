@@ -242,6 +242,7 @@ export class HttpClient {
     ) {
       throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
     }
+    options.signal?.throwIfAborted();
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
@@ -253,7 +254,7 @@ export class HttpClient {
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
-        if (options.signal?.aborted) throw cause;
+        if (options.signal?.aborted && !options.outcomeUnknown) throw cause;
         if (attempt < attempts) {
           await sleep(100 * 2 ** (attempt - 1), options.signal);
           continue;

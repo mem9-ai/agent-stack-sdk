@@ -220,6 +220,31 @@ test("unusable credential responses are outcome unknown", async () => {
   }
 });
 
+test("credential cancellation is outcome unknown only after dispatch", async () => {
+  const controller = new AbortController();
+  let requests = 0;
+  const baseUrl = await serve(() => {
+    requests += 1;
+    controller.abort(new Error("stop after dispatch"));
+  });
+  const serviceUser = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey }).serviceUser(
+    "user_1",
+  );
+
+  await assert.rejects(
+    serviceUser.createApiKey({ name: "backend", signal: controller.signal }),
+    OutcomeUnknownError,
+  );
+
+  const beforeDispatch = new AbortController();
+  beforeDispatch.abort(new Error("stop before dispatch"));
+  await assert.rejects(
+    serviceUser.createApiKey({ name: "backend", signal: beforeDispatch.signal }),
+    /stop before dispatch/,
+  );
+  assert.equal(requests, 1);
+});
+
 test("offboarding revokes every active key and leaves revoked keys alone", async () => {
   const revoked = [];
   const baseUrl = await serve((request, response) => {

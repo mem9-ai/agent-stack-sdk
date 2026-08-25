@@ -28,6 +28,11 @@ export interface HttpResult<T> {
   requestId: string;
 }
 
+export interface HttpStream {
+  response: Response;
+  requestId: string;
+}
+
 export const requireEtag = <T>(result: HttpResult<T>): string => {
   if (!result.etag) {
     throw new AgentStackError("Agent Service response omitted a required ETag", {
@@ -106,6 +111,18 @@ export class HttpClient {
     this.#projectId = input.projectId;
   }
 
+  #headers(options: RequestOptions, stableRequestId: string): Record<string, string> {
+    return {
+      accept: "application/json",
+      authorization: `Bearer ${this.#apiKey}`,
+      "x-request-id": stableRequestId,
+      ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
+      ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+      ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+    };
+  }
+
   get<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<T> {
     return this.request(path, { ...options, retry: "safe" });
   }
@@ -161,6 +178,55 @@ export class HttpClient {
     return this.request(path, { ...options, method: "PUT", body });
   }
 
+  async openStream(
+    path: string,
+    body: unknown,
+    options?: Pick<RequestOptions, "requestId" | "signal">,
+  ): Promise<HttpStream> {
+    const stableRequestId = options?.requestId ?? requestId();
+    if (!REQUEST_ID.test(stableRequestId)) {
+      throw new TypeError("requestId must be 1-64 safe characters");
+    }
+    const requestOptions: RequestOptions = {
+      method: "POST",
+      body,
+      ...(options?.signal ? { signal: options.signal } : {}),
+    };
+    let response: Response;
+    try {
+      response = await fetch(`${this.#baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          ...this.#headers(requestOptions, stableRequestId),
+          accept: "application/x-ndjson",
+        },
+        body: JSON.stringify(body),
+        ...(options?.signal ? { signal: options.signal } : {}),
+      });
+    } catch (cause) {
+      if (options?.signal?.aborted) throw options.signal.reason ?? cause;
+      throw new OutcomeUnknownError(
+        "Turn request outcome is unknown; the request was not replayed",
+        { requestId: stableRequestId, cause },
+      );
+    }
+    if (!response.ok) {
+      const input = await errorInput(response, stableRequestId);
+      throw input.status === 409 || input.status === 412
+        ? new ConflictError(input)
+        : new AgentStackApiError(input);
+    }
+    if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
+      throw new OutcomeUnknownError("Agent Service returned an invalid Turn stream", {
+        requestId: response.headers.get("x-request-id") ?? stableRequestId,
+      });
+    }
+    return {
+      response,
+      requestId: response.headers.get("x-request-id") ?? stableRequestId,
+    };
+  }
+
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     return (await this.response<T>(path, options)).data;
   }
@@ -182,15 +248,7 @@ export class HttpClient {
       try {
         response = await fetch(`${this.#baseUrl}${path}`, {
           method: options.method ?? "GET",
-          headers: {
-            accept: "application/json",
-            authorization: `Bearer ${this.#apiKey}`,
-            "x-request-id": stableRequestId,
-            ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
-            ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
-            ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
-            ...(options.body === undefined ? {} : { "content-type": "application/json" }),
-          },
+          headers: this.#headers(options, stableRequestId),
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
           ...(options.signal ? { signal: options.signal } : {}),
         });

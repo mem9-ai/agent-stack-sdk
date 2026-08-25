@@ -6,7 +6,10 @@ export {
   AgentStackError,
   ConflictError,
   ConnectionError,
+  InvalidTurnEventError,
   OutcomeUnknownError,
+  TurnFailedError,
+  TurnInterruptedError,
 } from "./errors.js";
 export { ServiceUser, WorkspaceClient } from "./workspace.js";
 export type {
@@ -31,3 +34,4 @@ export type {
   SessionRecord,
   TurnRecord,
 } from "./session.js";
+export type { CreateTurnInput, TurnResult, TurnStreamEvent } from "./turn.js";

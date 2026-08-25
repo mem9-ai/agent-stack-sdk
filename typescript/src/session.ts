@@ -1,4 +1,11 @@
 import { HttpClient, requireEtag } from "./http.js";
+import {
+  collectTurn,
+  type CreateTurnInput,
+  streamTurn,
+  type TurnResult,
+  type TurnStreamEvent,
+} from "./turn.js";
 
 export interface SessionRecord {
   sessionId: string;
@@ -120,6 +127,14 @@ export class Session {
       options,
     );
     return response.turn;
+  }
+
+  streamTurn(input: CreateTurnInput): AsyncGenerator<TurnStreamEvent> {
+    return streamTurn(this.#http, this.id, input);
+  }
+
+  turn(input: CreateTurnInput): Promise<TurnResult> {
+    return collectTurn(this.#http, this.id, input);
   }
 }
 

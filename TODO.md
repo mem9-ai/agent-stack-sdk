@@ -2,7 +2,7 @@
 
 ## Publish `@mem9/agent-stack@0.1.0`
 
-Status: blocked until an npm granular access token with publish access to `@mem9` and **bypass 2FA enabled** is available.
+Status: completed on 2026-08-26.
 
 Completed:
 
@@ -14,17 +14,16 @@ Completed:
 - Release run `32940192816` passed every check before `npm publish`, which failed with `ENEEDAUTH` because the repository has no `NPM_TOKEN` secret.
 - Retrieved the supplied npm token from Feishu without logging or persisting it and set the repository `NPM_TOKEN` secret through stdin.
 - Re-ran release run `32940192816` (attempt 2). All checks passed again, but npm rejected publication with `E403`: the supplied token does not bypass the organization's publish-time 2FA requirement.
-
-Resume steps:
-
-1. Obtain an npm granular access token that can publish public packages in the `@mem9` scope and has **bypass 2FA enabled**. Do not paste it into this document or a shell argument.
-2. Set it through stdin: `gh secret set NPM_TOKEN --repo mem9-ai/agent-stack-sdk`.
-3. Re-run failed release run `32940192816` and require the publish job to pass.
-4. Verify `npm view @mem9/agent-stack@0.1.0 version` returns `0.1.0`.
-5. Replace the Demo's vendored tarball dependency with `@mem9/agent-stack@0.1.0`, install from the public registry in a clean directory, and repeat the deployment-environment end-to-end check.
+- Replaced the secret with the newer bypass-2FA token from Feishu; npm then accepted the token.
+- Disabled provenance in commits `07529b8` and `7cde990` because npm cannot verify provenance from a private GitHub source repository.
+- Published `@mem9/agent-stack@0.1.0` successfully in release run `32945979418` after all 25 tests, typecheck, pack, and tag checks passed.
+- Verified the public registry returns version `0.1.0` and tarball shasum `a95a416bd1688e58906d36888bd1ce7023bf3002`.
+- Replaced the Demo's vendored dependency with exact registry version `0.1.0`, passed a clean-directory import check, and repeated the deployment-environment end-to-end check successfully.
 
 References:
 
 - Failed publish run: https://github.com/mem9-ai/agent-stack-sdk/actions/runs/32940192816
 - Attempt 2 (`E403`, token lacks bypass 2FA): https://github.com/mem9-ai/agent-stack-sdk/actions/runs/32940192816/attempts/2
+- Private-repository provenance failures: https://github.com/mem9-ai/agent-stack-sdk/actions/runs/32945822997
+- Successful publish: https://github.com/mem9-ai/agent-stack-sdk/actions/runs/32945979418
 - Earlier workflow-quoting failure (fixed): https://github.com/mem9-ai/agent-stack-sdk/actions/runs/32940040198

@@ -50,12 +50,14 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     `import type {
       Agent,
       AgentConfigPatch,
+      ProjectRecord,
       PublicAgentConfig,
       ServiceUser,
       Session,
       TurnResult,
     } from "@mem9/agent-stack";
     import {
+      listProjects,
       UserClient,
       WorkspaceClient,
     } from "@mem9/agent-stack";
@@ -69,7 +71,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     async function quickStart(): Promise<TurnResult> {
       const created: ServiceUser = await workspace.createServiceUser({ displayName: "Customer" });
       const { token } = await created.createApiKey({ name: "backend" });
-      const user = new UserClient({ baseUrl, apiKey: token, projectId: "project_1" });
+      const projects: ProjectRecord[] = await listProjects({ baseUrl, apiKey: token });
+      const project = projects[0];
+      if (!project) throw new Error("No Project is available");
+      const user = new UserClient({ baseUrl, apiKey: token, projectId: project.projectId });
       const agents: Agent[] = await user.listAgents();
       const agent = agents[0] ?? await user.createAgent({ name: "Customer Agent" });
       const config: AgentConfigPatch = { delegation: { enabled: true } };

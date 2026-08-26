@@ -18,12 +18,11 @@ User ID in your customer mapping and store the one-time User API Key in your
 secret manager before continuing.
 
 ```ts
-import { UserClient, WorkspaceClient } from "@mem9/agent-stack";
+import { listProjects, UserClient, WorkspaceClient } from "@mem9/agent-stack";
 
 export async function runCustomerTurn(input: {
   baseUrl: string;
   workspaceApiKey: string;
-  projectId: string;
   customerName: string;
   prompt: string;
 }) {
@@ -41,10 +40,12 @@ export async function runCustomerTurn(input: {
 
   // Persist serviceUser.id and userApiKey securely here. The plaintext key is
   // not available from list or revoke responses.
+  const [project] = await listProjects({ baseUrl: input.baseUrl, apiKey: userApiKey });
+  if (!project) throw new Error("No Project is available");
   const user = new UserClient({
     baseUrl: input.baseUrl,
     apiKey: userApiKey,
-    projectId: input.projectId,
+    projectId: project.projectId,
   });
   const agent = await user.createAgent({ name: `${input.customerName} Agent` });
   const session = await agent.createSession();
@@ -67,6 +68,8 @@ for await (const event of session.streamTurn({ text: "Continue" })) {
   reconstructs a `ServiceUser` handle from a retained User ID.
 - `ServiceUser` creates, lists, rotates, revokes, and bulk-revokes User API
   Keys. Plaintext is returned only by successful create and rotate calls.
+- `listProjects()` accepts a User or Workspace API Key and discovers Projects
+  before a project-bound client is constructed.
 - `UserClient` accepts a User API Key and is permanently bound to one Project.
   It manages the current User's Agents, AgentTemplates, and Sessions.
 - `Agent` retains its latest ETag for rename, configure, and archive. A stale

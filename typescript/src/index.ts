@@ -19,7 +19,7 @@ export type {
   WorkspaceClientOptions,
   WorkspaceMembership,
 } from "./workspace.js";
-export { Agent, UserClient } from "./user.js";
+export { Agent, listProjects, UserClient } from "./user.js";
 export type {
   AgentConfigInput,
   AgentConfigPatch,
@@ -33,6 +33,8 @@ export type {
   PublicAgentConfig,
   PublicAgentLarkConfig,
   PublicAgentRuntimeConfig,
+  ProjectDiscoveryOptions,
+  ProjectRecord,
   UserClientOptions,
 } from "./user.js";
 export { Session } from "./session.js";

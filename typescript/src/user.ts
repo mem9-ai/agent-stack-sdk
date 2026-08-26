@@ -7,6 +7,38 @@ export interface UserClientOptions {
   projectId: string;
 }
 
+export interface ProjectDiscoveryOptions {
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface ProjectRecord {
+  projectId: string;
+  workspaceId: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const listProjects = async (
+  options: ProjectDiscoveryOptions,
+  request?: { signal?: AbortSignal },
+): Promise<ProjectRecord[]> => {
+  if (
+    !options.apiKey.startsWith("ag9_uak_") &&
+    !options.apiKey.startsWith("ag9_uak.") &&
+    !options.apiKey.startsWith("ag9_wak.")
+  ) {
+    throw new TypeError("listProjects requires a User or Workspace API Key");
+  }
+  const response = await new HttpClient(options).get<{ projects: ProjectRecord[] }>(
+    "/api/console/projects",
+    request,
+  );
+  return response.projects;
+};
+
 export type AgentRuntimeConfigInput =
   | { backend: "pi" }
   | {

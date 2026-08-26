@@ -1,9 +1,8 @@
-import { UserClient, WorkspaceClient } from "@mem9/agent-stack";
+import { listProjects, UserClient, WorkspaceClient } from "@mem9/agent-stack";
 
 export async function runCustomerTurn(input: {
   baseUrl: string;
   workspaceApiKey: string;
-  projectId: string;
   customerName: string;
   prompt: string;
 }) {
@@ -15,10 +14,12 @@ export async function runCustomerTurn(input: {
   const { token: userApiKey } = await serviceUser.createApiKey({ name: "saas-backend" });
 
   // Persist serviceUser.id and userApiKey in your customer mapping and secret manager.
+  const [project] = await listProjects({ baseUrl: input.baseUrl, apiKey: userApiKey });
+  if (!project) throw new Error("No Project is available");
   const user = new UserClient({
     baseUrl: input.baseUrl,
     apiKey: userApiKey,
-    projectId: input.projectId,
+    projectId: project.projectId,
   });
   const agent = await user.createAgent({ name: `${input.customerName} Agent` });
   const session = await agent.createSession();

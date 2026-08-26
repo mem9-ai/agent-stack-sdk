@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, UserClient } from "../dist/index.js";
+import { ConflictError, listProjects, UserClient } from "../dist/index.js";
 
 const servers = [];
 const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
@@ -45,6 +45,33 @@ const userClient = (baseUrl) =>
     apiKey: userApiKey,
     projectId: "project_1",
   });
+
+test("projects are discoverable before choosing a Project", async () => {
+  const requests = [];
+  const project = {
+    projectId: "project_1",
+    workspaceId: "workspace_1",
+    name: "Default",
+    status: "active",
+    createdAt: "2026-08-25T00:00:00.000Z",
+    updatedAt: "2026-08-25T00:00:00.000Z",
+  };
+  const baseUrl = await serve((request, response) => {
+    requests.push(request.headers);
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ projects: [project] }));
+  });
+
+  assert.deepEqual(await listProjects({ baseUrl, apiKey: userApiKey }), [project]);
+  assert.deepEqual(
+    await listProjects({ baseUrl, apiKey: "ag9_wak.key_id." + "x".repeat(32) }),
+    [project],
+  );
+
+  assert.equal(requests.length, 2);
+  assert(requests.every((headers) => headers["x-agent9-project-id"] === undefined));
+  assert.equal(requests[0].authorization, `Bearer ${userApiKey}`);
+});
 
 test("Agent creation retries with stable identities and retains the ETag", async () => {
   const requests = [];

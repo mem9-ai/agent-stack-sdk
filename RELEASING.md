@@ -11,7 +11,7 @@ is pre-1.0.
 4. Create an annotated tag named `typescript-v<version>`, for example
    `typescript-v0.1.0`.
 5. Push the tag. The release workflow verifies the packed package and publishes
-   it to npm with provenance.
+   it to npm.
 
 Do not release SDK `1.0` until the public Agent Service HTTP contract is
 declared stable.

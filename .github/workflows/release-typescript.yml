@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
@@ -24,6 +23,6 @@ jobs:
       - run: npm test
       - run: npm run pack:check
       - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p 'require("./typescript/package.json").version')"
-      - run: npm publish --workspace @mem9/agent-stack --access public --provenance
+      - run: npm publish --workspace @mem9/agent-stack --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

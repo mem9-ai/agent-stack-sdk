@@ -23,7 +23,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
-      - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p \"require('./typescript/package.json').version\")"
+      - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p 'require("./typescript/package.json").version')"
       - run: npm publish --workspace @mem9/agent-stack --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

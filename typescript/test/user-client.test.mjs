@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, listProjects, UserClient } from "../dist/index.js";
+import { ConflictError, UserClient } from "../dist/index.js";
 
 const servers = [];
 const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
@@ -22,16 +22,19 @@ const serve = async (handler) => {
 
 const agentRecord = (overrides = {}) => ({
   agentId: "agent_1",
-  workspaceId: "workspace_1",
   name: "Agent One",
   sandboxProfile: "default",
-  e2bTemplate: "default",
-  model: "gpt-5.6-terra",
-  modelPolicyStatus: "allowed",
   agentTemplateId: null,
-  agentDefinitionId: null,
   agentTemplate: null,
-  config: {},
+  config: {
+    memory: {
+      enabled: false,
+      provider: "mem9",
+      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
+    },
+    sessionRecall: { enabled: false },
+    generatedMedia: { enabled: true },
+  },
   configVersion: 1,
   status: "active",
   createdAt: "2026-08-25T00:00:00.000Z",
@@ -39,39 +42,7 @@ const agentRecord = (overrides = {}) => ({
   ...overrides,
 });
 
-const userClient = (baseUrl) =>
-  new UserClient({
-    baseUrl,
-    apiKey: userApiKey,
-    projectId: "project_1",
-  });
-
-test("projects are discoverable before choosing a Project", async () => {
-  const requests = [];
-  const project = {
-    projectId: "project_1",
-    workspaceId: "workspace_1",
-    name: "Default",
-    status: "active",
-    createdAt: "2026-08-25T00:00:00.000Z",
-    updatedAt: "2026-08-25T00:00:00.000Z",
-  };
-  const baseUrl = await serve((request, response) => {
-    requests.push(request.headers);
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({ projects: [project] }));
-  });
-
-  assert.deepEqual(await listProjects({ baseUrl, apiKey: userApiKey }), [project]);
-  assert.deepEqual(
-    await listProjects({ baseUrl, apiKey: "ag9_wak.key_id." + "x".repeat(32) }),
-    [project],
-  );
-
-  assert.equal(requests.length, 2);
-  assert(requests.every((headers) => headers["x-agent9-project-id"] === undefined));
-  assert.equal(requests[0].authorization, `Bearer ${userApiKey}`);
-});
+const userClient = (baseUrl) => new UserClient({ baseUrl, apiKey: userApiKey });
 
 test("Agent creation retries with stable identities and retains the ETag", async () => {
   const requests = [];
@@ -104,7 +75,7 @@ test("Agent creation retries with stable identities and retains the ETag", async
   assert.equal(requests[0].headers["idempotency-key"], "create-agent-1");
   assert.equal(requests[0].headers["idempotency-key"], requests[1].headers["idempotency-key"]);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
-  assert.equal(requests[0].headers["x-agent9-project-id"], "project_1");
+  assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
   assert.deepEqual(JSON.parse(requests[0].body), {
     name: "Agent One",
     agentTemplateId: "template_1",
@@ -140,7 +111,10 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
         JSON.stringify({
           agent: agentRecord({
             name: "Renamed",
-            config: { delegation: { enabled: true } },
+            config: {
+              ...agentRecord().config,
+              sessionRecall: { enabled: true },
+            },
             configVersion: 3,
           }),
         }),
@@ -155,8 +129,8 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
 
   await agent.rename("Renamed");
   assert.equal(agent.name, "Renamed");
-  await agent.configure({ delegation: { enabled: true } });
-  assert.deepEqual(agent.config, { delegation: { enabled: true } });
+  await agent.configure({ sessionRecall: { enabled: true } });
+  assert.deepEqual(agent.config.sessionRecall, { enabled: true });
   await agent.archive();
   assert.equal(agent.status, "archived");
 
@@ -198,12 +172,9 @@ test("the User client exposes real default Agents and read-only AgentTemplates",
   const calls = [];
   const template = {
     agentTemplateId: "template_1",
-    agentDefinitionId: "template_1",
-    workspaceId: "workspace_1",
+    organizationId: "org_1",
     name: "Support",
     sandboxProfile: "default",
-    e2bTemplate: "default",
-    model: "gpt-5.6-terra",
     status: "active",
     createdAt: "2026-08-25T00:00:00.000Z",
     updatedAt: "2026-08-25T00:00:00.000Z",
@@ -222,9 +193,7 @@ test("the User client exposes real default Agents and read-only AgentTemplates",
       response.end(JSON.stringify({ defaultAgentId: "agent_1" }));
       return;
     }
-    response.end(
-      JSON.stringify({ agentTemplates: [template], agentDefinitions: [{ name: "deprecated" }] }),
-    );
+    response.end(JSON.stringify({ agentTemplates: [template] }));
   });
   const client = userClient(baseUrl);
 
@@ -243,19 +212,128 @@ test("the User client exposes real default Agents and read-only AgentTemplates",
   assert.deepEqual(JSON.parse(calls[1].body), { agentId: "agent_1" });
 });
 
-test("a User client rejects Workspace authority and an invalid Project", () => {
-  const workspaceKey = "ag9_wak." + "key_id." + "x".repeat(32);
+test("Memory provisioning, retained state, and creator credential operations use the canonical contract", async () => {
+  const calls = [];
+  let configVersion = 1;
+  const memoryAgent = (enabled = true) =>
+    agentRecord({
+      configVersion,
+      config: {
+        ...agentRecord().config,
+        memory: {
+          enabled,
+          provider: "mem9",
+          mem9: { hasKey: true, ownershipState: "claimed" },
+        },
+      },
+    });
+  const baseUrl = await serve(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    calls.push({ method: request.method, url: request.url, body });
+    response.setHeader("content-type", "application/json");
+    if (request.url === "/api/agents") {
+      response.setHeader("etag", `"agent-v${configVersion}"`);
+      response.writeHead(201).end(JSON.stringify({ agent: memoryAgent() }));
+      return;
+    }
+    if (request.url === "/api/agents/memory/mem9/key-validations") {
+      response.setHeader("cache-control", "no-store");
+      response.end(JSON.stringify({ valid: true }));
+      return;
+    }
+    if (request.url === "/api/agents/agent_1/memory/mem9/key" && request.method === "GET") {
+      response.setHeader("cache-control", "no-store");
+      response.end(JSON.stringify({ mem9Key: "test-memory-key" }));
+      return;
+    }
+    if (request.url === "/api/agents/agent_1/memory/mem9/key" && request.method === "PUT") {
+      response.setHeader("cache-control", "no-store");
+      response.end(JSON.stringify({ agent: memoryAgent() }));
+      return;
+    }
+    if (request.url === "/api/agents/agent_1" && request.method === "GET") {
+      response.setHeader("etag", `"agent-v${configVersion}"`);
+      response.end(JSON.stringify({ agent: memoryAgent() }));
+      return;
+    }
+    configVersion += 1;
+    response.setHeader("etag", `"agent-v${configVersion}"`);
+    response.end(
+      JSON.stringify({
+        agent: memoryAgent(JSON.parse(body).memory.enabled),
+      }),
+    );
+  });
+  const client = userClient(baseUrl);
+
+  const agent = await client.createAgent({
+    config: { memory: { enabled: true } },
+    memoryCredential: { mode: "provision" },
+  });
+  await client.createAgent({
+    config: { memory: { enabled: true } },
+    memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
+  });
+  assert.deepEqual(await client.validateMemoryKey("test-memory-key"), { valid: true });
+  assert.equal(await agent.revealMemoryKey(), "test-memory-key");
+  await agent.replaceMemoryKey("replacement-memory-key");
+  await agent.configure({ memory: { enabled: false } });
+  await agent.configure({ memory: { enabled: true } });
+
+  assert.equal(agent.config.memory.enabled, true);
+  assert.equal(agent.config.memory.mem9.hasKey, true);
+  assert.equal("mem9Key" in agent.config.memory.mem9, false);
+  assert.deepEqual(JSON.parse(calls[0].body), {
+    config: { memory: { enabled: true } },
+    memoryCredential: { mode: "provision" },
+  });
+  assert.deepEqual(JSON.parse(calls[1].body), {
+    config: { memory: { enabled: true } },
+    memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
+  });
+  assert.deepEqual(JSON.parse(calls[2].body), { mem9Key: "test-memory-key" });
+  assert.deepEqual(JSON.parse(calls[4].body), { mem9Key: "replacement-memory-key" });
+  assert.deepEqual(JSON.parse(calls[6].body), { memory: { enabled: false } });
+  assert.deepEqual(JSON.parse(calls[7].body), { memory: { enabled: true } });
+});
+
+test("a User client rejects Organization authority without exposing it", () => {
+  const organizationKey = "ag9_oak." + "key_id." + "x".repeat(32);
   assert.throws(
-    () => new UserClient({ baseUrl: "https://agent.example.com", apiKey: workspaceKey, projectId: "p" }),
-    (error) => !String(error).includes(workspaceKey),
+    () => new UserClient({ baseUrl: "https://agent.example.com", apiKey: organizationKey }),
+    (error) => !String(error).includes(organizationKey),
   );
   assert.throws(
     () =>
       new UserClient({
         baseUrl: "https://agent.example.com",
         apiKey: userApiKey,
-        projectId: "INVALID PROJECT",
+        projectId: "project_1",
       }),
-    /projectId/,
+    /projectId is not supported/,
   );
+});
+
+test("removed Agent fields are rejected before a request", async () => {
+  let requests = 0;
+  const baseUrl = await serve((_request, response) => {
+    requests += 1;
+    response.writeHead(500).end();
+  });
+  const client = userClient(baseUrl);
+
+  await assert.rejects(
+    client.createAgent({ config: { runtime: { backend: "codex" } } }),
+    /Agent config.runtime is not supported/,
+  );
+  await assert.rejects(
+    client.createAgent({ config: { memory: { enabled: true, provider: "mem9" } } }),
+    /Agent config.memory.provider is not supported/,
+  );
+  await assert.rejects(
+    client.createAgent({ model: "gpt-5.6-sol" }),
+    /Agent creation.model is not supported/,
+  );
+  assert.equal(requests, 0);
 });

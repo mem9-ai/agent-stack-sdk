@@ -1,7 +1,7 @@
 import { OutcomeUnknownError } from "./errors.js";
-import { HttpClient } from "./http.js";
+import { HttpClient, requireKnownKeys } from "./http.js";
 
-export interface WorkspaceClientOptions {
+export interface OrganizationClientOptions {
   baseUrl: string;
   apiKey: string;
 }
@@ -9,36 +9,16 @@ export interface WorkspaceClientOptions {
 export interface UserApiKey {
   apiKeyId: string;
   organizationId: string;
-  workspaceId: string;
   userId: string;
   name: string;
   tokenPrefix: string;
   status: "active" | "revoked";
   createdByUserId: string | null;
-  createdByWorkspaceApiKeyId: string | null;
+  createdByOrganizationApiKeyId: string | null;
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
-}
-
-export interface ServiceUserRecord {
-  userId: string;
-  organizationId: string;
-  kind: "service";
-  orgRole: string;
-  serviceTier: string;
-  serviceTierUpdatedAt: string;
-  email: null;
-  displayName: string | null;
-  createdAt: string;
-}
-
-export interface WorkspaceMembership {
-  userId: string;
-  workspaceId: string;
-  role: string;
-  status: string;
 }
 
 export interface IssuedUserApiKey {
@@ -69,25 +49,16 @@ const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey =
 export class ServiceUser {
   readonly #http: HttpClient;
   readonly id: string;
-  readonly membership: WorkspaceMembership | undefined;
-  readonly user: ServiceUserRecord | undefined;
 
-  constructor(
-    http: HttpClient,
-    id: string,
-    user?: ServiceUserRecord,
-    membership?: WorkspaceMembership,
-  ) {
+  constructor(http: HttpClient, id: string) {
     if (!id) throw new TypeError("Service User id is required");
     this.#http = http;
     this.id = id;
-    this.user = user;
-    this.membership = membership;
   }
 
   async listApiKeys(options?: { signal?: AbortSignal }): Promise<UserApiKey[]> {
     const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
-      `/api/admin/users/${encodeURIComponent(this.id)}/api-keys`,
+      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
       options,
     );
     return response.apiKeys;
@@ -95,7 +66,7 @@ export class ServiceUser {
 
   async createApiKey(input: { name: string; signal?: AbortSignal }): Promise<IssuedUserApiKey> {
     const result = await this.#http.postResponse<unknown>(
-      `/api/admin/users/${encodeURIComponent(this.id)}/api-keys`,
+      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
       { name: input.name },
       { ...(input.signal ? { signal: input.signal } : {}), outcomeUnknown: true },
     );
@@ -107,7 +78,7 @@ export class ServiceUser {
     options?: { signal?: AbortSignal },
   ): Promise<IssuedUserApiKey> {
     const result = await this.#http.postResponse<unknown>(
-      `/api/admin/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
+      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
       undefined,
       { ...(options?.signal ? { signal: options.signal } : {}), outcomeUnknown: true },
     );
@@ -119,7 +90,7 @@ export class ServiceUser {
     options?: { signal?: AbortSignal },
   ): Promise<UserApiKey> {
     const response = await this.#http.post<{ apiKey: UserApiKey }>(
-      `/api/admin/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
+      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
       undefined,
       { ...(options?.signal ? { signal: options.signal } : {}), idempotent: true },
     );
@@ -132,37 +103,18 @@ export class ServiceUser {
   }
 }
 
-export class WorkspaceClient {
+export class OrganizationClient {
   readonly #http: HttpClient;
 
-  constructor(options: WorkspaceClientOptions) {
-    if (!options.apiKey.startsWith("ag9_wak.")) {
-      throw new TypeError("WorkspaceClient requires a Workspace API Key");
+  constructor(options: OrganizationClientOptions) {
+    requireKnownKeys(options, ["baseUrl", "apiKey"], "OrganizationClient options");
+    if (!options.apiKey.startsWith("ag9_oak.")) {
+      throw new TypeError("OrganizationClient requires an Organization API Key");
     }
     this.#http = new HttpClient(options);
   }
 
   serviceUser(id: string): ServiceUser {
     return new ServiceUser(this.#http, id);
-  }
-
-  async createServiceUser(input: {
-    displayName?: string;
-    requestId?: string;
-    signal?: AbortSignal;
-  } = {}): Promise<ServiceUser> {
-    const response = await this.#http.post<{
-      user: ServiceUserRecord;
-      membership: WorkspaceMembership;
-    }>(
-      "/api/admin/users",
-      input.displayName === undefined ? {} : { displayName: input.displayName },
-      {
-        ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
-        ...(input.signal ? { signal: input.signal } : {}),
-        outcomeUnknown: true,
-      },
-    );
-    return new ServiceUser(this.#http, response.user.userId, response.user, response.membership);
   }
 }

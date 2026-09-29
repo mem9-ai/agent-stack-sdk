@@ -5,8 +5,8 @@ import {
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
-import { HttpClient } from "./http.js";
-import type { ClarificationItem } from "./session.js";
+import { HttpClient, requireKnownKeys } from "./http.js";
+import type { BillingTag, ClarificationItem, SessionModel } from "./session.js";
 
 type TurnEvent<Event extends string, Payload> = {
   event: Event;
@@ -23,9 +23,7 @@ export type TurnStreamEvent =
       "turn_started",
       {
         execution?: {
-          backend: "pi" | "codex";
-          model: string;
-          modelReasoningEffort: "low" | "medium" | "high" | "xhigh" | null;
+          model: SessionModel;
         };
       }
     >
@@ -40,17 +38,6 @@ export type TurnStreamEvent =
       }
     >
   | TurnEvent<
-      "agent_run_step",
-      {
-        parentAgentRunId: string;
-        runOrdinal: number;
-        role: "subagent";
-        depth: 1;
-        status: "running" | "succeeded" | "failed" | "timed_out" | "interrupted";
-        displayLabel: string;
-      }
-    >
-  | TurnEvent<
       "assistant_message",
       { messageId: string; text: string; clarificationItem?: ClarificationItem }
     >
@@ -60,8 +47,8 @@ export type TurnStreamEvent =
 export interface CreateTurnInput {
   text: string | [string, ...string[]];
   userFileIds?: string[];
-  outputSchema?: { type: "object"; [key: string]: unknown };
   clarificationSourceTurnId?: string;
+  billingTag?: BillingTag | null;
   requestId?: string;
   signal?: AbortSignal;
 }
@@ -101,7 +88,7 @@ const clarification = (value: unknown): value is ClarificationItem => {
   if (value.response === undefined) return true;
   return (
     isRecord(value.response) &&
-    typeof value.response.text === "string" &&
+    Object.keys(value.response).sort().join(",") === "answers,responseTurnId" &&
     typeof value.response.responseTurnId === "string" &&
     strings(value.response.answers, 1, value.selectionMode === "single" ? 1 : 9)
   );
@@ -114,10 +101,18 @@ const validPayload = (event: string, payload: Record<string, unknown>): boolean 
       const execution = payload.execution;
       return (
         isRecord(execution) &&
-        oneOf(execution.backend, ["pi", "codex"]) &&
-        typeof execution.model === "string" &&
-        (execution.modelReasoningEffort === null ||
-          oneOf(execution.modelReasoningEffort, ["low", "medium", "high", "xhigh"]))
+        Object.keys(execution).length === 1 &&
+        oneOf(execution.model, [
+          "gpt-6-astra",
+          "gpt-5.6-sol",
+          "gpt-5.6-terra",
+          "gpt-5.6-luna",
+          "claude-haiku-4-5",
+          "claude-sonnet-5",
+          "claude-opus-5",
+          "DeepSeek-V4-Flash",
+          "gpt-5.4",
+        ])
       );
     }
     case "progress":
@@ -129,16 +124,6 @@ const validPayload = (event: string, payload: Record<string, unknown>): boolean 
         payload.operationId.length > 0 &&
         oneOf(payload.status, ["running", "succeeded", "failed", "interrupted", "unknown_result"]) &&
         typeof payload.label === "string"
-      );
-    case "agent_run_step":
-      return (
-        typeof payload.parentAgentRunId === "string" &&
-        payload.parentAgentRunId.length > 0 &&
-        Number.isInteger(payload.runOrdinal) &&
-        payload.role === "subagent" &&
-        payload.depth === 1 &&
-        oneOf(payload.status, ["running", "succeeded", "failed", "timed_out", "interrupted"]) &&
-        typeof payload.displayLabel === "string"
       );
     case "assistant_message":
       return (
@@ -203,6 +188,11 @@ const parseEvent = (
 };
 
 const bodyFor = (input: CreateTurnInput): Record<string, unknown> => {
+  requireKnownKeys(
+    input,
+    ["text", "userFileIds", "clarificationSourceTurnId", "billingTag", "requestId", "signal"],
+    "Turn input",
+  );
   const textIsValid =
     (typeof input.text === "string" && input.text.length > 0) || strings(input.text, 1, 9);
   if (!textIsValid) throw new TypeError("text must contain 1-9 non-empty values");
@@ -211,14 +201,6 @@ const bodyFor = (input: CreateTurnInput): Record<string, unknown> => {
     (!strings(input.userFileIds, 0, 20) || input.userFileIds.some((id) => id.length > 64))
   ) {
     throw new TypeError("userFileIds must contain at most 20 non-empty ids");
-  }
-  if (
-    input.outputSchema !== undefined &&
-    (!isRecord(input.outputSchema) ||
-      input.outputSchema.type !== "object" ||
-      new TextEncoder().encode(JSON.stringify(input.outputSchema)).byteLength > 65_536)
-  ) {
-    throw new TypeError("outputSchema must be an object schema no larger than 65536 UTF-8 bytes");
   }
   if (
     input.clarificationSourceTurnId !== undefined &&
@@ -233,11 +215,11 @@ const bodyFor = (input: CreateTurnInput): Record<string, unknown> => {
       type: "text",
       text: input.text,
       ...(input.userFileIds === undefined ? {} : { userFileIds: input.userFileIds }),
-      ...(input.outputSchema === undefined ? {} : { outputSchema: input.outputSchema }),
     },
     ...(input.clarificationSourceTurnId === undefined
       ? {}
       : { clarificationSourceTurnId: input.clarificationSourceTurnId }),
+    ...(input.billingTag === undefined ? {} : { billingTag: input.billingTag }),
   };
 };
 

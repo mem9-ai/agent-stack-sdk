@@ -100,15 +100,25 @@ const normalizeBaseUrl = (value: string): string => {
   return url.toString().replace(/\/$/, "");
 };
 
+export function requireKnownKeys(
+  value: unknown,
+  allowed: readonly string[],
+  label: string,
+): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object`);
+  }
+  const unknown = Object.keys(value).find((key) => !allowed.includes(key));
+  if (unknown) throw new TypeError(`${label}.${unknown} is not supported`);
+}
+
 export class HttpClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
-  readonly #projectId: string | undefined;
 
-  constructor(input: { baseUrl: string; apiKey: string; projectId?: string }) {
+  constructor(input: { baseUrl: string; apiKey: string }) {
     this.#baseUrl = normalizeBaseUrl(input.baseUrl);
     this.#apiKey = input.apiKey;
-    this.#projectId = input.projectId;
   }
 
   #headers(options: RequestOptions, stableRequestId: string): Record<string, string> {
@@ -116,7 +126,6 @@ export class HttpClient {
       accept: "application/json",
       authorization: `Bearer ${this.#apiKey}`,
       "x-request-id": stableRequestId,
-      ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
       ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
       ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),

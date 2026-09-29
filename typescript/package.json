@@ -1,6 +1,6 @@
 {
   "name": "@mem9/agent-stack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Official TypeScript SDK for Agent Stack",
   "license": "Apache-2.0",
   "type": "module",
@@ -8,6 +8,7 @@
     "node": ">=22.12"
   },
   "agentServiceApiVersion": "0.0.1",
+  "agentServiceRevision": "9c1e9aceb28afce1166e4249ea104c7a2f8aac73",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -19,9 +20,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test",
+    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
+    "typecheck": "npm run build && tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2023 --lib ES2023,DOM,DOM.Iterable examples/quickstart.ts",
+    "test": "npm run build && node --test 'test/**/*.test.mjs'",
+    "test:service-contract": "node --test 'service-contract/**/*.test.mjs'",
     "pack:check": "npm pack --dry-run"
   },
   "publishConfig": {

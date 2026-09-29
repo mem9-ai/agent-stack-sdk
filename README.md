@@ -9,10 +9,11 @@ runtime dependencies.
 - [TypeScript quick start](typescript/README.md#quick-start)
 - [Contributing](CONTRIBUTING.md)
 - [Release process](RELEASING.md)
+- [Changelog](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 
 The SDK is pre-1.0 while the Agent Service HTTP API remains pre-1.0. Each SDK
-release declares the Agent Service API version it supports.
+release declares the exact Agent Service revision and API version it supports.
 
 ## Development
 

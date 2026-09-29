@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2023 --lib ES2023,DOM,DOM.Iterable examples/quickstart.ts",
+    "typecheck": "npm run build && tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2023 --lib ES2023,DOM,DOM.Iterable examples/quickstart.ts",
     "test": "npm run build && node --test 'test/**/*.test.mjs'",
     "test:service-contract": "node --test 'service-contract/**/*.test.mjs'",
     "pack:check": "npm pack --dry-run"

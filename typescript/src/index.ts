@@ -1,5 +1,7 @@
 /** Agent Service OpenAPI version supported by this SDK release. */
 export const AGENT_SERVICE_API_VERSION = "0.0.1" as const;
+/** Exact Agent Service revision whose public contract is supported by this SDK release. */
+export const AGENT_SERVICE_REVISION = "9c1e9aceb28afce1166e4249ea104c7a2f8aac73" as const;
 
 export {
   AgentStackApiError,
@@ -11,36 +13,33 @@ export {
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
-export { ServiceUser, WorkspaceClient } from "./workspace.js";
+export { OrganizationClient, ServiceUser } from "./organization.js";
 export type {
   IssuedUserApiKey,
-  ServiceUserRecord,
+  OrganizationClientOptions,
   UserApiKey,
-  WorkspaceClientOptions,
-  WorkspaceMembership,
-} from "./workspace.js";
-export { Agent, listProjects, UserClient } from "./user.js";
+} from "./organization.js";
+export { Agent, UserClient } from "./user.js";
 export type {
   AgentConfigInput,
   AgentConfigPatch,
   AgentRecord,
-  AgentRuntimeConfigInput,
   AgentTemplate,
   AgentTemplateProvenance,
   CreateAgentInput,
   EnabledAgentCapability,
-  ManagedToolReference,
+  McpServerReference,
+  MemoryCredentialInput,
   PublicAgentConfig,
-  PublicAgentLarkConfig,
-  PublicAgentRuntimeConfig,
-  ProjectDiscoveryOptions,
-  ProjectRecord,
   UserClientOptions,
 } from "./user.js";
 export { Session } from "./session.js";
 export type {
+  BillingTag,
   ClarificationItem,
   MessageRecord,
+  SelectableSessionModel,
+  SessionModel,
   SessionRecord,
   TurnRecord,
 } from "./session.js";

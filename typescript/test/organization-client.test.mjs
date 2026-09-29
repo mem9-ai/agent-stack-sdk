@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, OutcomeUnknownError, WorkspaceClient } from "../dist/index.js";
+import { ConflictError, OrganizationClient, OutcomeUnknownError } from "../dist/index.js";
 
 const servers = [];
-const workspaceApiKey = "ag9_wak." + "key_id." + "x".repeat(32);
+const organizationApiKey = "ag9_oak." + "key_id." + "x".repeat(32);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -20,7 +20,7 @@ const serve = async (handler) => {
   return `http://127.0.0.1:${address.port}`;
 };
 
-test("a Workspace client retries a safe read with one request identity", async () => {
+test("an Organization client retries a safe read with one request identity", async () => {
   const requests = [];
   const baseUrl = await serve((request, response) => {
     requests.push({ url: request.url, headers: request.headers });
@@ -34,15 +34,15 @@ test("a Workspace client retries a safe read with one request identity", async (
     response.end(JSON.stringify({ apiKeys: [] }));
   });
 
-  const client = new WorkspaceClient({
+  const client = new OrganizationClient({
     baseUrl,
-    apiKey: workspaceApiKey,
+    apiKey: organizationApiKey,
   });
 
   assert.deepEqual(await client.serviceUser("user_1").listApiKeys(), []);
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].url, "/api/admin/users/user_1/api-keys");
-  assert.equal(requests[0].headers.authorization, `Bearer ${workspaceApiKey}`);
+  assert.equal(requests[0].url, "/api/admin/org/users/user_1/api-keys");
+  assert.equal(requests[0].headers.authorization, `Bearer ${organizationApiKey}`);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
   assert.equal(requests[0].headers["x-agent9-workspace-id"], undefined);
   assert.equal(requests[0].headers["x-agent9-user-id"], undefined);
@@ -50,7 +50,7 @@ test("a Workspace client retries a safe read with one request identity", async (
   assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
 });
 
-test("a service conflict preserves safe error details", async () => {
+test("an Organization service conflict preserves safe error details", async () => {
   const baseUrl = await serve((_request, response) => {
     response.setHeader("content-type", "application/json");
     response.setHeader("x-request-id", "request_from_service");
@@ -64,9 +64,9 @@ test("a service conflict preserves safe error details", async () => {
       }),
     );
   });
-  const client = new WorkspaceClient({
+  const client = new OrganizationClient({
     baseUrl,
-    apiKey: workspaceApiKey,
+    apiKey: organizationApiKey,
   });
 
   await assert.rejects(client.serviceUser("user_1").listApiKeys(), (error) => {
@@ -79,11 +79,11 @@ test("a service conflict preserves safe error details", async () => {
   });
 });
 
-test("a Workspace client rejects a User API Key without exposing it", () => {
+test("an Organization client rejects a User API Key without exposing it", () => {
   const apiKey = "ag9_uak_" + "key_" + "x".repeat(32);
 
   assert.throws(
-    () => new WorkspaceClient({ baseUrl: "https://agent.example.com", apiKey }),
+    () => new OrganizationClient({ baseUrl: "https://agent.example.com", apiKey }),
     (error) => {
       assert(!String(error).includes(apiKey));
       return true;
@@ -91,18 +91,17 @@ test("a Workspace client rejects a User API Key without exposing it", () => {
   );
 });
 
-test("a Workspace client provisions a Service User and manages its credentials", async () => {
+test("an Organization client manages a Service User's credentials", async () => {
   const calls = [];
   const apiKey = {
     apiKeyId: "uak_1",
     organizationId: "org_1",
-    workspaceId: "workspace_1",
     userId: "user_1",
     name: "backend",
     tokenPrefix: "ag9_uak_1_",
     status: "active",
     createdByUserId: null,
-    createdByWorkspaceApiKeyId: "wak_1",
+    createdByOrganizationApiKeyId: "oak_1",
     createdAt: "2026-08-25T00:00:00.000Z",
     updatedAt: "2026-08-25T00:00:00.000Z",
     lastUsedAt: null,
@@ -113,35 +112,11 @@ test("a Workspace client provisions a Service User and manages its credentials",
     for await (const chunk of request) body += chunk;
     calls.push({ method: request.method, url: request.url, body, headers: request.headers });
     response.setHeader("content-type", "application/json");
-    if (request.url === "/api/admin/users") {
-      response.writeHead(201).end(
-        JSON.stringify({
-          user: {
-            userId: "user_1",
-            organizationId: "org_1",
-            kind: "service",
-            orgRole: "member",
-            serviceTier: "v0",
-            serviceTierUpdatedAt: "2026-08-25T00:00:00.000Z",
-            email: null,
-            displayName: "Customer One",
-            createdAt: "2026-08-25T00:00:00.000Z",
-          },
-          membership: {
-            userId: "user_1",
-            workspaceId: "workspace_1",
-            role: "member",
-            status: "active",
-          },
-        }),
-      );
-      return;
-    }
-    if (request.url === "/api/admin/users/user_1/api-keys") {
+    if (request.url === "/api/admin/org/users/user_1/api-keys") {
       response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-1" }));
       return;
     }
-    if (request.url === "/api/admin/user-api-keys/uak_1/rotate") {
+    if (request.url === "/api/admin/org/user-api-keys/uak_1/rotate") {
       response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-2" }));
       return;
     }
@@ -151,32 +126,24 @@ test("a Workspace client provisions a Service User and manages its credentials",
       }),
     );
   });
-  const client = new WorkspaceClient({
+  const client = new OrganizationClient({
     baseUrl,
-    apiKey: workspaceApiKey,
+    apiKey: organizationApiKey,
   });
 
-  const serviceUser = await client.createServiceUser({
-    displayName: "Customer One",
-    requestId: "provision_customer_1",
-  });
+  const serviceUser = client.serviceUser("user_1");
   assert.equal(serviceUser.id, "user_1");
-  assert.equal(serviceUser.user?.displayName, "Customer One");
-  assert.equal(serviceUser.membership?.status, "active");
   assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "one-time-key-1");
   assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "one-time-key-2");
   assert.equal((await serviceUser.revokeApiKey("uak_1")).status, "revoked");
 
-  assert.deepEqual(JSON.parse(calls[0].body), { displayName: "Customer One" });
-  assert.equal(calls[0].headers["x-request-id"], "provision_customer_1");
-  assert.deepEqual(JSON.parse(calls[1].body), { name: "backend" });
+  assert.deepEqual(JSON.parse(calls[0].body), { name: "backend" });
   assert.deepEqual(
     calls.map(({ method, url }) => [method, url]),
     [
-      ["POST", "/api/admin/users"],
-      ["POST", "/api/admin/users/user_1/api-keys"],
-      ["POST", "/api/admin/user-api-keys/uak_1/rotate"],
-      ["POST", "/api/admin/user-api-keys/uak_1/revoke"],
+      ["POST", "/api/admin/org/users/user_1/api-keys"],
+      ["POST", "/api/admin/org/user-api-keys/uak_1/rotate"],
+      ["POST", "/api/admin/org/user-api-keys/uak_1/revoke"],
     ],
   );
 });
@@ -187,9 +154,9 @@ test("a lost credential response is outcome unknown and is not retried", async (
     attempts += 1;
     request.socket.destroy();
   });
-  const client = new WorkspaceClient({
+  const client = new OrganizationClient({
     baseUrl,
-    apiKey: workspaceApiKey,
+    apiKey: organizationApiKey,
   });
 
   await assert.rejects(
@@ -197,7 +164,7 @@ test("a lost credential response is outcome unknown and is not retried", async (
     (error) => {
       assert(error instanceof OutcomeUnknownError);
       assert.match(error.requestId, /^[0-9a-f-]{36}$/);
-      assert(!String(error).includes(workspaceApiKey));
+      assert(!String(error).includes(organizationApiKey));
       return true;
     },
   );
@@ -210,7 +177,7 @@ test("unusable credential responses are outcome unknown", async () => {
   const baseUrl = await serve((_request, response) => {
     response.writeHead(201, { "content-type": "application/json" }).end(bodies[request++]);
   });
-  const client = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey });
+  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
 
   for (let attempt = 0; attempt < bodies.length; attempt += 1) {
     await assert.rejects(
@@ -227,7 +194,7 @@ test("credential cancellation is outcome unknown only after dispatch", async () 
     requests += 1;
     controller.abort(new Error("stop after dispatch"));
   });
-  const serviceUser = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey }).serviceUser(
+  const serviceUser = new OrganizationClient({ baseUrl, apiKey: organizationApiKey }).serviceUser(
     "user_1",
   );
 
@@ -265,13 +232,13 @@ test("offboarding revokes every active key and leaves revoked keys alone", async
       JSON.stringify({ apiKey: { apiKeyId: "uak_active", status: "revoked" } }),
     );
   });
-  const client = new WorkspaceClient({
+  const client = new OrganizationClient({
     baseUrl,
-    apiKey: workspaceApiKey,
+    apiKey: organizationApiKey,
   });
 
   const result = await client.serviceUser("user_1").revokeAllApiKeys();
 
   assert.deepEqual(result, [{ apiKeyId: "uak_active", status: "revoked" }]);
-  assert.deepEqual(revoked, ["/api/admin/user-api-keys/uak_active/revoke"]);
+  assert.deepEqual(revoked, ["/api/admin/org/user-api-keys/uak_active/revoke"]);
 });

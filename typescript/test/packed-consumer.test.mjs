@@ -25,6 +25,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("package.json"));
   assert(files.includes("dist/index.js"));
   assert(files.includes("dist/index.d.ts"));
+  assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
       (file) =>
@@ -50,39 +51,53 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     `import type {
       Agent,
       AgentConfigPatch,
-      ProjectRecord,
       PublicAgentConfig,
       ServiceUser,
       Session,
       TurnResult,
     } from "@mem9/agent-stack";
     import {
-      listProjects,
+      AGENT_SERVICE_API_VERSION,
+      AGENT_SERVICE_REVISION,
+      OrganizationClient,
       UserClient,
-      WorkspaceClient,
     } from "@mem9/agent-stack";
+    // @ts-expect-error Workspace authority was removed from the supported SDK.
+    import { WorkspaceClient } from "@mem9/agent-stack";
 
     declare const baseUrl: string;
-    declare const workspaceApiKey: string;
-    const workspace = new WorkspaceClient({ baseUrl, apiKey: workspaceApiKey });
-    const serviceUser: ServiceUser = workspace.serviceUser("user_1");
-    type CodexRuntime = Extract<PublicAgentConfig["runtime"], { backend: "codex" }>;
-    const effort: CodexRuntime["modelReasoningEffort"] = "high";
+    declare const organizationApiKey: string;
+    const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+    const serviceUser: ServiceUser = organization.serviceUser("user_1");
+    declare const publicConfig: PublicAgentConfig;
     async function quickStart(): Promise<TurnResult> {
-      const created: ServiceUser = await workspace.createServiceUser({ displayName: "Customer" });
-      const { token } = await created.createApiKey({ name: "backend" });
-      const projects: ProjectRecord[] = await listProjects({ baseUrl, apiKey: token });
-      const project = projects[0];
-      if (!project) throw new Error("No Project is available");
-      const user = new UserClient({ baseUrl, apiKey: token, projectId: project.projectId });
+      const { token } = await serviceUser.createApiKey({ name: "backend" });
+      const user = new UserClient({ baseUrl, apiKey: token });
       const agents: Agent[] = await user.listAgents();
       const agent = agents[0] ?? await user.createAgent({ name: "Customer Agent" });
-      const config: AgentConfigPatch = { delegation: { enabled: true } };
+      const config: AgentConfigPatch = { memory: { enabled: true } };
       await agent.configure(config);
       const session: Session = await agent.createSession();
       return session.turn({ text: "Hello" });
     }
-    void effort; void serviceUser; void quickStart;
+    // @ts-expect-error Organization API Keys cannot create Service Users through the public contract.
+    organization.createServiceUser({ displayName: "Customer" });
+    // @ts-expect-error Project selection was removed from User authority.
+    new UserClient({ baseUrl, apiKey: "ag9_uak_key_${"x".repeat(32)}", projectId: "removed" });
+    // @ts-expect-error Runtime selection is not an Agent configuration capability.
+    const removedRuntime: AgentConfigPatch = { runtime: { backend: "codex", authId: "removed" } };
+    declare const session: Session;
+    // @ts-expect-error Historical Session models cannot be selected for new Runs.
+    session.setModel("gpt-5.4");
+    // @ts-expect-error Structured Turn output is not supported.
+    session.turn({ text: "Hello", outputSchema: { type: "object" } });
+    void AGENT_SERVICE_API_VERSION;
+    void AGENT_SERVICE_REVISION;
+    void publicConfig;
+    void WorkspaceClient;
+    void removedRuntime;
+    void serviceUser;
+    void quickStart;
     `,
   );
   const tsc = path.join(repositoryRoot, "node_modules", "typescript", "bin", "tsc");
@@ -109,11 +124,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   const installedPackage = JSON.parse(await readFile(path.join(installedRoot, "package.json"), "utf8"));
   assert.equal(installedPackage.dependencies, undefined);
   assert.equal(installedPackage.agentServiceApiVersion, "0.0.1");
+  assert.equal(installedPackage.agentServiceRevision, "9c1e9aceb28afce1166e4249ea104c7a2f8aac73");
   assert.match(installedPackage.version, /^0\./);
   assert.deepEqual((await readdir(installedRoot)).sort(), ["LICENSE", "README.md", "dist", "package.json"]);
 
   const publishedFiles = await readdir(installedRoot, { recursive: true, withFileTypes: true });
-  const credentialPattern = /ag9_wak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
+  const credentialPattern = /ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
   for (const file of publishedFiles) {
     if (!file.isFile()) continue;
     const contents = await readFile(path.join(file.parentPath, file.name), "utf8");

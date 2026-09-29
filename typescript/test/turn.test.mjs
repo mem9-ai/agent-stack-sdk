@@ -30,7 +30,6 @@ const sessionFor = (baseUrl) =>
   new UserClient({
     baseUrl,
     apiKey: userApiKey,
-    projectId: "project_1",
   }).session("session_1");
 
 const event = (eventName, seq, payload) => ({
@@ -51,7 +50,7 @@ const writeEvents = (response, events) => {
 test("the Turn stream validates ordered events across chunks and heartbeats", async () => {
   const requests = [];
   const events = [
-    event("turn_started", 0, { execution: { backend: "codex", model: "gpt-5.6-sol", modelReasoningEffort: null } }),
+    event("turn_started", 0, { execution: { model: "gpt-5.6-sol" } }),
     event("progress", 1, { text: "Working" }),
     event("assistant_message", 2, { messageId: "message_1", text: "Done" }),
     event("turn_finished", 3, { status: "succeeded" }),
@@ -71,18 +70,27 @@ test("the Turn stream validates ordered events across chunks and heartbeats", as
   });
 
   const received = [];
-  for await (const item of sessionFor(baseUrl).streamTurn({ text: "Hello" })) received.push(item);
+  for await (const item of sessionFor(baseUrl).streamTurn({
+    text: "Hello",
+    billingTag: { key: "customer", value: "acme" },
+  })) {
+    received.push(item);
+  }
 
   assert.deepEqual(received, events);
   assert.equal(requests.length, 1);
   assert.equal(requests[0].method, "POST");
   assert.equal(requests[0].url, "/api/sessions/session_1/turns");
-  assert.deepEqual(JSON.parse(requests[0].body), { input: { type: "text", text: "Hello" } });
-  assert.equal(requests[0].headers["x-agent9-project-id"], "project_1");
+  assert.deepEqual(JSON.parse(requests[0].body), {
+    input: { type: "text", text: "Hello" },
+    billingTag: { key: "customer", value: "acme" },
+  });
+  assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
 });
 
 test("malformed Turn payloads are rejected at the package boundary", async () => {
   const invalid = [
+    event("turn_started", 0, { execution: { model: "unsupported-model" } }),
     event("progress", 0, { text: 42 }),
     event("assistant_message", 0, {
       messageId: "message_1",
@@ -105,7 +113,7 @@ test("malformed Turn payloads are rejected at the package boundary", async () =>
         prompt: "Choose one",
         selectionMode: "single",
         answerChoices: ["A", "B"],
-        response: { text: "A", responseTurnId: "turn_2" },
+        response: { text: "A", answers: ["A"], responseTurnId: "turn_2" },
       },
     }),
   ];
@@ -124,6 +132,56 @@ test("malformed Turn payloads are rejected at the package boundary", async () =>
       InvalidTurnEventError,
     );
   }
+});
+
+test("linked Clarification inputs preserve canonical single and ordered multiple answers", async () => {
+  const bodies = [];
+  const baseUrl = await serve(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    bodies.push(JSON.parse(body));
+    writeEvents(response, [
+      event("turn_started", 0, {}),
+      event("assistant_message", 1, { messageId: "message_1", text: "Continued" }),
+      event("turn_finished", 2, { status: "succeeded" }),
+    ]);
+  });
+  const session = sessionFor(baseUrl);
+
+  await session.turn({ text: "A", clarificationSourceTurnId: "turn_source" });
+  await session.turn({ text: ["A"], clarificationSourceTurnId: "turn_source" });
+  await session.turn({
+    text: ["A", "B", "Custom"],
+    clarificationSourceTurnId: "turn_source",
+  });
+
+  assert.deepEqual(
+    bodies.map(({ input, clarificationSourceTurnId }) => ({ input, clarificationSourceTurnId })),
+    [
+      {
+        input: { type: "text", text: "A" },
+        clarificationSourceTurnId: "turn_source",
+      },
+      {
+        input: { type: "text", text: ["A"] },
+        clarificationSourceTurnId: "turn_source",
+      },
+      {
+        input: { type: "text", text: ["A", "B", "Custom"] },
+        clarificationSourceTurnId: "turn_source",
+      },
+    ],
+  );
+});
+
+test("removed structured Turn output is rejected instead of ignored", async () => {
+  await assert.rejects(
+    sessionFor("https://agent.example.com").streamTurn({
+      text: "Hello",
+      outputSchema: { type: "object" },
+    }).next(),
+    /outputSchema is not supported/,
+  );
 });
 
 test("a stream ending without a terminal event is outcome unknown and is not replayed", async () => {

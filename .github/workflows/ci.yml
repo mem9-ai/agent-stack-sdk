@@ -1,26 +1,25 @@
-name: Release TypeScript SDK
+name: SDK checks
 
 on:
+  pull_request:
   push:
-    tags:
-      - "typescript-v*"
+    branches:
+      - main
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   AGENT_STACK_CONTRACT_COMMIT: a4ad2714b1a2244189a83af74a85e31fba60e3e8
 
 jobs:
-  publish:
+  typescript:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
-          registry-url: https://registry.npmjs.org
           cache: npm
       - run: |
           mkdir -p "$RUNNER_TEMP/agent-stack-contract"
@@ -37,17 +36,3 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
-      - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p 'require("./typescript/package.json").version')"
-      - run: npm publish --workspace @mem9/agent-stack --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Record compatibility mapping
-        run: |
-          {
-            echo "## Published TypeScript SDK"
-            echo
-            echo "- Package: \`@mem9/agent-stack@$(node -p 'require(\"./typescript/package.json\").version')\`"
-            echo "- SDK commit: \`$GITHUB_SHA\`"
-            echo "- Agent Service commit: \`$(node -p 'require(\"./typescript/package.json\").agentServiceRevision')\`"
-            echo "- Agent Service API: \`$(node -p 'require(\"./typescript/package.json\").agentServiceApiVersion')\`"
-          } >> "$GITHUB_STEP_SUMMARY"

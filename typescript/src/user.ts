@@ -1,87 +1,24 @@
-import { HttpClient, requireEtag } from "./http.js";
-import { createSessionForAgent, Session } from "./session.js";
+import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
+import { createSessionForAgent, type BillingTag, Session } from "./session.js";
 
 export interface UserClientOptions {
   baseUrl: string;
   apiKey: string;
-  projectId: string;
 }
-
-export interface ProjectDiscoveryOptions {
-  baseUrl: string;
-  apiKey: string;
-}
-
-export interface ProjectRecord {
-  projectId: string;
-  workspaceId: string;
-  name: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export const listProjects = async (
-  options: ProjectDiscoveryOptions,
-  request?: { signal?: AbortSignal },
-): Promise<ProjectRecord[]> => {
-  if (
-    !options.apiKey.startsWith("ag9_uak_") &&
-    !options.apiKey.startsWith("ag9_uak.") &&
-    !options.apiKey.startsWith("ag9_wak.")
-  ) {
-    throw new TypeError("listProjects requires a User or Workspace API Key");
-  }
-  const response = await new HttpClient(options).get<{ projects: ProjectRecord[] }>(
-    "/api/console/projects",
-    request,
-  );
-  return response.projects;
-};
-
-export type AgentRuntimeConfigInput =
-  | { backend: "pi" }
-  | {
-      backend: "codex";
-      authId: string;
-      modelReasoningEffort?: "low" | "medium" | "high" | "xhigh";
-    };
-
-export type PublicAgentRuntimeConfig =
-  | { backend: "pi" }
-  | {
-      backend: "codex";
-      authId?: string;
-      modelReasoningEffort: "low" | "medium" | "high" | "xhigh";
-    };
 
 export interface EnabledAgentCapability {
   enabled: boolean;
 }
 
-export interface PublicAgentLarkConfig {
-  apiBaseUrl: "https://open.feishu.cn" | "https://open.larksuite.com";
-  appId: string;
-  hasAppSecret: boolean;
-  toolNames?: string[];
-  coverageItemIds?: string[];
-  enabled: boolean;
-  hasLarkAuth: boolean;
-  status: "configured" | "authorized" | "needs_reauth" | "error";
-}
-
-export interface ManagedToolReference {
-  name: string;
-  version: number;
-  packageDigest: string;
+export interface McpServerReference {
+  serverId: string;
 }
 
 export interface AgentConfigInput {
-  runtime?: AgentRuntimeConfigInput;
-  delegation?: EnabledAgentCapability;
+  memory?: EnabledAgentCapability;
   sessionRecall?: EnabledAgentCapability;
-  knowledgeBase?: EnabledAgentCapability;
   generatedMedia?: EnabledAgentCapability;
+  tools?: { mcp?: McpServerReference[] };
 }
 
 export interface AgentConfigPatch extends AgentConfigInput {
@@ -89,9 +26,6 @@ export interface AgentConfigPatch extends AgentConfigInput {
 }
 
 export interface PublicAgentConfig {
-  runtime: PublicAgentRuntimeConfig;
-  delegation: EnabledAgentCapability;
-  lark?: PublicAgentLarkConfig;
   memory: {
     enabled: boolean;
     provider: "mem9";
@@ -107,60 +41,80 @@ export interface PublicAgentConfig {
     };
   };
   sessionRecall: EnabledAgentCapability;
-  knowledgeBase: EnabledAgentCapability;
   generatedMedia: EnabledAgentCapability;
-  tools?: { managed: ManagedToolReference[]; mcp: { serverId: string }[] };
+  tools?: { mcp: McpServerReference[] };
 }
 
 export interface AgentTemplateProvenance {
   agentTemplateId: string;
   name: string | null;
-  status: string;
+  status: "active" | "archived" | "unavailable";
 }
 
 export interface AgentRecord {
   agentId: string;
-  workspaceId: string;
   name: string;
   sandboxProfile: string;
-  /** @deprecated Compatibility projection from Agent Service. */
-  e2bTemplate: string;
-  /** Compatibility-only; Session owns the mutable model. */
-  model: string;
-  modelPolicyStatus: string;
   agentTemplateId: string | null;
-  /** @deprecated Use agentTemplateId. */
-  agentDefinitionId: string | null;
   agentTemplate: AgentTemplateProvenance | null;
   config: PublicAgentConfig;
   configVersion: number;
-  status: string;
+  status: "active" | "archived";
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AgentTemplate {
   agentTemplateId: string;
-  /** @deprecated Use agentTemplateId. */
-  agentDefinitionId: string;
-  workspaceId: string;
+  organizationId: string;
   name: string;
   sandboxProfile: string;
-  /** @deprecated Use sandboxProfile. */
-  e2bTemplate: string;
-  model: string;
-  status: string;
+  status: "active";
   createdAt: string;
   updatedAt: string;
 }
 
+export type MemoryCredentialInput =
+  | { mode: "provision" }
+  | { mode: "use_existing"; mem9Key: string };
+
 export interface CreateAgentInput {
   name?: string;
-  agentTemplateId?: string;
+  agentTemplateId?: string | null;
   config?: AgentConfigInput;
+  memoryCredential?: MemoryCredentialInput;
   idempotencyKey?: string;
   signal?: AbortSignal;
 }
+
+const validateAgentConfig = (config: AgentConfigInput | AgentConfigPatch, patch: boolean): void => {
+  requireKnownKeys(
+    config,
+    ["memory", "sessionRecall", "generatedMedia", "tools", ...(patch ? ["sandboxProfile"] : [])],
+    "Agent config",
+  );
+  for (const [name, capability] of [
+    ["memory", config.memory],
+    ["sessionRecall", config.sessionRecall],
+    ["generatedMedia", config.generatedMedia],
+  ] as const) {
+    if (capability === undefined) continue;
+    requireKnownKeys(capability, ["enabled"], `Agent config.${name}`);
+    if (typeof capability.enabled !== "boolean") {
+      throw new TypeError(`Agent config.${name}.enabled must be a boolean`);
+    }
+  }
+  if (config.tools === undefined) return;
+  requireKnownKeys(config.tools, ["mcp"], "Agent config.tools");
+  if (config.tools.mcp === undefined) return;
+  if (!Array.isArray(config.tools.mcp)) throw new TypeError("Agent config.tools.mcp must be an array");
+  for (const server of config.tools.mcp) {
+    requireKnownKeys(server, ["serverId"], "Agent config.tools.mcp entry");
+    if (typeof server.serverId !== "string") {
+      throw new TypeError("Agent config.tools.mcp entry.serverId must be a string");
+    }
+  }
+};
 
 export class Agent {
   readonly #http: HttpClient;
@@ -185,7 +139,7 @@ export class Agent {
     return this.#record.config;
   }
 
-  get status(): string {
+  get status(): AgentRecord["status"] {
     return this.#record.status;
   }
 
@@ -219,6 +173,7 @@ export class Agent {
     config: AgentConfigPatch,
     options?: { signal?: AbortSignal },
   ): Promise<this> {
+    validateAgentConfig(config, true);
     const etag = await this.#currentEtag(options);
     const result = await this.#http.patchResponse<{ agent: AgentRecord }>(
       `/api/agents/${encodeURIComponent(this.id)}/config`,
@@ -227,6 +182,28 @@ export class Agent {
     );
     this.#record = result.data.agent;
     this.#etag = requireEtag(result);
+    return this;
+  }
+
+  async revealMemoryKey(options?: { signal?: AbortSignal }): Promise<string> {
+    const response = await this.#http.get<{ mem9Key: string }>(
+      `/api/agents/${encodeURIComponent(this.id)}/memory/mem9/key`,
+      options,
+    );
+    return response.mem9Key;
+  }
+
+  async replaceMemoryKey(
+    mem9Key: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<this> {
+    const response = await this.#http.put<{ agent: AgentRecord }>(
+      `/api/agents/${encodeURIComponent(this.id)}/memory/mem9/key`,
+      { mem9Key },
+      { outcomeUnknown: true, ...(options?.signal ? { signal: options.signal } : {}) },
+    );
+    this.#record = response.agent;
+    this.#etag = undefined;
     return this;
   }
 
@@ -250,7 +227,10 @@ export class Agent {
     this.#etag = undefined;
   }
 
-  createSession(options?: { signal?: AbortSignal }): Promise<Session> {
+  createSession(options?: {
+    billingTag?: BillingTag | null;
+    signal?: AbortSignal;
+  }): Promise<Session> {
     return createSessionForAgent(this.#http, this.id, options);
   }
 
@@ -264,13 +244,11 @@ export class UserClient {
   readonly #http: HttpClient;
 
   constructor(options: UserClientOptions) {
-    if (!options.apiKey.startsWith("ag9_uak_") && !options.apiKey.startsWith("ag9_uak.")) {
+    requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
+    if (!options.apiKey.startsWith("ag9_uak_")) {
       throw new TypeError("UserClient requires a User API Key");
     }
-    if (!/^[a-z0-9_-]{1,64}$/.test(options.projectId)) {
-      throw new TypeError("projectId must contain 1-64 lowercase letters, numbers, _ or -");
-    }
-    this.#http = new HttpClient(options);
+    this.#http = new HttpClient({ baseUrl: options.baseUrl, apiKey: options.apiKey });
   }
 
   async listAgents(options?: { signal?: AbortSignal }): Promise<Agent[]> {
@@ -278,7 +256,35 @@ export class UserClient {
     return response.agents.map((agent) => new Agent(this.#http, agent));
   }
 
+  validateMemoryKey(
+    mem9Key: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<{ valid: true }> {
+    return this.#http.post(
+      "/api/agents/memory/mem9/key-validations",
+      { mem9Key },
+      { idempotent: true, ...(options?.signal ? { signal: options.signal } : {}) },
+    );
+  }
+
   async createAgent(input: CreateAgentInput = {}): Promise<Agent> {
+    requireKnownKeys(
+      input,
+      ["name", "agentTemplateId", "config", "memoryCredential", "idempotencyKey", "signal"],
+      "Agent creation",
+    );
+    if (input.config !== undefined) validateAgentConfig(input.config, false);
+    if (input.memoryCredential !== undefined) {
+      requireKnownKeys(input.memoryCredential, ["mode", "mem9Key"], "Memory credential");
+      if (input.memoryCredential.mode === "provision") {
+        requireKnownKeys(input.memoryCredential, ["mode"], "Memory credential");
+      } else if (
+        input.memoryCredential.mode !== "use_existing" ||
+        typeof input.memoryCredential.mem9Key !== "string"
+      ) {
+        throw new TypeError("Memory credential mode is not supported");
+      }
+    }
     const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
     const result = await this.#http.postResponse<{ agent: AgentRecord }>(
       "/api/agents",
@@ -288,6 +294,9 @@ export class UserClient {
           ? {}
           : { agentTemplateId: input.agentTemplateId }),
         ...(input.config === undefined ? {} : { config: input.config }),
+        ...(input.memoryCredential === undefined
+          ? {}
+          : { memoryCredential: input.memoryCredential }),
       },
       {
         idempotencyKey,

@@ -24,21 +24,23 @@ const clientFor = (baseUrl) =>
   new UserClient({
     baseUrl,
     apiKey: userApiKey,
-    projectId: "project_1",
   });
 
 const agent = {
   agentId: "agent_1",
-  workspaceId: "workspace_1",
   name: "Agent One",
   sandboxProfile: "default",
-  e2bTemplate: "default",
-  model: "gpt-5.6-terra",
-  modelPolicyStatus: "allowed",
   agentTemplateId: null,
-  agentDefinitionId: null,
   agentTemplate: null,
-  config: {},
+  config: {
+    memory: {
+      enabled: false,
+      provider: "mem9",
+      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
+    },
+    sessionRecall: { enabled: false },
+    generatedMedia: { enabled: true },
+  },
   configVersion: 1,
   status: "active",
   createdAt: "2026-08-25T00:00:00.000Z",
@@ -46,9 +48,8 @@ const agent = {
 };
 
 const sessionRecord = (overrides = {}) => ({
+  organizationId: "org_1",
   sessionId: "session_1",
-  workspaceId: "workspace_1",
-  projectId: "project_1",
   name: null,
   autoTitle: null,
   ownerUserId: "user_1",
@@ -57,7 +58,8 @@ const sessionRecord = (overrides = {}) => ({
   readOnly: false,
   sourceSchedulerId: null,
   sourceSchedulerFireId: null,
-  clientTag: null,
+  sourceVoiceSessionId: null,
+  billingTag: { key: "customer", value: "acme" },
   model: "gpt-5.6-terra",
   modelRevision: 1,
   createdWithAgentId: "agent_1",
@@ -87,13 +89,23 @@ test("an Agent creates a persistent Session and retains its model ETag", async (
   });
   const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
 
-  const session = await remoteAgent.createSession();
+  await assert.rejects(
+    remoteAgent.createSession({ model: "gpt-5.6-sol" }),
+    /Session options.model is not supported/,
+  );
+  assert.equal(calls.length, 1);
+  const session = await remoteAgent.createSession({
+    billingTag: { key: "customer", value: "acme" },
+  });
 
   assert.equal(session.id, "session_1");
   assert.equal(session.model, "gpt-5.6-terra");
-  assert.deepEqual(JSON.parse(calls[1].body), { agentId: "agent_1" });
+  assert.deepEqual(JSON.parse(calls[1].body), {
+    agentId: "agent_1",
+    billingTag: { key: "customer", value: "acme" },
+  });
   assert.equal(calls[1].headers["idempotency-key"], undefined);
-  assert.equal(calls[1].headers["x-agent9-project-id"], "project_1");
+  assert.equal(calls[1].headers["x-agent9-project-id"], undefined);
 });
 
 test("a Session updates the model with its retained ETag and never overwrites a conflict", async () => {
@@ -145,6 +157,7 @@ test("a reconstructed Session reads ordered history and one known Turn", async (
     id: "turn_1",
     sessionId: "session_1",
     status: "succeeded",
+    billingTag: null,
     userMessage: {
       id: "message_1",
       sessionId: "session_1",

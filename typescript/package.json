@@ -8,7 +8,7 @@
     "node": ">=22.12"
   },
   "tidbLinkApiVersion": "0.0.1",
-  "tidbLinkRevision": "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
+  "tidbLinkRevision": "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

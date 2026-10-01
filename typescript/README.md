@@ -113,7 +113,7 @@ The renamed package, error classes and compatibility exports have no old aliases
 ## Compatibility
 
 `@mem9/tidb-link` 0.3.x targets TiDB Link OpenAPI `0.0.1` at revision
-`7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6`, exported as
+`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87`, exported as
 `TIDB_LINK_API_VERSION` and `TIDB_LINK_REVISION`.
 
 Credential creation and Session creation still report ambiguous transport

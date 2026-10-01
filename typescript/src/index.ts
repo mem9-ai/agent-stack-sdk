@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact TiDB Link revision whose public contract is supported by this SDK release. */
 export const TIDB_LINK_REVISION =
-  "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6" as const;
+  "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
 
 export {
   TiDBLinkApiError,

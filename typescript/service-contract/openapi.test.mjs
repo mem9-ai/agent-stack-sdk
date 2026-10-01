@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const expectedServiceRevision = "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6";
+const expectedServiceRevision = "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87";
 
 const contractRoot = process.env.TIDB_LINK_CONTRACT;
 if (!contractRoot) throw new Error("TIDB_LINK_CONTRACT is required");

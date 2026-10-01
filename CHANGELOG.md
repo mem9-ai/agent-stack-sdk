@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.3.0)
+
+- Rename the package to `@mem9/tidb-link` and errors/constants to TiDB Link names.
+- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases. HTTP resource paths stay unchanged.
+- Reject unusable one-time User Key responses without automatically repeating issuance.
 
 - Require explicit published Template selection for new Agents.
 - Add descriptive Hardware configuration, content version 2 types, published version reads and explicit Template application with preserved override/reset intent.

@@ -1,8 +1,8 @@
-# Agent Stack SDKs
+# TiDB Link SDKs
 
-Official, supported SDKs for Agent Stack.
+Official, supported SDKs for TiDB Link.
 
-The TypeScript SDK lives in [`typescript/`](typescript/). It targets Node.js
+The TypeScript SDK lives in [`typescript/`](typescript/README.md). It targets Node.js
 22.12 or newer, uses the platform `fetch` and Web Streams APIs, and has no
 runtime dependencies.
 
@@ -12,8 +12,8 @@ runtime dependencies.
 - [Changelog](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 
-The SDK is pre-1.0 while the Agent Service HTTP API remains pre-1.0. Each SDK
-release declares the exact Agent Service revision and API version it supports.
+The SDK is pre-1.0 while the TiDB Link HTTP API remains pre-1.0. Each SDK
+release declares the exact TiDB Link revision and API version it supports.
 
 ## Development
 

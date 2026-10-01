@@ -1,12 +1,12 @@
-/** Agent Service OpenAPI version supported by this SDK release. */
-export const AGENT_SERVICE_API_VERSION = "0.0.1" as const;
-/** Exact Agent Service revision whose public contract is supported by this SDK release. */
-export const AGENT_SERVICE_REVISION =
-  "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6" as const;
+/** TiDB Link OpenAPI version supported by this SDK release. */
+export const TIDB_LINK_API_VERSION = "0.0.1" as const;
+/** Exact TiDB Link revision whose public contract is supported by this SDK release. */
+export const TIDB_LINK_REVISION =
+  "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
 
 export {
-  AgentStackApiError,
-  AgentStackError,
+  TiDBLinkApiError,
+  TiDBLinkError,
   ConflictError,
   ConnectionError,
   InvalidTurnEventError,

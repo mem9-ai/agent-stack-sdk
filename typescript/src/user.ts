@@ -1,4 +1,4 @@
-import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
+import { HttpClient, isApiKey, requireEtag, requireKnownKeys } from "./http.js";
 import { createSessionForAgent, type BillingTag, Session } from "./session.js";
 
 export interface UserClientOptions {
@@ -463,7 +463,7 @@ export class UserClient {
 
   constructor(options: UserClientOptions) {
     requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
-    if (!options.apiKey.startsWith("ag9_uak_")) {
+    if (!isApiKey(options.apiKey, "user")) {
       throw new TypeError("UserClient requires a User API Key");
     }
     this.#http = new HttpClient({

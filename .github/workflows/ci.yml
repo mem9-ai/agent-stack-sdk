@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  AGENT_STACK_CONTRACT_COMMIT: 557b624acdee125e49c847776fc9feba27029a87
+  TIDB_LINK_CONTRACT_COMMIT: 48c3a0dd06d02fea7d5935e37e2484f97a770362
 
 jobs:
   typescript:
@@ -22,17 +22,17 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: |
-          mkdir -p "$RUNNER_TEMP/agent-stack-contract"
+          mkdir -p "$RUNNER_TEMP/tidb-link-contract"
           curl --fail --location --silent --show-error \
-            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$AGENT_STACK_CONTRACT_COMMIT/openapi.json" \
-            --output "$RUNNER_TEMP/agent-stack-contract/openapi.json"
+            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$TIDB_LINK_CONTRACT_COMMIT/openapi.json" \
+            --output "$RUNNER_TEMP/tidb-link-contract/openapi.json"
           curl --fail --location --silent --show-error \
-            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$AGENT_STACK_CONTRACT_COMMIT/metadata.json" \
-            --output "$RUNNER_TEMP/agent-stack-contract/metadata.json"
+            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$TIDB_LINK_CONTRACT_COMMIT/metadata.json" \
+            --output "$RUNNER_TEMP/tidb-link-contract/metadata.json"
       - run: npm ci
       - run: npm run test:service-contract
         env:
-          AGENT_STACK_CONTRACT: ${{ runner.temp }}/agent-stack-contract
+          TIDB_LINK_CONTRACT: ${{ runner.temp }}/tidb-link-contract
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check

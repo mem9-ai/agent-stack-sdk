@@ -1,5 +1,5 @@
 import { OutcomeUnknownError } from "./errors.js";
-import { HttpClient, requireKnownKeys } from "./http.js";
+import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
 
 export interface OrganizationClientOptions {
   baseUrl: string;
@@ -35,11 +35,10 @@ const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey =
     typeof result.apiKey !== "object" ||
     result.apiKey === null ||
     Array.isArray(result.apiKey) ||
-    typeof result.token !== "string" ||
-    result.token.length === 0
+    !isApiKey(result.token, "user")
   ) {
     throw new OutcomeUnknownError(
-      "Agent Service accepted the credential request but omitted the one-time credential",
+      "TiDB Link accepted the credential request but returned an unusable one-time credential",
       { requestId },
     );
   }
@@ -108,7 +107,7 @@ export class OrganizationClient {
 
   constructor(options: OrganizationClientOptions) {
     requireKnownKeys(options, ["baseUrl", "apiKey"], "OrganizationClient options");
-    if (!options.apiKey.startsWith("ag9_oak.")) {
+    if (!isApiKey(options.apiKey, "org")) {
       throw new TypeError("OrganizationClient requires an Organization API Key");
     }
     this.#http = new HttpClient(options);

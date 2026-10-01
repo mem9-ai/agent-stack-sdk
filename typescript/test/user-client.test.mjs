@@ -5,7 +5,7 @@ import { after, test } from "node:test";
 import { ConflictError, UserClient } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
+const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(
@@ -106,6 +106,7 @@ test("Agent creation retries with stable identities and retains the ETag", async
     requests[1].headers["x-request-id"],
   );
   assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-project-id"], undefined);
   assert.deepEqual(JSON.parse(requests[0].body), {
     name: "Agent One",
     agentTemplateId: "template_1",
@@ -370,7 +371,7 @@ test("Memory provisioning, retained state, and creator credential operations use
 });
 
 test("a User client rejects Organization authority without exposing it", () => {
-  const organizationKey = "ag9_oak." + "key_id." + "x".repeat(32);
+  const organizationKey = "ti_org_" + "keyId_" + "x".repeat(43);
   assert.throws(
     () =>
       new UserClient({
@@ -388,6 +389,16 @@ test("a User client rejects Organization authority without exposing it", () => {
       }),
     /projectId is not supported/,
   );
+});
+
+test("a User client rejects the former User Key format without disclosing it", () => {
+  const apiKey = "ag9_uak_" + "key_" + "x".repeat(32);
+  assert.throws(() => new UserClient({ baseUrl: "https://agent.example.com", apiKey }), (error) => {
+    assert(error instanceof TypeError);
+    assert(!String(error).includes(apiKey));
+    assert(!JSON.stringify(error).includes(apiKey));
+    return true;
+  });
 });
 
 test("removed Agent fields are rejected before a request", async () => {

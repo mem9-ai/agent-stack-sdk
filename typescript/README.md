@@ -1,6 +1,6 @@
-# `@mem9/agent-stack`
+# `@mem9/tidb-link`
 
-Official TypeScript SDK for Agent Stack. The package requires Node.js 22.12 or
+Official TypeScript SDK for TiDB Link. The package requires Node.js 22.12 or
 newer and has no runtime dependencies.
 
 The SDK is ESM-only and ships TypeScript declarations.
@@ -8,7 +8,7 @@ The SDK is ESM-only and ships TypeScript declarations.
 ## Install
 
 ```sh
-npm install @mem9/agent-stack
+npm install @mem9/tidb-link
 ```
 
 ## Quick start
@@ -18,7 +18,7 @@ in the Console first, then store its ID in your customer mapping. Store the
 one-time User API Key in your secret manager.
 
 ```ts
-import { OrganizationClient, UserClient } from "@mem9/agent-stack";
+import { OrganizationClient, UserClient } from "@mem9/tidb-link";
 
 export async function runCustomerTurn(input: {
   baseUrl: string;
@@ -86,9 +86,16 @@ for await (const event of session.streamTurn({ text: "Continue" })) {
 The clients never accept caller-supplied Organization or User identity headers.
 Identity comes from the API Key.
 
+Credentials use `ti_org_<id>_<secret>` for `OrganizationClient` and
+`ti_user_<id>_<secret>` for `UserClient`. IDs contain 1–64 ASCII letters or digits;
+the secret contains exactly 43 base64url characters. Constructors reject a key
+of the other kind, malformed values and previous credential formats before making
+a request. One-time create/rotate responses must contain a valid User Key.
+The renamed package, error classes and compatibility exports have no old aliases.
+
 ## Errors and retry behavior
 
-- `AgentStackApiError` preserves HTTP status, stable service error code,
+- `TiDBLinkApiError` preserves HTTP status, stable service error code,
   request identity, and display-safe details.
 - `ConflictError` represents an explicit service conflict, including stale
   ETags.
@@ -105,9 +112,9 @@ Identity comes from the API Key.
 
 ## Compatibility
 
-`@mem9/agent-stack` 0.2.x targets Agent Service OpenAPI `0.0.1` at revision
-`7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6`, exported as
-`AGENT_SERVICE_API_VERSION` and `AGENT_SERVICE_REVISION`.
+`@mem9/tidb-link` 0.3.x targets TiDB Link OpenAPI `0.0.1` at revision
+`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87`, exported as
+`TIDB_LINK_API_VERSION` and `TIDB_LINK_REVISION`.
 
 Credential creation and Session creation still report ambiguous transport
 outcomes explicitly and are not retried. Progress-stream resumption is outside

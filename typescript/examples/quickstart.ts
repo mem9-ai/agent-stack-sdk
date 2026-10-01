@@ -1,4 +1,4 @@
-import { OrganizationClient, UserClient } from "@mem9/agent-stack";
+import { OrganizationClient, UserClient } from "@mem9/tidb-link";
 
 export async function runCustomerTurn(input: {
   baseUrl: string;

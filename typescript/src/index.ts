@@ -1,7 +1,8 @@
 /** Agent Service OpenAPI version supported by this SDK release. */
 export const AGENT_SERVICE_API_VERSION = "0.0.1" as const;
 /** Exact Agent Service revision whose public contract is supported by this SDK release. */
-export const AGENT_SERVICE_REVISION = "9c1e9aceb28afce1166e4249ea104c7a2f8aac73" as const;
+export const AGENT_SERVICE_REVISION =
+  "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025" as const;
 
 export {
   AgentStackApiError,
@@ -21,6 +22,14 @@ export type {
 } from "./organization.js";
 export { Agent, UserClient } from "./user.js";
 export type {
+  HardwareRequirement,
+  PublishedTemplateVersion,
+  ApplyTemplateInput,
+  TemplateApplicationPreview,
+  TemplateOverridePath,
+  TemplateContent,
+  TemplateOverrides,
+  TemplateApplicationReference,
   AgentConfigInput,
   AgentConfigPatch,
   AgentRecord,

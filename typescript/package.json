@@ -8,7 +8,7 @@
     "node": ">=22.12"
   },
   "agentServiceApiVersion": "0.0.1",
-  "agentServiceRevision": "9c1e9aceb28afce1166e4249ea104c7a2f8aac73",
+  "agentServiceRevision": "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

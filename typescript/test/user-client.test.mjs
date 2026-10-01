@@ -8,7 +8,9 @@ const servers = [];
 const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
 
 after(async () => {
-  await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
+  await Promise.all(
+    servers.map((server) => new Promise((resolve) => server.close(resolve))),
+  );
 });
 
 const serve = async (handler) => {
@@ -52,20 +54,42 @@ test("Agent creation retries with stable identities and retains the ETag", async
     requests.push({ headers: request.headers, body });
     response.setHeader("content-type", "application/json");
     if (requests.length === 1) {
-      response.writeHead(503).end(
-        JSON.stringify({ error: { code: "idempotency_in_progress", message: "Still creating" } }),
-      );
+      response
+        .writeHead(503)
+        .end(
+          JSON.stringify({
+            error: {
+              code: "idempotency_in_progress",
+              message: "Still creating",
+            },
+          }),
+        );
       return;
     }
     response.setHeader("etag", '"agent-v1"');
-    response.writeHead(201).end(
-      JSON.stringify({ agent: agentRecord({ agentTemplateId: "template_1" }) }),
-    );
+    response
+      .writeHead(201)
+      .end(
+        JSON.stringify({
+          agent: agentRecord({ agentTemplateId: "template_1" }),
+        }),
+      );
   });
 
   const agent = await userClient(baseUrl).createAgent({
     name: "Agent One",
     agentTemplateId: "template_1",
+    templateVersion: 2,
+    config: {
+      hardware: {
+        requirements: [
+          {
+            definitionId: "hdef_" + "a".repeat(32),
+            capabilityNames: ["set_level"],
+          },
+        ],
+      },
+    },
     idempotencyKey: "create-agent-1",
   });
 
@@ -73,12 +97,29 @@ test("Agent creation retries with stable identities and retains the ETag", async
   assert.equal(agent.name, "Agent One");
   assert.equal(requests.length, 2);
   assert.equal(requests[0].headers["idempotency-key"], "create-agent-1");
-  assert.equal(requests[0].headers["idempotency-key"], requests[1].headers["idempotency-key"]);
-  assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
+  assert.equal(
+    requests[0].headers["idempotency-key"],
+    requests[1].headers["idempotency-key"],
+  );
+  assert.equal(
+    requests[0].headers["x-request-id"],
+    requests[1].headers["x-request-id"],
+  );
   assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
   assert.deepEqual(JSON.parse(requests[0].body), {
     name: "Agent One",
     agentTemplateId: "template_1",
+    templateVersion: 2,
+    config: {
+      hardware: {
+        requirements: [
+          {
+            definitionId: "hdef_" + "a".repeat(32),
+            capabilityNames: ["set_level"],
+          },
+        ],
+      },
+    },
   });
 });
 
@@ -87,7 +128,12 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
   const baseUrl = await serve(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
-    calls.push({ method: request.method, url: request.url, headers: request.headers, body });
+    calls.push({
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body,
+    });
     response.setHeader("content-type", "application/json");
     if (request.url === "/api/agents" && request.method === "GET") {
       response.end(JSON.stringify({ agents: [agentRecord()] }));
@@ -101,7 +147,11 @@ test("Agent mutations refresh once when needed and retain each fresh ETag", asyn
     if (request.url === "/api/agents/agent_1/name") {
       assert.equal(request.headers["if-match"], '"agent-v1"');
       response.setHeader("etag", '"agent-v2"');
-      response.end(JSON.stringify({ agent: agentRecord({ name: "Renamed", configVersion: 2 }) }));
+      response.end(
+        JSON.stringify({
+          agent: agentRecord({ name: "Renamed", configVersion: 2 }),
+        }),
+      );
       return;
     }
     if (request.url === "/api/agents/agent_1/config") {
@@ -156,16 +206,23 @@ test("a stale Agent mutation fails without an automatic overwrite", async () => 
       response.end(JSON.stringify({ agent: agentRecord() }));
       return;
     }
-    response.writeHead(412).end(
-      JSON.stringify({ error: { code: "precondition_failed", message: "Stale Agent" } }),
-    );
+    response
+      .writeHead(412)
+      .end(
+        JSON.stringify({
+          error: { code: "precondition_failed", message: "Stale Agent" },
+        }),
+      );
   });
   const agent = await userClient(baseUrl).getAgent("agent_1");
 
   await assert.rejects(agent.rename("Lost update"), ConflictError);
 
   assert.equal(agent.name, "Agent One");
-  assert.deepEqual(calls, ["GET /api/agents/agent_1", "PATCH /api/agents/agent_1/name"]);
+  assert.deepEqual(calls, [
+    "GET /api/agents/agent_1",
+    "PATCH /api/agents/agent_1/name",
+  ]);
 });
 
 test("the User client exposes real default Agents and read-only AgentTemplates", async () => {
@@ -242,12 +299,18 @@ test("Memory provisioning, retained state, and creator credential operations use
       response.end(JSON.stringify({ valid: true }));
       return;
     }
-    if (request.url === "/api/agents/agent_1/memory/mem9/key" && request.method === "GET") {
+    if (
+      request.url === "/api/agents/agent_1/memory/mem9/key" &&
+      request.method === "GET"
+    ) {
       response.setHeader("cache-control", "no-store");
       response.end(JSON.stringify({ mem9Key: "test-memory-key" }));
       return;
     }
-    if (request.url === "/api/agents/agent_1/memory/mem9/key" && request.method === "PUT") {
+    if (
+      request.url === "/api/agents/agent_1/memory/mem9/key" &&
+      request.method === "PUT"
+    ) {
       response.setHeader("cache-control", "no-store");
       response.end(JSON.stringify({ agent: memoryAgent() }));
       return;
@@ -268,14 +331,18 @@ test("Memory provisioning, retained state, and creator credential operations use
   const client = userClient(baseUrl);
 
   const agent = await client.createAgent({
+    agentTemplateId: "template_1",
     config: { memory: { enabled: true } },
     memoryCredential: { mode: "provision" },
   });
   await client.createAgent({
+    agentTemplateId: "template_1",
     config: { memory: { enabled: true } },
     memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
   });
-  assert.deepEqual(await client.validateMemoryKey("test-memory-key"), { valid: true });
+  assert.deepEqual(await client.validateMemoryKey("test-memory-key"), {
+    valid: true,
+  });
   assert.equal(await agent.revealMemoryKey(), "test-memory-key");
   await agent.replaceMemoryKey("replacement-memory-key");
   await agent.configure({ memory: { enabled: false } });
@@ -285,15 +352,19 @@ test("Memory provisioning, retained state, and creator credential operations use
   assert.equal(agent.config.memory.mem9.hasKey, true);
   assert.equal("mem9Key" in agent.config.memory.mem9, false);
   assert.deepEqual(JSON.parse(calls[0].body), {
+    agentTemplateId: "template_1",
     config: { memory: { enabled: true } },
     memoryCredential: { mode: "provision" },
   });
   assert.deepEqual(JSON.parse(calls[1].body), {
+    agentTemplateId: "template_1",
     config: { memory: { enabled: true } },
     memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
   });
   assert.deepEqual(JSON.parse(calls[2].body), { mem9Key: "test-memory-key" });
-  assert.deepEqual(JSON.parse(calls[4].body), { mem9Key: "replacement-memory-key" });
+  assert.deepEqual(JSON.parse(calls[4].body), {
+    mem9Key: "replacement-memory-key",
+  });
   assert.deepEqual(JSON.parse(calls[6].body), { memory: { enabled: false } });
   assert.deepEqual(JSON.parse(calls[7].body), { memory: { enabled: true } });
 });
@@ -301,7 +372,11 @@ test("Memory provisioning, retained state, and creator credential operations use
 test("a User client rejects Organization authority without exposing it", () => {
   const organizationKey = "ag9_oak." + "key_id." + "x".repeat(32);
   assert.throws(
-    () => new UserClient({ baseUrl: "https://agent.example.com", apiKey: organizationKey }),
+    () =>
+      new UserClient({
+        baseUrl: "https://agent.example.com",
+        apiKey: organizationKey,
+      }),
     (error) => !String(error).includes(organizationKey),
   );
   assert.throws(
@@ -324,11 +399,17 @@ test("removed Agent fields are rejected before a request", async () => {
   const client = userClient(baseUrl);
 
   await assert.rejects(
-    client.createAgent({ config: { runtime: { backend: "codex" } } }),
+    client.createAgent({
+      agentTemplateId: "template_1",
+      config: { runtime: { backend: "codex" } },
+    }),
     /Agent config.runtime is not supported/,
   );
   await assert.rejects(
-    client.createAgent({ config: { memory: { enabled: true, provider: "mem9" } } }),
+    client.createAgent({
+      agentTemplateId: "template_1",
+      config: { memory: { enabled: true, provider: "mem9" } },
+    }),
     /Agent config.memory.provider is not supported/,
   );
   await assert.rejects(
@@ -336,4 +417,79 @@ test("removed Agent fields are rejected before a request", async () => {
     /Agent creation.model is not supported/,
   );
   assert.equal(requests, 0);
+});
+
+test("published hardware content and explicit application preserve empty overrides on the wire", async () => {
+  const calls = [];
+  const ref = {
+    templateId: "template_1",
+    version: 2,
+    contentDigest: "a".repeat(64),
+  };
+  const baseUrl = await serve(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({
+      path: request.url,
+      headers: request.headers,
+      body: raw ? JSON.parse(raw) : null,
+    });
+    response.setHeader("content-type", "application/json");
+    response.setHeader("etag", '"agent-v2"');
+    if (request.url === "/api/agents/template-versions/template_1/2")
+      return response.end(
+        JSON.stringify({
+          agentTemplateId: "template_1",
+          templateVersion: 2,
+          contentDigest: ref.contentDigest,
+          content: {
+            schemaVersion: "agent-template-content@2",
+            hardware: { requirements: [] },
+          },
+          availability: "available",
+        }),
+      );
+    if (request.url.endsWith("template-application-previews"))
+      return response.end(
+        JSON.stringify({
+          targetRef: ref,
+          nextOverrides: { hardware: { requirements: [] } },
+        }),
+      );
+    response.end(
+      JSON.stringify({
+        agent: agentRecord({
+          templateApplication: {
+            ...ref,
+            overrides: { hardware: { requirements: [] } },
+          },
+          config: { hardware: { requirements: [] } },
+        }),
+      }),
+    );
+  });
+  const user = userClient(baseUrl),
+    version = await user.getPublishedTemplateVersion("template_1", 2);
+  assert.equal(version.content.schemaVersion, "agent-template-content@2");
+  assert.deepEqual(version.content.hardware.requirements, []);
+  const agent = await user.getAgent("agent_1");
+  const body = {
+    agentTemplateId: "template_1",
+    templateVersion: 2,
+    expectedApplication: null,
+    adoption: true,
+    resetOverridePaths: ["hardware.requirements"],
+    overrides: { hardware: { requirements: [] } },
+  };
+  assert.deepEqual(
+    (await agent.previewTemplateApplication(body)).nextOverrides,
+    { hardware: { requirements: [] } },
+  );
+  await agent.applyTemplate(body, { idempotencyKey: "apply-hardware-2" });
+  assert.deepEqual(calls.at(-1).body, body);
+  assert.equal(calls.at(-1).headers["if-match"], '"agent-v2"');
+  assert.equal(calls.at(-1).headers["idempotency-key"], "apply-hardware-2");
+  assert.deepEqual(agent.config.hardware, { requirements: [] });
+  await agent.configure({ hardware: { requirements: [] } });
+  assert.deepEqual(calls.at(-1).body, { hardware: { requirements: [] } });
 });

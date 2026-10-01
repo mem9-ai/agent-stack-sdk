@@ -156,7 +156,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.agentServiceApiVersion, "0.0.1");
   assert.equal(
     installedPackage.agentServiceRevision,
-    "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025",
+    "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
   );
   assert.match(installedPackage.version, /^0\./);
   assert.deepEqual((await readdir(installedRoot)).sort(), [

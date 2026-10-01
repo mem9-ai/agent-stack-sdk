@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  AGENT_STACK_CONTRACT_COMMIT: 09bc113afa82ae37948ebf4ed576662d23068e4b
+  AGENT_STACK_CONTRACT_COMMIT: 557b624acdee125e49c847776fc9feba27029a87
 
 jobs:
   typescript:

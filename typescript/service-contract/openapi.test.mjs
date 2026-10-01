@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const expectedServiceRevision = "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025";
+const expectedServiceRevision = "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6";
 
 const contractRoot = process.env.AGENT_STACK_CONTRACT;
 if (!contractRoot) throw new Error("AGENT_STACK_CONTRACT is required");

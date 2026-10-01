@@ -106,7 +106,7 @@ Identity comes from the API Key.
 ## Compatibility
 
 `@mem9/agent-stack` 0.2.x targets Agent Service OpenAPI `0.0.1` at revision
-`95475ff6a9a7a1a98f8b3efbf57b89fb263e7025`, exported as
+`7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6`, exported as
 `AGENT_SERVICE_API_VERSION` and `AGENT_SERVICE_REVISION`.
 
 Credential creation and Session creation still report ambiguous transport

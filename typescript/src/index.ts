@@ -2,7 +2,7 @@
 export const AGENT_SERVICE_API_VERSION = "0.0.1" as const;
 /** Exact Agent Service revision whose public contract is supported by this SDK release. */
 export const AGENT_SERVICE_REVISION =
-  "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025" as const;
+  "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6" as const;
 
 export {
   AgentStackApiError,

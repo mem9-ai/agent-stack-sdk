@@ -1,6 +1,6 @@
 {
-  "agentServiceRevision": "95475ff6a9a7a1a98f8b3efbf57b89fb263e7025",
+  "agentServiceRevision": "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
   "agentServiceApiVersion": "0.0.1",
-  "sha256": "0710f16437fb0080a1e55601a1b6158c4ada6ec7b8513ca448f6868792e32806",
-  "sourceOpenApiSha256": "5e0618869c0e9d0910d730dc26fa25898286f534a8cd98c034d2cfc847b1e024"
+  "sha256": "a6a53d40437a97a087ee1b352fac069f4b9d5c40b92d4eea26b9edc71f09e51c",
+  "sourceOpenApiSha256": "6b087d8132393bc7a07d27f5efc649a3c2654bb9768a126eb6cc359cb5b9d5c8"
 }

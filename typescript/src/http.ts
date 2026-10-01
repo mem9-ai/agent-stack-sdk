@@ -1,6 +1,6 @@
 import {
-  AgentStackApiError,
-  AgentStackError,
+  TiDBLinkApiError,
+  TiDBLinkError,
   ConflictError,
   ConnectionError,
   OutcomeUnknownError,
@@ -35,7 +35,7 @@ export interface HttpStream {
 
 export const requireEtag = <T>(result: HttpResult<T>): string => {
   if (!result.etag) {
-    throw new AgentStackError("Agent Service response omitted a required ETag", {
+    throw new TiDBLinkError("TiDB Link response omitted a required ETag", {
       requestId: result.requestId,
     });
   }
@@ -63,7 +63,7 @@ const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => {
 const errorInput = async (
   response: Response,
   fallbackRequestId: string,
-): Promise<ConstructorParameters<typeof AgentStackApiError>[0]> => {
+): Promise<ConstructorParameters<typeof TiDBLinkApiError>[0]> => {
   let value: unknown;
   try {
     value = await response.json();
@@ -80,7 +80,7 @@ const errorInput = async (
     message:
       typeof error?.message === "string"
         ? error.message
-        : `Agent Service request failed with status ${response.status}`,
+        : `TiDB Link request failed with status ${response.status}`,
     requestId: response.headers.get("x-request-id") ?? fallbackRequestId,
     ...(error && "details" in error ? { details: error.details } : {}),
   };
@@ -111,6 +111,13 @@ export function requireKnownKeys(
   const unknown = Object.keys(value).find((key) => !allowed.includes(key));
   if (unknown) throw new TypeError(`${label}.${unknown} is not supported`);
 }
+
+/** Check the frozen wire grammar without retaining or exposing the credential. */
+export const isApiKey = (value: unknown, kind: "org" | "user"): value is string => {
+  if (typeof value !== "string") return false;
+  const match = /^ti_(org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.exec(value);
+  return match !== null && match[0] === value && match[1] === kind;
+};
 
 export class HttpClient {
   readonly #apiKey: string;
@@ -223,10 +230,10 @@ export class HttpClient {
       const input = await errorInput(response, stableRequestId);
       throw input.status === 409 || input.status === 412
         ? new ConflictError(input)
-        : new AgentStackApiError(input);
+        : new TiDBLinkApiError(input);
     }
     if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
-      throw new OutcomeUnknownError("Agent Service returned an invalid Turn stream", {
+      throw new OutcomeUnknownError("TiDB Link returned an invalid Turn stream", {
         requestId: response.headers.get("x-request-id") ?? stableRequestId,
       });
     }
@@ -271,8 +278,8 @@ export class HttpClient {
         const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : ConnectionError;
         throw new ErrorClass(
           options.outcomeUnknown
-            ? "Agent Service request outcome is unknown; do not repeat it automatically"
-            : "Could not reach Agent Service",
+            ? "TiDB Link request outcome is unknown; do not repeat it automatically"
+            : "Could not reach TiDB Link",
           {
             requestId: stableRequestId,
             cause,
@@ -288,11 +295,11 @@ export class HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (cause) {
-            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : AgentStackError;
+            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : TiDBLinkError;
             throw new ErrorClass(
               options.outcomeUnknown
-                ? "Agent Service accepted the request but returned an unusable response"
-                : "Agent Service returned invalid JSON",
+                ? "TiDB Link accepted the request but returned an unusable response"
+                : "TiDB Link returned invalid JSON",
               {
                 requestId: response.headers.get("x-request-id") ?? stableRequestId,
                 cause,
@@ -316,7 +323,7 @@ export class HttpClient {
       const input = await errorInput(response, stableRequestId);
       throw input.status === 409 || input.status === 412
         ? new ConflictError(input)
-        : new AgentStackApiError(input);
+        : new TiDBLinkApiError(input);
     }
     throw new Error("unreachable");
   }

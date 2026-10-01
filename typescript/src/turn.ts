@@ -1,5 +1,5 @@
 import {
-  AgentStackError,
+  TiDBLinkError,
   InvalidTurnEventError,
   OutcomeUnknownError,
   TurnFailedError,
@@ -160,7 +160,7 @@ const parseEvent = (
   try {
     value = JSON.parse(line);
   } catch (cause) {
-    throw new InvalidTurnEventError("Agent Service returned malformed NDJSON", {
+    throw new InvalidTurnEventError("TiDB Link returned malformed NDJSON", {
       requestId,
       ...(expectedTurnId ? { turnId: expectedTurnId } : {}),
       cause,
@@ -179,7 +179,7 @@ const parseEvent = (
     !isRecord(value.payload) ||
     !validPayload(value.event, value.payload)
   ) {
-    throw new InvalidTurnEventError("Agent Service returned an invalid Turn event", {
+    throw new InvalidTurnEventError("TiDB Link returned an invalid Turn event", {
       requestId,
       ...(expectedTurnId ? { turnId: expectedTurnId } : {}),
     });
@@ -281,7 +281,7 @@ export async function* streamTurn(
     }
   } catch (cause) {
     if (input.signal?.aborted) throw input.signal.reason ?? cause;
-    if (cause instanceof AgentStackError) throw cause;
+    if (cause instanceof TiDBLinkError) throw cause;
     throw new OutcomeUnknownError("Turn stream was interrupted before its terminal event", {
       requestId: opened.requestId,
       ...(turnId ? { turnId } : {}),

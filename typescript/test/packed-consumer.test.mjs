@@ -11,7 +11,7 @@ const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 test("the packed SDK installs and typechecks in a clean ESM consumer", async (context) => {
   const temporary = await mkdtemp(
-    path.join(tmpdir(), "agent-stack-sdk-consumer-"),
+    path.join(tmpdir(), "tidb-link-sdk-consumer-"),
   );
   context.after(() => rm(temporary, { recursive: true, force: true }));
 
@@ -63,15 +63,19 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       ServiceUser,
       Session,
       TurnResult,
-    } from "@mem9/agent-stack";
+    } from "@mem9/tidb-link";
     import {
-      AGENT_SERVICE_API_VERSION,
-      AGENT_SERVICE_REVISION,
+      TIDB_LINK_API_VERSION,
+      TIDB_LINK_REVISION,
+      TiDBLinkApiError,
+      TiDBLinkError,
       OrganizationClient,
       UserClient,
-    } from "@mem9/agent-stack";
+    } from "@mem9/tidb-link";
+    // @ts-expect-error Previous compatibility constants and error exports have no aliases.
+    import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@mem9/tidb-link";
     // @ts-expect-error Workspace authority was removed from the supported SDK.
-    import { WorkspaceClient } from "@mem9/agent-stack";
+    import { WorkspaceClient } from "@mem9/tidb-link";
 
     declare const baseUrl: string;
     declare const organizationApiKey: string;
@@ -100,7 +104,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     // @ts-expect-error Organization API Keys cannot create Service Users through the public contract.
     organization.createServiceUser({ displayName: "Customer" });
     // @ts-expect-error Project selection was removed from User authority.
-    new UserClient({ baseUrl, apiKey: "ag9_uak_key_${"x".repeat(32)}", projectId: "removed" });
+    new UserClient({ baseUrl, apiKey: "ti_user_key_${"x".repeat(43)}", projectId: "removed" });
     // @ts-expect-error Runtime selection is not an Agent configuration capability.
     const removedRuntime: AgentConfigPatch = { runtime: { backend: "codex", authId: "removed" } };
     declare const session: Session;
@@ -108,8 +112,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     session.setModel("gpt-5.4");
     // @ts-expect-error Structured Turn output is not supported.
     session.turn({ text: "Hello", outputSchema: { type: "object" } });
-    void AGENT_SERVICE_API_VERSION;
-    void AGENT_SERVICE_REVISION;
+    void TIDB_LINK_API_VERSION;
+    void TIDB_LINK_REVISION;
+    const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
+    void apiError;
     void publicConfig;
     void WorkspaceClient;
     void removedRuntime;
@@ -147,15 +153,15 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     temporary,
     "node_modules",
     "@mem9",
-    "agent-stack",
+    "tidb-link",
   );
   const installedPackage = JSON.parse(
     await readFile(path.join(installedRoot, "package.json"), "utf8"),
   );
   assert.equal(installedPackage.dependencies, undefined);
-  assert.equal(installedPackage.agentServiceApiVersion, "0.0.1");
+  assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
-    installedPackage.agentServiceRevision,
+    installedPackage.tidbLinkRevision,
     "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
   );
   assert.match(installedPackage.version, /^0\./);
@@ -171,7 +177,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     withFileTypes: true,
   });
   const credentialPattern =
-    /ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
+    /ti_(?:org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}|ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
   for (const file of publishedFiles) {
     if (!file.isFile()) continue;
     const contents = await readFile(
@@ -180,4 +186,63 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     );
     assert.doesNotMatch(contents, credentialPattern);
   }
+
+  await writeFile(path.join(temporary, "consumer.mjs"), `
+    import assert from "node:assert/strict";
+    import { createServer } from "node:http";
+    import * as sdk from "@mem9/tidb-link";
+    assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
+    assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
+    for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError"]) {
+      assert.equal(sdk[name], undefined);
+    }
+    const orgKey = "ti_org_key_" + "x".repeat(43);
+    const userKey = "ti_user_key_" + "y".repeat(43);
+    const rotatedKey = "ti_user_key_" + "z".repeat(43);
+    const requests = [];
+    const server = createServer((request, response) => {
+      requests.push({ method: request.method, url: request.url, key: request.headers.authorization });
+      response.setHeader("content-type", "application/json");
+      if (request.url === "/api/agents") {
+        response.end(JSON.stringify({ agents: [] }));
+      } else {
+        const token = request.url.endsWith("/rotate") ? rotatedKey : userKey;
+        response.writeHead(201).end(JSON.stringify({ apiKey: { apiKeyId: "uak_key" }, token }));
+      }
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const baseUrl = "http://127.0.0.1:" + server.address().port;
+      const org = new sdk.OrganizationClient({ baseUrl, apiKey: orgKey });
+      const serviceUser = org.serviceUser("user_1");
+      const { token } = await serviceUser.createApiKey({ name: "test" });
+      assert.equal(token, userKey);
+      const user = new sdk.UserClient({ baseUrl, apiKey: token });
+      assert.deepEqual(await user.listAgents(), []);
+      const rotated = await serviceUser.rotateApiKey("uak_key");
+      assert.equal(rotated.token, rotatedKey);
+      assert.deepEqual(await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents(), []);
+      assert.deepEqual(requests, [
+        {method:"POST",url:"/api/admin/org/users/user_1/api-keys",key:"Bearer " + orgKey},
+        {method:"GET",url:"/api/agents",key:"Bearer " + userKey},
+        {method:"POST",url:"/api/admin/org/user-api-keys/uak_key/rotate",key:"Bearer " + orgKey},
+        {method:"GET",url:"/api/agents",key:"Bearer " + rotatedKey},
+      ]);
+      for (const [Client, apiKey] of [[sdk.UserClient, orgKey], [sdk.OrganizationClient, "ag9_oak." + "key." + "x".repeat(32)]]) {
+        assert.throws(() => new Client({baseUrl,apiKey}), (error) => {
+          assert(error instanceof TypeError);
+          assert(!String(error).includes(apiKey));
+          assert(!JSON.stringify(error).includes(apiKey));
+          return true;
+        });
+      }
+      assert.equal(requests.length, 4);
+      for (const client of [org, user]) {
+        for (const key of [orgKey, userKey, rotatedKey]) assert(!JSON.stringify(client).includes(key));
+      }
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  `);
+  execFileSync(process.execPath, ["consumer.mjs"], {cwd: temporary, stdio: "pipe"});
 });

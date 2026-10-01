@@ -1,5 +1,5 @@
 {
-  "name": "agent-stack-sdks",
+  "name": "tidb-link-sdks",
   "private": true,
   "workspaces": [
     "typescript"
@@ -9,11 +9,11 @@
   },
   "packageManager": "npm@11.6.2",
   "scripts": {
-    "build": "npm run build --workspace @mem9/agent-stack",
-    "typecheck": "npm run typecheck --workspace @mem9/agent-stack",
-    "test": "npm run test --workspace @mem9/agent-stack",
-    "test:service-contract": "npm run test:service-contract --workspace @mem9/agent-stack",
-    "pack:check": "npm run pack:check --workspace @mem9/agent-stack"
+    "build": "npm run build --workspace @mem9/tidb-link",
+    "typecheck": "npm run typecheck --workspace @mem9/tidb-link",
+    "test": "npm run test --workspace @mem9/tidb-link",
+    "test:service-contract": "npm run test:service-contract --workspace @mem9/tidb-link",
+    "pack:check": "npm run pack:check --workspace @mem9/tidb-link"
   },
   "devDependencies": {
     "typescript": "5.9.2"

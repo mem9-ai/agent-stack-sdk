@@ -5,7 +5,7 @@ import { after, test } from "node:test";
 import { ConflictError, OutcomeUnknownError, UserClient } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
+const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -106,6 +106,7 @@ test("an Agent creates a persistent Session and retains its model ETag", async (
   });
   assert.equal(calls[1].headers["idempotency-key"], undefined);
   assert.equal(calls[1].headers["x-agent9-project-id"], undefined);
+  assert.equal(calls[1].headers["x-ti-project-id"], undefined);
 });
 
 test("a Session updates the model with its retained ETag and never overwrites a conflict", async () => {

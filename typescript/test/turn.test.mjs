@@ -11,7 +11,7 @@ import {
 } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ag9_uak_" + "key_" + "x".repeat(32);
+const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -86,6 +86,7 @@ test("the Turn stream validates ordered events across chunks and heartbeats", as
     billingTag: { key: "customer", value: "acme" },
   });
   assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-project-id"], undefined);
 });
 
 test("malformed Turn payloads are rejected at the package boundary", async () => {

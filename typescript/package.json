@@ -1,14 +1,14 @@
 {
-  "name": "@mem9/agent-stack",
-  "version": "0.2.0",
-  "description": "Official TypeScript SDK for Agent Stack",
+  "name": "@mem9/tidb-link",
+  "version": "0.3.0",
+  "description": "Official TypeScript SDK for TiDB Link",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=22.12"
   },
-  "agentServiceApiVersion": "0.0.1",
-  "agentServiceRevision": "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
+  "tidbLinkApiVersion": "0.0.1",
+  "tidbLinkRevision": "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

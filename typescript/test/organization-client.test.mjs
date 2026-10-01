@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, OrganizationClient, OutcomeUnknownError } from "../dist/index.js";
+import { ConflictError, OrganizationClient, OutcomeUnknownError, TiDBLinkApiError, TiDBLinkError, UserClient } from "../dist/index.js";
 
 const servers = [];
-const organizationApiKey = "ag9_oak." + "key_id." + "x".repeat(32);
+const organizationApiKey = "ti_org_" + "keyId_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -45,9 +45,13 @@ test("an Organization client retries a safe read with one request identity", asy
   assert.equal(requests[0].headers.authorization, `Bearer ${organizationApiKey}`);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
   assert.equal(requests[0].headers["x-agent9-workspace-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-workspace-id"], undefined);
   assert.equal(requests[0].headers["x-agent9-user-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-user-id"], undefined);
   assert.equal(requests[0].headers["x-agent9-organization-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-organization-id"], undefined);
   assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
+  assert.equal(requests[0].headers["x-ti-project-id"], undefined);
 });
 
 test("an Organization service conflict preserves safe error details", async () => {
@@ -71,6 +75,8 @@ test("an Organization service conflict preserves safe error details", async () =
 
   await assert.rejects(client.serviceUser("user_1").listApiKeys(), (error) => {
     assert(error instanceof ConflictError);
+    assert(error instanceof TiDBLinkApiError);
+    assert(error instanceof TiDBLinkError);
     assert.equal(error.status, 409);
     assert.equal(error.code, "revision_conflict");
     assert.equal(error.requestId, "request_from_service");
@@ -80,7 +86,7 @@ test("an Organization service conflict preserves safe error details", async () =
 });
 
 test("an Organization client rejects a User API Key without exposing it", () => {
-  const apiKey = "ag9_uak_" + "key_" + "x".repeat(32);
+  const apiKey = "ti_user_" + "key_" + "x".repeat(43);
 
   assert.throws(
     () => new OrganizationClient({ baseUrl: "https://agent.example.com", apiKey }),
@@ -91,6 +97,52 @@ test("an Organization client rejects a User API Key without exposing it", () => 
   );
 });
 
+test("clients accept only the frozen typed credential grammar before dispatch", async () => {
+  const calls = [];
+  const baseUrl = await serve((request, response) => {
+    calls.push({ url: request.url, headers: request.headers });
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ apiKeys: [], agents: [] }));
+  });
+  const secret = "x".repeat(41) + "_A";
+  for (const [kind, Client] of [["org", OrganizationClient], ["user", UserClient]]) {
+    const invalid = kind === "org" ? [
+      `ti_${kind}_key_${"x".repeat(42)}`,
+      `ti_${kind}_key_${"x".repeat(44)}`,
+      `ti_${kind}__${secret}`,
+      `ti_${kind}_${"a".repeat(65)}_${secret}`,
+      `ti_${kind}_key_id_${secret}`,
+      `ti_${kind}_é_${secret}`,
+      `ti_${kind}_key_${"x".repeat(42)}+`,
+      `ti_${kind}_key_${secret}\n`,
+      `ti_${kind}.key.${secret}`,
+      "ag9_oak." + "key." + "x".repeat(32),
+      "", null, undefined, 123,
+    ] : [`ti_user_key_${"x".repeat(42)}`];
+    for (const apiKey of invalid) {
+      assert.throws(() => new Client({ baseUrl, apiKey }), (error) => {
+        assert(error instanceof TypeError);
+        if (typeof apiKey === "string" && apiKey) {
+          for (const rendered of [String(error), error.stack, JSON.stringify(error)]) {
+            assert(!rendered.includes(apiKey));
+          }
+        }
+        return true;
+      });
+    }
+    assert.equal(calls.length, kind === "org" ? 0 : 2);
+    for (const id of ["A", "a".repeat(64)]) {
+      const apiKey = `ti_${kind}_${id}_${secret}`;
+      const client = new Client({ baseUrl, apiKey });
+      assert(!JSON.stringify(client).includes(apiKey));
+      if (kind === "org") await client.serviceUser("user_1").listApiKeys();
+      else await client.listAgents();
+      assert.equal(calls.at(-1).headers.authorization, `Bearer ${apiKey}`);
+    }
+  }
+  assert.equal(calls.length, 4);
+});
+
 test("an Organization client manages a Service User's credentials", async () => {
   const calls = [];
   const apiKey = {
@@ -98,7 +150,7 @@ test("an Organization client manages a Service User's credentials", async () => 
     organizationId: "org_1",
     userId: "user_1",
     name: "backend",
-    tokenPrefix: "ag9_uak_1_",
+    tokenPrefix: "ti_user_1_",
     status: "active",
     createdByUserId: null,
     createdByOrganizationApiKeyId: "oak_1",
@@ -113,11 +165,11 @@ test("an Organization client manages a Service User's credentials", async () => 
     calls.push({ method: request.method, url: request.url, body, headers: request.headers });
     response.setHeader("content-type", "application/json");
     if (request.url === "/api/admin/org/users/user_1/api-keys") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-1" }));
+      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_1_" + "a".repeat(43) }));
       return;
     }
     if (request.url === "/api/admin/org/user-api-keys/uak_1/rotate") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "one-time-key-2" }));
+      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_2_" + "b".repeat(43) }));
       return;
     }
     response.writeHead(201).end(
@@ -133,8 +185,8 @@ test("an Organization client manages a Service User's credentials", async () => 
 
   const serviceUser = client.serviceUser("user_1");
   assert.equal(serviceUser.id, "user_1");
-  assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "one-time-key-1");
-  assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "one-time-key-2");
+  assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "ti_user_1_" + "a".repeat(43));
+  assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "ti_user_2_" + "b".repeat(43));
   assert.equal((await serviceUser.revokeApiKey("uak_1")).status, "revoked");
 
   assert.deepEqual(JSON.parse(calls[0].body), { name: "backend" });
@@ -172,7 +224,15 @@ test("a lost credential response is outcome unknown and is not retried", async (
 });
 
 test("unusable credential responses are outcome unknown", async () => {
-  const bodies = ["not-json", JSON.stringify({ apiKey: { apiKeyId: "uak_1" } })];
+  const invalidTokens = [
+    "ag9_uak_" + "1_" + "x".repeat(32),
+    organizationApiKey,
+    "ti_user_1_" + "x".repeat(42),
+  ];
+  const bodies = [
+    "not-json", JSON.stringify({ apiKey: { apiKeyId: "uak_1" } }),
+    ...invalidTokens.map((token) => JSON.stringify({ apiKey: { apiKeyId: "uak_1" }, token })),
+  ];
   let request = 0;
   const baseUrl = await serve((_request, response) => {
     response.writeHead(201, { "content-type": "application/json" }).end(bodies[request++]);
@@ -181,9 +241,19 @@ test("unusable credential responses are outcome unknown", async () => {
 
   for (let attempt = 0; attempt < bodies.length; attempt += 1) {
     await assert.rejects(
-      client.serviceUser("user_1").createApiKey({ name: "backend" }),
-      OutcomeUnknownError,
+      attempt % 2 === 0
+        ? client.serviceUser("user_1").createApiKey({ name: "backend" })
+        : client.serviceUser("user_1").rotateApiKey("uak_1"),
+      (error) => {
+        assert(error instanceof OutcomeUnknownError);
+        for (const token of [organizationApiKey, ...invalidTokens]) {
+          assert(!String(error).includes(token));
+          assert(!JSON.stringify(error).includes(token));
+        }
+        return true;
+      },
     );
+    assert.equal(request, attempt + 1);
   }
 });
 

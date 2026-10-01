@@ -6,8 +6,8 @@ import { test } from "node:test";
 
 const expectedServiceRevision = "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6";
 
-const contractRoot = process.env.AGENT_STACK_CONTRACT;
-if (!contractRoot) throw new Error("AGENT_STACK_CONTRACT is required");
+const contractRoot = process.env.TIDB_LINK_CONTRACT;
+if (!contractRoot) throw new Error("TIDB_LINK_CONTRACT is required");
 
 const openApiBytes = await readFile(path.join(contractRoot, "openapi.json"));
 const document = JSON.parse(openApiBytes);
@@ -45,13 +45,13 @@ const propertyNames = (value, names = new Set()) => {
   return names;
 };
 
-test("the SDK declaration maps to one immutable Agent Service contract", () => {
-  assert.equal(metadata.agentServiceRevision, expectedServiceRevision);
-  assert.equal(metadata.agentServiceApiVersion, "0.0.1");
-  assert.equal(packageJson.agentServiceRevision, metadata.agentServiceRevision);
+test("the SDK declaration maps to one immutable TiDB Link contract", () => {
+  assert.equal(metadata.tidbLinkRevision, expectedServiceRevision);
+  assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
+  assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
   assert.equal(
-    packageJson.agentServiceApiVersion,
-    metadata.agentServiceApiVersion,
+    packageJson.tidbLinkApiVersion,
+    metadata.tidbLinkApiVersion,
   );
   assert.equal(
     createHash("sha256").update(openApiBytes).digest("hex"),
@@ -75,6 +75,22 @@ test("the declared contract exposes the supported Organization and User workflow
   ]) {
     assert(document.paths[route], `missing ${route}`);
   }
+
+  assert.equal(document.info.title, "TiDB Link API");
+  const securitySchemes = document.components.securitySchemes;
+  assert.equal(securitySchemes.TiDBLinkSession.type, "apiKey");
+  assert.equal(securitySchemes.TiDBLinkSession.in, "cookie");
+  assert.equal(securitySchemes.Agent9Session, undefined);
+  for (const name of ["OrganizationApiKey", "UserApiKey"]) {
+    assert.equal(securitySchemes[name].type, "http");
+    assert.equal(securitySchemes[name].scheme, "bearer");
+    assert.notEqual(securitySchemes[name].bearerFormat, "JWT");
+  }
+  const organizationIntent =
+    document.paths["/api/admin/org/users/{userId}/api-keys"].post.parameters
+      .filter((parameter) => parameter.in === "header");
+  assert(organizationIntent.some((parameter) => parameter.name === "x-ti-target-organization-id"));
+  assert(!organizationIntent.some((parameter) => parameter.name === "x-agent9-target-organization-id"));
 
   const organizationSecurity =
     document.paths["/api/admin/org/users/{userId}/api-keys"].get.security;

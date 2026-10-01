@@ -1,6 +1,6 @@
 {
-  "agentServiceRevision": "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
-  "agentServiceApiVersion": "0.0.1",
-  "sha256": "cb7564887d6100e928d6bd4d087c15655a3240adcfa24ec410a47b2f96046cfd",
-  "sourceOpenApiSha256": "6b087d8132393bc7a07d27f5efc649a3c2654bb9768a126eb6cc359cb5b9d5c8"
+  "tidbLinkRevision": "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87",
+  "tidbLinkApiVersion": "0.0.1",
+  "sha256": "d3496528fc2da2f38c65f587eed0cd855b6b9441e44d41a39a3a7ba0f5fa2077",
+  "sourceOpenApiSha256": "a62f578478d32980694cd3130f0dd86f39839132aaa43b26e278734e72a1c2c0"
 }

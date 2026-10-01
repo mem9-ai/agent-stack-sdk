@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Require explicit published Template selection for new Agents.
+- Add descriptive Hardware configuration, content version 2 types, published version reads and explicit Template application with preserved override/reset intent.
+- Keep Console Draft Preview separate from the User-key SDK.
+
 ## 0.2.0
 
 - Replace Workspace and Project authority with Organization and User authority.

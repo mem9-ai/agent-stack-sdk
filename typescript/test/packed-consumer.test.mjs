@@ -10,7 +10,9 @@ const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 test("the packed SDK installs and typechecks in a clean ESM consumer", async (context) => {
-  const temporary = await mkdtemp(path.join(tmpdir(), "agent-stack-sdk-consumer-"));
+  const temporary = await mkdtemp(
+    path.join(tmpdir(), "agent-stack-sdk-consumer-"),
+  );
   context.after(() => rm(temporary, { recursive: true, force: true }));
 
   const pack = JSON.parse(
@@ -41,16 +43,22 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     path.join(temporary, "package.json"),
     JSON.stringify({ private: true, type: "module" }),
   );
-  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], {
-    cwd: temporary,
-    stdio: "pipe",
-  });
+  execFileSync(
+    "npm",
+    ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball],
+    {
+      cwd: temporary,
+      stdio: "pipe",
+    },
+  );
 
   await writeFile(
     path.join(temporary, "consumer.ts"),
     `import type {
       Agent,
       AgentConfigPatch,
+      TemplateContent,
+      HardwareRequirement,
       PublicAgentConfig,
       ServiceUser,
       Session,
@@ -74,8 +82,17 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const { token } = await serviceUser.createApiKey({ name: "backend" });
       const user = new UserClient({ baseUrl, apiKey: token });
       const agents: Agent[] = await user.listAgents();
-      const agent = agents[0] ?? await user.createAgent({ name: "Customer Agent" });
-      const config: AgentConfigPatch = { memory: { enabled: true } };
+      const agent = agents[0] ?? await user.createAgent({ agentTemplateId: "template_1", templateVersion: 1, name: "Customer Agent" });
+      const requirement: HardwareRequirement = {definitionId:"hdef_"+"a".repeat(32),capabilityNames:["set_level"]};
+      const config: AgentConfigPatch = { memory: { enabled: true }, hardware:{requirements:[requirement]} };
+      const published = await user.getPublishedTemplateVersion("template_1",1);
+      const content: TemplateContent = published.content;
+      void content;
+      // @ts-expect-error Content version 1 cannot declare Hardware.
+      const invalidContent: TemplateContent = { ...published.content,schemaVersion:"agent-template-content@1",hardware:{requirements:[]} };
+      // @ts-expect-error Every new Agent needs an explicit Template selector.
+      user.createAgent({name:"Missing selection"});
+      void invalidContent;
       await agent.configure(config);
       const session: Session = await agent.createSession();
       return session.turn({ text: "Hello" });
@@ -100,7 +117,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     void quickStart;
     `,
   );
-  const tsc = path.join(repositoryRoot, "node_modules", "typescript", "bin", "tsc");
+  const tsc = path.join(
+    repositoryRoot,
+    "node_modules",
+    "typescript",
+    "bin",
+    "tsc",
+  );
   execFileSync(
     process.execPath,
     [
@@ -120,19 +143,41 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     { cwd: temporary, encoding: "utf8", stdio: "pipe" },
   );
 
-  const installedRoot = path.join(temporary, "node_modules", "@mem9", "agent-stack");
-  const installedPackage = JSON.parse(await readFile(path.join(installedRoot, "package.json"), "utf8"));
+  const installedRoot = path.join(
+    temporary,
+    "node_modules",
+    "@mem9",
+    "agent-stack",
+  );
+  const installedPackage = JSON.parse(
+    await readFile(path.join(installedRoot, "package.json"), "utf8"),
+  );
   assert.equal(installedPackage.dependencies, undefined);
   assert.equal(installedPackage.agentServiceApiVersion, "0.0.1");
-  assert.equal(installedPackage.agentServiceRevision, "9c1e9aceb28afce1166e4249ea104c7a2f8aac73");
+  assert.equal(
+    installedPackage.agentServiceRevision,
+    "7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6",
+  );
   assert.match(installedPackage.version, /^0\./);
-  assert.deepEqual((await readdir(installedRoot)).sort(), ["LICENSE", "README.md", "dist", "package.json"]);
+  assert.deepEqual((await readdir(installedRoot)).sort(), [
+    "LICENSE",
+    "README.md",
+    "dist",
+    "package.json",
+  ]);
 
-  const publishedFiles = await readdir(installedRoot, { recursive: true, withFileTypes: true });
-  const credentialPattern = /ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
+  const publishedFiles = await readdir(installedRoot, {
+    recursive: true,
+    withFileTypes: true,
+  });
+  const credentialPattern =
+    /ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
   for (const file of publishedFiles) {
     if (!file.isFile()) continue;
-    const contents = await readFile(path.join(file.parentPath, file.name), "utf8");
+    const contents = await readFile(
+      path.join(file.parentPath, file.name),
+      "utf8",
+    );
     assert.doesNotMatch(contents, credentialPattern);
   }
 });

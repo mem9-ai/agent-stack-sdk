@@ -13,7 +13,7 @@ npm install @mem9/agent-stack
 
 ## Quick start
 
-The Organization API Key needs `user-api-keys:manage`. Create the Service User
+The Organization API Key authenticates its Organization; the server authorizes each supported handler. Create the Service User
 in the Console first, then store its ID in your customer mapping. Store the
 one-time User API Key in your secret manager.
 
@@ -24,6 +24,8 @@ export async function runCustomerTurn(input: {
   baseUrl: string;
   organizationApiKey: string;
   serviceUserId: string;
+  agentTemplateId: string;
+  templateVersion: number;
   customerName: string;
   prompt: string;
 }) {
@@ -43,7 +45,11 @@ export async function runCustomerTurn(input: {
     baseUrl: input.baseUrl,
     apiKey: userApiKey,
   });
-  const agent = await user.createAgent({ name: `${input.customerName} Agent` });
+  const agent = await user.createAgent({
+    agentTemplateId: input.agentTemplateId,
+    templateVersion: input.templateVersion,
+    name: `${input.customerName} Agent`,
+  });
   const session = await agent.createSession();
   return session.turn({ text: input.prompt });
 }
@@ -61,7 +67,7 @@ for await (const event of session.streamTurn({ text: "Continue" })) {
 ## Clients and resources
 
 - `OrganizationClient` accepts an Organization API Key with
-  `user-api-keys:manage`. It reconstructs a `ServiceUser` handle from a retained
+  Organization scope. It reconstructs a `ServiceUser` handle from a retained
   User ID; Service User creation remains a Console action.
 - `ServiceUser` creates, lists, rotates, revokes, and bulk-revokes User API
   Keys. Plaintext is returned only by successful create and rotate calls.
@@ -100,9 +106,26 @@ Identity comes from the API Key.
 ## Compatibility
 
 `@mem9/agent-stack` 0.2.x targets Agent Service OpenAPI `0.0.1` at revision
-`9c1e9aceb28afce1166e4249ea104c7a2f8aac73`, exported as
+`7c12ed1a4f75ebb808b642f07f8fcd25259cf0f6`, exported as
 `AGENT_SERVICE_API_VERSION` and `AGENT_SERVICE_REVISION`.
 
 Credential creation and Session creation still report ambiguous transport
 outcomes explicitly and are not retried. Progress-stream resumption is outside
 the current supported surface.
+
+## Published templates and descriptive Hardware
+
+New Agents require an explicit `agentTemplateId`. Add `templateVersion` to choose
+an exact publication; ID-only selection pins latest once on the server. Published
+content is available through `getPublishedTemplateVersion`. `Agent.data` reports
+its immutable creation origin, independent instructions and current application.
+
+`config.hardware.requirements` and `overrides.hardware.requirements` contain exact
+Definition IDs and capability names. They describe metadata without assigning a
+device or granting execution. Explicit empty arrays survive upgrades. Preview an
+idle Agent upgrade with `previewTemplateApplication`, then use `applyTemplate`
+with the expected application, selected reset paths and one stable retry key.
+`hardware.requirements` is a supported reset path. Existing default-Agent ensure
+only returns an established mapping; if absent, explicitly create from a published
+Template first. This SDK exposes personal User-key APIs; Console unsaved Draft
+Preview remains a separate browser-cookie workflow.

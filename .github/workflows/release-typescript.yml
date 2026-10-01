@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 env:
-  AGENT_STACK_CONTRACT_COMMIT: a4ad2714b1a2244189a83af74a85e31fba60e3e8
+  AGENT_STACK_CONTRACT_COMMIT: 557b624acdee125e49c847776fc9feba27029a87
 
 jobs:
   publish:

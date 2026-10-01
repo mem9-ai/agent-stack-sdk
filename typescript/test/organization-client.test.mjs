@@ -104,7 +104,7 @@ test("clients accept only the frozen typed credential grammar before dispatch", 
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ apiKeys: [], agents: [] }));
   });
-  const secret = "x".repeat(41) + "_A";
+  const secret = "x".repeat(40) + "-_A";
   for (const [kind, Client] of [["org", OrganizationClient], ["user", UserClient]]) {
     const invalid = kind === "org" ? [
       `ti_${kind}_key_${"x".repeat(42)}`,

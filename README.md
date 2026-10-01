@@ -2,7 +2,7 @@
 
 Official, supported SDKs for TiDB Link.
 
-The TypeScript SDK lives in [`typescript/`](typescript/). It targets Node.js
+The TypeScript SDK lives in [`typescript/`](typescript/README.md). It targets Node.js
 22.12 or newer, uses the platform `fetch` and Web Streams APIs, and has no
 runtime dependencies.
 

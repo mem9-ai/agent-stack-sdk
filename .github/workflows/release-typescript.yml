@@ -46,8 +46,8 @@ jobs:
           {
             echo "## Published TypeScript SDK"
             echo
-            echo "- Package: \`@mem9/tidb-link@$(node -p 'require(\"./typescript/package.json\").version')\`"
+            echo "- Package: \`@mem9/tidb-link@$(node -p 'require("./typescript/package.json").version')\`"
             echo "- SDK commit: \`$GITHUB_SHA\`"
-            echo "- TiDB Link commit: \`$(node -p 'require(\"./typescript/package.json\").tidbLinkRevision')\`"
-            echo "- TiDB Link API: \`$(node -p 'require(\"./typescript/package.json\").tidbLinkApiVersion')\`"
+            echo "- TiDB Link commit: \`$(node -p 'require("./typescript/package.json").tidbLinkRevision')\`"
+            echo "- TiDB Link API: \`$(node -p 'require("./typescript/package.json").tidbLinkApiVersion')\`"
           } >> "$GITHUB_STEP_SUMMARY"

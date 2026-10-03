@@ -1,5 +1,5 @@
 import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
-import { createSessionForAgent, type BillingTag, Session } from "./session.js";
+import { createSessionForAgent, type BillingTag, type SessionRecord, Session } from "./session.js";
 
 export interface UserClientOptions {
   baseUrl: string;
@@ -106,6 +106,11 @@ export class UserClient {
     if (options?.limit !== undefined) query.set("limit", String(options.limit));
     if (options?.cursor !== undefined) query.set("cursor", options.cursor);
     return this.#http.get(`/api/v1/agent-templates${query.size ? `?${query}` : ""}`, options);
+  }
+
+  async listSessions(options?: { signal?: AbortSignal }): Promise<Session[]> {
+    const response = await this.#http.get<{ sessions: SessionRecord[] }>("/api/v1/sessions", options);
+    return response.sessions.map(record => new Session(this.#http, record.sessionId, record));
   }
 
   session(id: string): Session { return new Session(this.#http, id); }

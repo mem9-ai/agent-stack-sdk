@@ -194,7 +194,7 @@ export class HttpClient {
     return this.request(path, { ...options, method: "PUT", body });
   }
 
-  delete(path: string, options?: Pick<RequestOptions, "signal">): Promise<void> {
+  delete<T = void>(path: string, options?: Pick<RequestOptions, "signal">): Promise<T> {
     return this.request(path, { ...options, method: "DELETE", outcomeUnknown: true });
   }
 

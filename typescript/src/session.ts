@@ -1,4 +1,4 @@
-import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
+import { HttpClient, requireKnownKeys } from "./http.js";
 import {
   collectTurn,
   type CreateTurnInput,
@@ -7,7 +7,7 @@ import {
   type TurnStreamEvent,
 } from "./turn.js";
 
-export type SelectableSessionModel =
+export type SessionModel =
   | "gpt-6-astra"
   | "gpt-5.6-sol"
   | "gpt-5.6-terra"
@@ -17,7 +17,6 @@ export type SelectableSessionModel =
   | "claude-opus-5"
   | "DeepSeek-V4-Flash";
 
-export type SessionModel = SelectableSessionModel | "gpt-5.4";
 
 export interface BillingTag {
   key: string;
@@ -89,15 +88,13 @@ export interface TurnRecord {
 export class Session {
   readonly #http: HttpClient;
   readonly id: string;
-  #etag: string | undefined;
   #record: SessionRecord | undefined;
 
-  constructor(http: HttpClient, id: string, record?: SessionRecord, etag?: string) {
+  constructor(http: HttpClient, id: string, record?: SessionRecord) {
     if (!id) throw new TypeError("Session id is required");
     this.#http = http;
     this.id = id;
     this.#record = record;
-    this.#etag = etag;
   }
 
   get data(): Readonly<SessionRecord> | undefined {
@@ -110,33 +107,33 @@ export class Session {
 
   async refresh(options?: { signal?: AbortSignal }): Promise<this> {
     const result = await this.#http.getResponse<{ session: SessionRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}`,
+      `/api/v1/sessions/${encodeURIComponent(this.id)}`,
       options,
     );
     this.#record = result.data.session;
-    this.#etag = requireEtag(result);
     return this;
   }
 
-  async setModel(model: SelectableSessionModel, options?: { signal?: AbortSignal }): Promise<this> {
-    if (!this.#etag) await this.refresh(options);
-    const result = await this.#http.patchResponse<{ session: SessionRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/model`,
-      { model },
-      {
-        ifMatch: this.#etag as string,
-        outcomeUnknown: true,
-        ...(options?.signal ? { signal: options.signal } : {}),
-      },
-    );
-    this.#record = result.data.session;
-    this.#etag = requireEtag(result);
+  async rename(name: string, options?: { signal?: AbortSignal }): Promise<this> {
+    const response = await this.#http.post<{ session: SessionRecord }>(`/api/v1/sessions/${encodeURIComponent(this.id)}/name`, { name }, { outcomeUnknown: true, ...options });
+    this.#record = response.session;
     return this;
+  }
+
+  async setBillingTag(billingTag: BillingTag | null, options?: { signal?: AbortSignal }): Promise<this> {
+    const result = await this.#http.patchResponse<{ session: SessionRecord }>(`/api/v1/sessions/${encodeURIComponent(this.id)}/billing-tag`, { billingTag }, { outcomeUnknown: true, ...options });
+    this.#record = result.data.session;
+    return this;
+  }
+
+  async delete(options?: { signal?: AbortSignal }): Promise<void> {
+    const response = await this.#http.delete<{ session: SessionRecord }>(`/api/v1/sessions/${encodeURIComponent(this.id)}`, options);
+    this.#record = response.session;
   }
 
   async history(options?: { signal?: AbortSignal }): Promise<TurnRecord[]> {
     const response = await this.#http.get<{ turns: TurnRecord[] }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/turns`,
+      `/api/v1/sessions/${encodeURIComponent(this.id)}/turns`,
       options,
     );
     return response.turns;
@@ -144,7 +141,7 @@ export class Session {
 
   async getTurn(turnId: string, options?: { signal?: AbortSignal }): Promise<TurnRecord> {
     const response = await this.#http.get<{ turn: TurnRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/turns/${encodeURIComponent(turnId)}`,
+      `/api/v1/sessions/${encodeURIComponent(this.id)}/turns/${encodeURIComponent(turnId)}`,
       options,
     );
     return response.turn;
@@ -166,7 +163,7 @@ export const createSessionForAgent = async (
 ): Promise<Session> => {
   if (options) requireKnownKeys(options, ["billingTag", "signal"], "Session options");
   const result = await http.postResponse<{ session: SessionRecord }>(
-    "/api/sessions",
+    "/api/v1/sessions",
     {
       agentId,
       ...(options?.billingTag === undefined ? {} : { billingTag: options.billingTag }),
@@ -176,5 +173,5 @@ export const createSessionForAgent = async (
       ...(options?.signal ? { signal: options.signal } : {}),
     },
   );
-  return new Session(http, result.data.session.sessionId, result.data.session, requireEtag(result));
+  return new Session(http, result.data.session.sessionId, result.data.session);
 };

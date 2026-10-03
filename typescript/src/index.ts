@@ -30,7 +30,6 @@ export type {
   BillingTag,
   ClarificationItem,
   MessageRecord,
-  SelectableSessionModel,
   SessionModel,
   SessionRecord,
   TurnRecord,

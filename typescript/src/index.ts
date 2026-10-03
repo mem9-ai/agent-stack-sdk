@@ -24,27 +24,7 @@ export type {
   UserApiKey,
 } from "./organization.js";
 export { Agent, UserClient } from "./user.js";
-export type {
-  HardwareRequirement,
-  PublishedTemplateVersion,
-  ApplyTemplateInput,
-  TemplateApplicationPreview,
-  TemplateOverridePath,
-  TemplateContent,
-  TemplateOverrides,
-  TemplateApplicationReference,
-  AgentConfigInput,
-  AgentConfigPatch,
-  AgentRecord,
-  AgentTemplate,
-  AgentTemplateProvenance,
-  CreateAgentInput,
-  EnabledAgentCapability,
-  McpServerReference,
-  MemoryCredentialInput,
-  PublicAgentConfig,
-  UserClientOptions,
-} from "./user.js";
+export type { AgentRecord, AgentTemplate, AgentTemplatePage, CreateAgentInput, UserClientOptions } from "./user.js";
 export { Session } from "./session.js";
 export type {
   BillingTag,

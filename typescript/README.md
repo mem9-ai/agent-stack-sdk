@@ -30,8 +30,17 @@ const { token } = await businessUser.createApiKey({ name: "saas-backend" });
 const user = new UserClient({ baseUrl, apiKey: token });
 const page = await user.listAgentTemplates();
 const agent = await user.createAgent({ agentTemplateId: page.templates[0]!.agentTemplateId });
-const session = await agent.createSession();
-const result = await session.turn({ text: "Hello" });
+// Persist these identities with the original request before dispatch.
+const creationKey = "customer-42:conversation-001";
+const inputId = "message-001";
+const session = await agent.createSession({ idempotencyKey: creationKey });
+const result = await session.turn({ inputId, text: "Hello" });
+if (result.type === "receipt") {
+  const saved = await session.getInteraction(inputId);
+  const currentTurn = await session.getTurn(saved.turnId);
+} else {
+  console.log(result.text);
+}
 ```
 
 The typed, runnable functions are in `examples/quickstart.ts`. Retain a customer's
@@ -68,23 +77,66 @@ the credential in errors. One-time issuance responses require a valid User Key.
 
 ## Turn results and connections
 
-`session.turn()` collects an answer or structured clarification;
-`session.streamTurn()` yields validated progress and terminal events. The request
-that starts execution owns its stream. Normal completion closes the response and
-keeps the Session available. Ending the stream early requests interruption.
-The customer backend owns its downstream application-user connections and can
-keep the upstream execution request open when a user closes a page.
+`session.turn({inputId,text})` collects an answer, structured clarification or a
+saved receipt. `session.streamTurn` yields native progress/terminal events for a
+new Turn, or one discriminated SDK `type: "receipt"` item for active-message
+admission or identical replay. A receipt is saved input admission and outcome,
+not an assistant answer or a transient NDJSON event. `replayed` distinguishes an
+identical replay; `interaction.mode === "rejected"` preserves a saved refusal.
 
-## Errors and retry behavior
+```ts
+for await (const item of session.streamTurn({ inputId: "message-002", text: "Plan the work" })) {
+  if ("type" in item) continue; // Saved receipt: read its interaction/result.
+  if (item.event === "turn_started") {
+    const steering = await session.turn({ inputId: "steer-001", text: "Include costs" });
+    // An application can stop the same task with a separate input identity.
+    const stopping = await session.stopTurn(item.turnId, { inputId: "cancel-001" });
+  }
+  if (item.event === "progress") process.stdout.write(item.payload.text);
+}
+const page = await session.listInteractions({ limit: 50 });
+const saved = await session.getInteraction("message-002");
+const currentTurn = await session.getTurn(saved.turnId);
+```
 
-- `TiDBLinkApiError` preserves status, service error code, request identity and
-  display-safe details. `ConflictError` represents an explicit service conflict.
-- `TurnFailedError` and `TurnInterruptedError` distinguish terminal outcomes.
+An active plain-text message is admitted into the same Turn. `appliedAt` reports
+native incorporation; cancellation admission and a terminal outcome are separate
+facts. Query the saved interaction's `result` to distinguish running, succeeded,
+failed and interrupted. Paginate with `nextCursor`, and read a record by original
+inputId. Turn content contains ordered `userMessages`, the initial `userMessage`,
+final assistant and public Operations.
+
+The interaction retains its original execution generation's terminal result.
+An advanced explicit checkpoint retry can change the current Turn returned by
+`getTurn`; repeating an original inputId recovers its saved generation and never
+starts that retry. `getTurn` is current saved content, not an immutable transcript
+of each past execution generation.
+
+The request that starts execution owns its stream. Consume it through terminal
+and EOF; ending iteration or aborting before completion closes that owning
+request and requests interruption. Auxiliary steering/cancel receipts leave it
+open. Normal completion keeps the Session available. The customer backend owns
+its downstream application-user connections and can keep the upstream execution
+request open when a user closes a page.
+
+## Errors and recovery
+
+- `TiDBLinkApiError` preserves status, service error code, tracing identity and
+  display-safe details. `ConflictError` includes conflicting Session/input reuse.
+- `TurnFailedError` and `TurnInterruptedError` distinguish known terminal outcomes.
 - `OutcomeUnknownError` means a dispatched mutation or stream may have been
-  accepted. Use the operation's recovery contract before repeating it.
-- Safe reads and server-idempotent Agent association creation use bounded retries
-  with one request identity. One-time credential create/rotate and execution
-  streams are never automatically replayed.
+  accepted. Session creation errors preserve `idempotencyKey`; message/cancel
+  errors preserve `inputId` and the known Turn. Request tracing is separate.
+- Reissue an uncertain Session creation with its original key and body. Query
+  `getInteraction(inputId)` after an uncertain message or cancellation, and use
+  `getTurn` for current saved content. An unrecorded input is a scoped 404; saved
+  refusals remain readable. Identical input resubmission returns a saved receipt.
+- Session keys and input IDs contain 1–128 safe ASCII letters/digits/underscore/
+  dot/colon/hyphen and begin with a letter or digit. Persist each identity and
+  request intent before sending it. Reuse it only for that exact submission.
+- Safe reads and server-idempotent Agent association creation use bounded retries.
+  Session creation, input streams, cancellation and one-time key create/rotate
+  each make one automatic dispatch. Execution streams are never replayed.
 
 ## Compatibility
 

@@ -6,7 +6,12 @@
   the retained one-time User Key lifecycle.
 - Expose published Template summaries and unique User × Template Agent
   associations. Ordinary behavior and answer models belong to the publication.
-- Support fixed-configuration Session creation and owner metadata lifecycle.
+- Support fixed-configuration Session creation with explicit recoverable identities
+  and owner metadata lifecycle.
+- Add stable message/cancellation input IDs, distinct accepted/replayed SDK receipts,
+  paginated saved interactions, original-input recovery and ordered user Messages.
+- Drain normal execution through EOF, close abandoned owning requests, and preserve
+  that connection while auxiliary steering/stop acknowledgments return.
 - Remove ordinary configuration, Template-version/application and Session-model
   mutation contracts from the customer SDK.
 - Preserve private Memory credential operations and strict typed API Key grammar.

@@ -1,10 +1,14 @@
 export class TiDBLinkError extends Error {
   readonly requestId: string | undefined;
+  readonly inputId: string | undefined;
+  readonly idempotencyKey: string | undefined;
 
-  constructor(message: string, options?: { requestId?: string; cause?: unknown }) {
+  constructor(message: string, options?: { requestId?: string; inputId?: string; idempotencyKey?: string; cause?: unknown }) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = new.target.name;
     this.requestId = options?.requestId;
+    this.inputId = options?.inputId;
+    this.idempotencyKey = options?.idempotencyKey;
   }
 }
 
@@ -18,9 +22,11 @@ export class TiDBLinkApiError extends TiDBLinkError {
     code: string;
     message: string;
     requestId?: string;
+    inputId?: string;
+    idempotencyKey?: string;
     details?: unknown;
   }) {
-    super(input.message, input.requestId === undefined ? undefined : { requestId: input.requestId });
+    super(input.message, input);
     this.status = input.status;
     this.code = input.code;
     this.details = input.details;
@@ -37,7 +43,7 @@ export class OutcomeUnknownError extends TiDBLinkError {
 
   constructor(
     message: string,
-    options?: { requestId?: string; turnId?: string; cause?: unknown },
+    options?: { requestId?: string; inputId?: string; idempotencyKey?: string; turnId?: string; cause?: unknown },
   ) {
     super(message, options);
     this.turnId = options?.turnId;

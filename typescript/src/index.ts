@@ -28,11 +28,14 @@ export type { AgentRecord, AgentTemplate, AgentTemplatePage, CreateAgentInput, U
 export { Session } from "./session.js";
 export type {
   BillingTag,
+  CreateSessionOptions,
   ClarificationItem,
   MessageRecord,
+  Interaction,
+  InteractionPage,
   SessionModel,
   SessionRecord,
   SessionTemplateProvenance,
   TurnRecord,
 } from "./session.js";
-export type { CreateTurnInput, TurnResult, TurnStreamEvent } from "./turn.js";
+export type { CreateTurnInput, StopTurnInput, InteractionReceipt, TurnResult, TurnStreamEvent, TurnStreamItem } from "./turn.js";

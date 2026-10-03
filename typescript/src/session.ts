@@ -1,10 +1,15 @@
-import { HttpClient, requireKnownKeys } from "./http.js";
+import { TiDBLinkError } from "./errors.js";
+import { HttpClient, requireKnownKeys, requireStableIdentity } from "./http.js";
 import {
   collectTurn,
+  decodeInteraction,
   type CreateTurnInput,
   streamTurn,
+  stopTurn,
+  type StopTurnInput,
+  type InteractionReceipt,
   type TurnResult,
-  type TurnStreamEvent,
+  type TurnStreamItem,
 } from "./turn.js";
 
 export type SessionModel =
@@ -83,6 +88,7 @@ export interface TurnRecord {
   status: "running" | "succeeded" | "failed" | "interrupted";
   billingTag: BillingTag | null;
   userMessage: MessageRecord;
+  userMessages: MessageRecord[];
   userFiles?: unknown[];
   operations: unknown[];
   assistantMessage: MessageRecord | null;
@@ -90,6 +96,25 @@ export interface TurnRecord {
   createdAt: string;
   completedAt?: string;
   sourceFireId?: string | null;
+}
+
+export interface Interaction {
+  inputId: string;
+  sequence: number;
+  kind: "message" | "cancel";
+  mode: "started" | "steered" | "cancelled" | "rejected";
+  turnId: string;
+  message: { id: string; role: "user"; content: string; createdAt: string } | null;
+  createdAt: string;
+  appliedAt: string | null;
+  rejection: { code: "interaction_admission_closed" | "interaction_target_conflict" } | null;
+  result: { status: "running" | "succeeded" | "failed" | "interrupted"; completedAt: string | null };
+}
+
+export interface InteractionPage {
+  interactions: Interaction[];
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 
 export class Session {
@@ -154,7 +179,30 @@ export class Session {
     return response.turn;
   }
 
-  streamTurn(input: CreateTurnInput): AsyncGenerator<TurnStreamEvent> {
+  async listInteractions(options?: { limit?: number; cursor?: string; signal?: AbortSignal }): Promise<InteractionPage> {
+    const query = new URLSearchParams();
+    if (options) requireKnownKeys(options, ["limit", "cursor", "signal"], "Interaction page options");
+    if (options?.limit !== undefined) {
+      if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 200) throw new TypeError("limit must be 1-200");
+      query.set("limit", String(options.limit));
+    }
+    if (options?.cursor !== undefined) query.set("cursor", options.cursor);
+    const response = await this.#http.getResponse<{ interactions: unknown[]; hasMore: boolean; nextCursor: string | null }>(`/api/v1/sessions/${encodeURIComponent(this.id)}/interactions${query.size ? `?${query}` : ""}`, options);
+    if (!response.data || !Array.isArray(response.data.interactions) || typeof response.data.hasMore !== "boolean" || !(response.data.nextCursor === null || typeof response.data.nextCursor === "string")) throw new TiDBLinkError("TiDB Link returned an invalid interaction page", { requestId: response.requestId });
+    return { interactions: response.data.interactions.map(value => decodeInteraction(value, { requestId: response.requestId })), hasMore: response.data.hasMore, nextCursor: response.data.nextCursor };
+  }
+
+  async getInteraction(inputId: string, options?: { signal?: AbortSignal }): Promise<Interaction> {
+    requireStableIdentity(inputId, "inputId");
+    const response = await this.#http.getResponse<{ interaction: unknown }>(`/api/v1/sessions/${encodeURIComponent(this.id)}/interactions/${encodeURIComponent(inputId)}`, options);
+    return decodeInteraction(response.data?.interaction, { requestId: response.requestId, inputId });
+  }
+
+  stopTurn(turnId: string, input: StopTurnInput): Promise<InteractionReceipt> {
+    return stopTurn(this.#http, this.id, turnId, input);
+  }
+
+  streamTurn(input: CreateTurnInput): AsyncGenerator<TurnStreamItem> {
     return streamTurn(this.#http, this.id, input);
   }
 
@@ -163,12 +211,19 @@ export class Session {
   }
 }
 
+export interface CreateSessionOptions {
+  idempotencyKey: string;
+  billingTag?: BillingTag | null;
+  signal?: AbortSignal;
+}
+
 export const createSessionForAgent = async (
   http: HttpClient,
   agentId: string,
-  options?: { billingTag?: BillingTag | null; signal?: AbortSignal },
+  options: CreateSessionOptions,
 ): Promise<Session> => {
-  if (options) requireKnownKeys(options, ["billingTag", "signal"], "Session options");
+  requireKnownKeys(options, ["idempotencyKey", "billingTag", "signal"], "Session options");
+  requireStableIdentity(options.idempotencyKey, "idempotencyKey");
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/api/v1/sessions",
     {
@@ -177,6 +232,7 @@ export const createSessionForAgent = async (
     },
     {
       outcomeUnknown: true,
+      idempotencyKey: options.idempotencyKey,
       ...(options?.signal ? { signal: options.signal } : {}),
     },
   );

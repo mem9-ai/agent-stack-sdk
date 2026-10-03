@@ -1,5 +1,5 @@
 import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
-import { createSessionForAgent, type BillingTag, type SessionRecord, Session } from "./session.js";
+import { createSessionForAgent, type CreateSessionOptions, type SessionRecord, Session } from "./session.js";
 
 export interface UserClientOptions {
   baseUrl: string;
@@ -69,7 +69,7 @@ export class Agent {
     return this;
   }
 
-  createSession(options?: { billingTag?: BillingTag | null; signal?: AbortSignal }): Promise<Session> {
+  createSession(options: CreateSessionOptions): Promise<Session> {
     return createSessionForAgent(this.#http, this.id, options);
   }
 }

@@ -54,7 +54,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
 
   await writeFile(
     path.join(temporary, "consumer.ts"),
-    `import type { Agent, AgentRecord, AgentTemplatePage, BusinessUser, BusinessUserRecord, Session, SessionRecord, SessionTemplateProvenance, TurnResult } from "@mem9/tidb-link";
+    `import type { Agent, AgentRecord, AgentTemplatePage, BusinessUser, BusinessUserRecord, Session, SessionRecord, SessionTemplateProvenance, TurnResult, TurnStreamEvent, Interaction, InteractionReceipt, InteractionPage } from "@mem9/tidb-link";
     import { TIDB_LINK_API_VERSION, TIDB_LINK_REVISION, TiDBLinkApiError, TiDBLinkError, OrganizationClient, UserClient } from "@mem9/tidb-link";
     // @ts-expect-error Previous public behavior types and ServiceUser have no aliases.
     import { AgentConfigPatch, TemplateContent, HardwareRequirement, PublicAgentConfig, ServiceUser, ApplyTemplateInput, SelectableSessionModel } from "@mem9/tidb-link";
@@ -74,7 +74,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const summaries: AgentTemplatePage = await user.listAgentTemplates({ limit: 20 });
       const agent: Agent = await user.createAgent({ agentTemplateId: summaries.templates[0]!.agentTemplateId });
       const association: Readonly<AgentRecord> = agent.data;
-      const session: Session = await agent.createSession();
+      const session: Session = await agent.createSession({ idempotencyKey: "customer-session-001" });
       const metadata: Readonly<SessionRecord> | undefined = session.data;
       const provenance: SessionTemplateProvenance | null | undefined = metadata?.template;
       // @ts-expect-error Public Session metadata excludes the private execution recipe.
@@ -87,7 +87,16 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       await agent.revealMemoryKey();
       await agent.replaceMemoryKey("replacement-memory-key");
       void record; void existing; void association; void metadata;
-      return session.turn({ text: "Hello" });
+            const page: InteractionPage = await session.listInteractions({ limit: 1 });
+      const saved: Interaction = await session.getInteraction("message-001");
+      const cancelled: InteractionReceipt = await session.stopTurn(saved.turnId, { inputId: "cancel-001" });
+      const content = await session.getTurn(saved.turnId);
+      void content.userMessages; void page; void cancelled;
+      for await (const item of session.streamTurn({ inputId: "message-002", text: "Hello" })) {
+        if ("type" in item) { const receipt: InteractionReceipt = item; void receipt; }
+        else { const event: TurnStreamEvent = item; void event; }
+      }
+      return session.turn({ inputId: "message-001", text: "Hello" });
     }
     const user = new UserClient({ baseUrl, apiKey: "from-secret-manager" });
     // @ts-expect-error Every new Agent requires a Template association.
@@ -110,8 +119,17 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     session.setModel("gpt-5.6-sol");
     // @ts-expect-error Session creation does not choose a model.
     agent.createSession({ model: "gpt-5.6-sol" });
+    // @ts-expect-error Session creation requires a stable identity.
+    agent.createSession();
+    // @ts-expect-error Messages require a stable original input identity.
+    session.turn({ text: "Hello" });
+    // @ts-expect-error Cancellation requires a stable original input identity.
+    session.stopTurn("turn_1", {});
+    declare const receipt: InteractionReceipt;
+    // @ts-expect-error An SDK receipt is not a native transient stream event.
+    const nativeReceipt: TurnStreamEvent = receipt;
     // @ts-expect-error Structured Turn output is unsupported.
-    session.turn({ text: "Hello", outputSchema: { type: "object" } });
+    session.turn({ inputId: "message-001", text: "Hello", outputSchema: { type: "object" } });
     void TIDB_LINK_API_VERSION; void TIDB_LINK_REVISION;
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
     void apiError; void quickStart;
@@ -194,6 +212,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const userKey = "ti_user_key_" + "y".repeat(43);
     const rotatedKey = "ti_user_key_" + "z".repeat(43);
     const requests = [];
+    let executionResponse;
+    const started = { inputId: "message-001", sequence: 1, kind: "message", mode: "started", turnId: "turn_1", message: { id: "user-message_1", role: "user", content: "Hello", createdAt: "2026-10-04T00:00:00Z" }, createdAt: "2026-10-04T00:00:00Z", appliedAt: "2026-10-04T00:00:00Z", rejection: null, result: { status: "interrupted", completedAt: "2026-10-04T00:00:01Z" } };
+    const steered = { ...started, inputId: "steer-001", sequence: 2, mode: "steered", message: { ...started.message, id: "user-message_2", content: "Add details" } };
+    const cancelled = { ...started, inputId: "cancel-001", sequence: 3, kind: "cancel", mode: "cancelled", message: null, appliedAt: null };
+    const event = (name, seq, payload) => ({ event: name, seq, turnId: "turn_1", sessionId: "session_1", createdAt: "2026-10-04T00:00:00Z", payload });
     const businessUserRecord = { userId: "busr_1", organizationId: "org_1", displayName: "Customer", externalId: "customer-42", status: "active" };
     const association = { agentId: "agent_1", organizationId: "org_1", ownerUserId: "busr_1", agentTemplateId: "template_1", status: "active" };
     const sessionRecord = { sessionId: "session_1", template: { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) }, model: "gpt-5.6-sol", createdWithAgentId: "agent_1", status: "active", name: null, billingTag: null };
@@ -208,6 +231,18 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       if (request.url === "/api/v1/agent-templates") return response.end(JSON.stringify({ templates: [{ agentTemplateId: "template_1", displayName: "Support", description: "Support", latestPublishedVersion: 2 }], hasMore: false, nextCursor: null }));
       if (request.url === "/api/v1/agents" && request.method === "GET") return response.end(JSON.stringify({ agents: [association] }));
       if (request.url.startsWith("/api/v1/agents")) return response.end(JSON.stringify({ agent: request.method === "DELETE" ? { ...association, status: "archived" } : association }));
+      if (request.url.endsWith("/turns/turn_1/stop")) return response.writeHead(202).end(JSON.stringify({ interaction: cancelled }));
+      if (request.url.endsWith("/interactions/message-001")) return response.end(JSON.stringify({ interaction: started }));
+      if (request.url.includes("/interactions?")) return response.end(JSON.stringify({ interactions: [started, steered, cancelled], hasMore: false, nextCursor: null }));
+      if (request.url.endsWith("/turns/turn_1")) return response.end(JSON.stringify({ turn: { id: "turn_1", sessionId: "session_1", status: "interrupted", billingTag: null, userMessage: started.message, userMessages: [started.message, steered.message], operations: [], assistantMessage: null, createdAt: started.createdAt } }));
+      if (request.url.endsWith("/turns")) {
+        const input = JSON.parse(body);
+        if (input.inputId === "steer-001") return response.writeHead(202).end(JSON.stringify({ interaction: steered }));
+        if (executionResponse) return response.end(JSON.stringify({ interaction: started }));
+        executionResponse = response;
+        response.writeHead(201, { "content-type": "application/x-ndjson" });
+        return response.write(JSON.stringify(event("turn_started", 0, { inputId: "message-001" })) + String.fromCharCode(10));
+      }
       if (request.url === "/api/v1/sessions" && request.method === "GET") return response.end(JSON.stringify({ sessions: [sessionRecord] }));
       response.end(JSON.stringify({ session: sessionRecord }));
     });
@@ -227,9 +262,20 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const agent = await user.createAgent({ agentTemplateId: page.templates[0].agentTemplateId });
       assert.equal((await user.listAgents())[0].id, agent.id);
       assert.equal((await user.getAgent(agent.id)).id, agent.id);
-      const session = await agent.createSession();
+      const session = await agent.createSession({ idempotencyKey: "customer-session-001" });
       assert.deepEqual(session.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
       assert.equal((await user.listSessions())[0].id, session.id);
+      const owner = session.streamTurn({ inputId: "message-001", text: "Hello" });
+      assert.equal((await owner.next()).value.event, "turn_started");
+      const active = await session.turn({ inputId: "steer-001", text: "Add details" });
+      assert.equal(active.type, "receipt"); assert.equal(active.replayed, false); assert.equal(active.interaction.mode, "steered");
+      assert.equal((await session.stopTurn("turn_1", { inputId: "cancel-001" })).interaction.kind, "cancel");
+      executionResponse.end(JSON.stringify(event("turn_finished", 1, { status: "interrupted" })) + String.fromCharCode(10));
+      assert.equal((await owner.next()).value.event, "turn_finished"); assert.equal((await owner.next()).done, true);
+      assert.equal((await session.turn({ inputId: "message-001", text: "Hello" })).replayed, true);
+      assert.deepEqual((await session.listInteractions({ limit: 3 })).interactions, [started, steered, cancelled]);
+      assert.deepEqual(await session.getInteraction("message-001"), started);
+      assert.equal((await session.getTurn("turn_1")).userMessages.length, 2);
       await session.refresh(); await session.rename("Support"); await session.setBillingTag(null); await session.delete(); await agent.unlink();
       assert.equal(agent.data.status, "archived");
       const rotated = await businessUser.rotateApiKey("uak_key");

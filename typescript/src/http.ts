@@ -112,6 +112,12 @@ export function requireKnownKeys(
   if (unknown) throw new TypeError(`${label}.${unknown} is not supported`);
 }
 
+export const requireStableIdentity = (value: unknown, label: string): void => {
+  if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) || value.endsWith("\n")) {
+    throw new TypeError(`${label} must be 1-128 safe characters, starting with a letter or digit`);
+  }
+};
+
 /** Check the frozen wire grammar without retaining or exposing the credential. */
 export const isApiKey = (value: unknown, kind: "org" | "user"): value is string => {
   if (typeof value !== "string") return false;
@@ -201,12 +207,13 @@ export class HttpClient {
   async openStream(
     path: string,
     body: unknown,
-    options?: Pick<RequestOptions, "requestId" | "signal">,
+    options?: Pick<RequestOptions, "requestId" | "signal"> & { inputId?: string; turnId?: string },
   ): Promise<HttpStream> {
     const stableRequestId = options?.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
     }
+    options?.signal?.throwIfAborted();
     const requestOptions: RequestOptions = {
       method: "POST",
       body,
@@ -224,22 +231,16 @@ export class HttpClient {
         ...(options?.signal ? { signal: options.signal } : {}),
       });
     } catch (cause) {
-      if (options?.signal?.aborted) throw options.signal.reason ?? cause;
       throw new OutcomeUnknownError(
         "Turn request outcome is unknown; the request was not replayed",
-        { requestId: stableRequestId, cause },
+        { requestId: stableRequestId, ...(options?.inputId === undefined ? {} : { inputId: options.inputId }), ...(options?.turnId === undefined ? {} : { turnId: options.turnId }), cause },
       );
     }
     if (!response.ok) {
-      const input = await errorInput(response, stableRequestId);
+      const input = { ...await errorInput(response, stableRequestId), ...(options?.inputId === undefined ? {} : { inputId: options.inputId }) };
       throw input.status === 409 || input.status === 412
         ? new ConflictError(input)
         : new TiDBLinkApiError(input);
-    }
-    if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
-      throw new OutcomeUnknownError("TiDB Link returned an invalid Turn stream", {
-        requestId: response.headers.get("x-request-id") ?? stableRequestId,
-      });
     }
     return {
       response,
@@ -256,12 +257,7 @@ export class HttpClient {
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
     }
-    if (
-      options.idempotencyKey !== undefined &&
-      (options.idempotencyKey.length > 255 || !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
-    ) {
-      throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
-    }
+    if (options.idempotencyKey !== undefined) requireStableIdentity(options.idempotencyKey, "idempotencyKey");
     options.signal?.throwIfAborted();
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -286,6 +282,7 @@ export class HttpClient {
             : "Could not reach TiDB Link",
           {
             requestId: stableRequestId,
+            ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
             cause,
           },
         );
@@ -306,7 +303,7 @@ export class HttpClient {
                 : "TiDB Link returned invalid JSON",
               {
                 requestId: response.headers.get("x-request-id") ?? stableRequestId,
-                cause,
+                ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
               },
             );
           }
@@ -324,7 +321,7 @@ export class HttpClient {
         continue;
       }
 
-      const input = await errorInput(response, stableRequestId);
+      const input = { ...await errorInput(response, stableRequestId), ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }) };
       throw input.status === 409 || input.status === 412
         ? new ConflictError(input)
         : new TiDBLinkApiError(input);

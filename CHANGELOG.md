@@ -2,13 +2,14 @@
 
 ## Unreleased (0.3.0)
 
-- Rename the package to `@mem9/tidb-link` and errors/constants to TiDB Link names.
-- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases. HTTP resource paths stay unchanged.
-- Reject unusable one-time User Key responses without automatically repeating issuance.
-
-- Require explicit published Template selection for new Agents.
-- Add descriptive Hardware configuration, content version 2 types, published version reads and explicit Template application with preserved override/reset intent.
-- Keep Console Draft Preview separate from the User-key SDK.
+- Use customer `/api/v1` routes with Organization-Key Business User admission and
+  the retained one-time User Key lifecycle.
+- Expose published Template summaries and unique User × Template Agent
+  associations. Ordinary behavior and answer models belong to the publication.
+- Support fixed-configuration Session creation and owner metadata lifecycle.
+- Remove ordinary configuration, Template-version/application and Session-model
+  mutation contracts from the customer SDK.
+- Preserve private Memory credential operations and strict typed API Key grammar.
 
 ## 0.2.0
 

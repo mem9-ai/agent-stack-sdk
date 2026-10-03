@@ -1,33 +1,26 @@
 import { OrganizationClient, UserClient } from "@mem9/tidb-link";
 
-export async function runCustomerTurn(input: {
+/** First-time customer admission. Retain the returned identity and key securely. */
+export async function provisionCustomer(input: {
   baseUrl: string;
   organizationApiKey: string;
-  serviceUserId: string;
+  externalId: string;
+  displayName: string;
+}) {
+  const organization = new OrganizationClient({ baseUrl: input.baseUrl, apiKey: input.organizationApiKey });
+  const businessUser = await organization.createBusinessUser({ externalId: input.externalId, displayName: input.displayName });
+  const { token } = await businessUser.createApiKey({ name: "saas-backend" });
+  return { businessUserId: businessUser.id, userApiKey: token };
+}
+
+export async function runCustomerTurn(input: {
+  baseUrl: string;
+  userApiKey: string;
   agentTemplateId: string;
-  templateVersion: number;
-  customerName: string;
   prompt: string;
 }) {
-  const organization = new OrganizationClient({
-    baseUrl: input.baseUrl,
-    apiKey: input.organizationApiKey,
-  });
-  const serviceUser = organization.serviceUser(input.serviceUserId);
-  const { token: userApiKey } = await serviceUser.createApiKey({
-    name: "saas-backend",
-  });
-
-  // Persist serviceUser.id and userApiKey in your customer mapping and secret manager.
-  const user = new UserClient({
-    baseUrl: input.baseUrl,
-    apiKey: userApiKey,
-  });
-  const agent = await user.createAgent({
-    agentTemplateId: input.agentTemplateId,
-    templateVersion: input.templateVersion,
-    name: `${input.customerName} Agent`,
-  });
+  const user = new UserClient({ baseUrl: input.baseUrl, apiKey: input.userApiKey });
+  const agent = await user.createAgent({ agentTemplateId: input.agentTemplateId });
   const session = await agent.createSession();
   return session.turn({ text: input.prompt });
 }

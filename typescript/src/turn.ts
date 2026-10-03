@@ -228,7 +228,7 @@ export async function* streamTurn(
   input: CreateTurnInput,
 ): AsyncGenerator<TurnStreamEvent> {
   const opened = await http.openStream(
-    `/api/sessions/${encodeURIComponent(sessionId)}/turns`,
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/turns`,
     bodyFor(input),
     {
       ...(input.requestId === undefined ? {} : { requestId: input.requestId }),

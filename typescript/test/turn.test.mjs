@@ -80,7 +80,7 @@ test("the Turn stream validates ordered events across chunks and heartbeats", as
   assert.deepEqual(received, events);
   assert.equal(requests.length, 1);
   assert.equal(requests[0].method, "POST");
-  assert.equal(requests[0].url, "/api/sessions/session_1/turns");
+  assert.equal(requests[0].url, "/api/v1/sessions/session_1/turns");
   assert.deepEqual(JSON.parse(requests[0].body), {
     input: { type: "text", text: "Hello" },
     billingTag: { key: "customer", value: "acme" },

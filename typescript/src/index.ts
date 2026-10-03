@@ -14,8 +14,11 @@ export {
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
-export { OrganizationClient, ServiceUser } from "./organization.js";
+export { OrganizationClient, BusinessUser } from "./organization.js";
 export type {
+  OrganizationRecord,
+  BusinessUserRecord,
+  CreateBusinessUserInput,
   IssuedUserApiKey,
   OrganizationClientOptions,
   UserApiKey,

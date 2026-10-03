@@ -6,6 +6,30 @@ export interface OrganizationClientOptions {
   apiKey: string;
 }
 
+export interface OrganizationRecord {
+  organizationId: string;
+  slug: string;
+  name: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessUserRecord {
+  userId: string;
+  organizationId: string;
+  displayName: string | null;
+  externalId: string | null;
+  status: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBusinessUserInput {
+  displayName?: string;
+  externalId?: string;
+  signal?: AbortSignal;
+}
+
 export interface UserApiKey {
   apiKeyId: string;
   organizationId: string;
@@ -45,19 +69,21 @@ const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey =
   return result as IssuedUserApiKey;
 };
 
-export class ServiceUser {
+export class BusinessUser {
   readonly #http: HttpClient;
   readonly id: string;
+  readonly data: Readonly<BusinessUserRecord> | undefined;
 
-  constructor(http: HttpClient, id: string) {
-    if (!id) throw new TypeError("Service User id is required");
+  constructor(http: HttpClient, id: string, record?: BusinessUserRecord) {
+    if (!id) throw new TypeError("Business User id is required");
     this.#http = http;
     this.id = id;
+    this.data = record;
   }
 
   async listApiKeys(options?: { signal?: AbortSignal }): Promise<UserApiKey[]> {
     const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
-      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
+      `/api/v1/organization/users/${encodeURIComponent(this.id)}/api-keys`,
       options,
     );
     return response.apiKeys;
@@ -65,7 +91,7 @@ export class ServiceUser {
 
   async createApiKey(input: { name: string; signal?: AbortSignal }): Promise<IssuedUserApiKey> {
     const result = await this.#http.postResponse<unknown>(
-      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
+      `/api/v1/organization/users/${encodeURIComponent(this.id)}/api-keys`,
       { name: input.name },
       { ...(input.signal ? { signal: input.signal } : {}), outcomeUnknown: true },
     );
@@ -77,7 +103,7 @@ export class ServiceUser {
     options?: { signal?: AbortSignal },
   ): Promise<IssuedUserApiKey> {
     const result = await this.#http.postResponse<unknown>(
-      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
+      `/api/v1/organization/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
       undefined,
       { ...(options?.signal ? { signal: options.signal } : {}), outcomeUnknown: true },
     );
@@ -89,7 +115,7 @@ export class ServiceUser {
     options?: { signal?: AbortSignal },
   ): Promise<UserApiKey> {
     const response = await this.#http.post<{ apiKey: UserApiKey }>(
-      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
+      `/api/v1/organization/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
       undefined,
       { ...(options?.signal ? { signal: options.signal } : {}), idempotent: true },
     );
@@ -113,7 +139,32 @@ export class OrganizationClient {
     this.#http = new HttpClient(options);
   }
 
-  serviceUser(id: string): ServiceUser {
-    return new ServiceUser(this.#http, id);
+  async getOrganization(options?: { signal?: AbortSignal }): Promise<OrganizationRecord> {
+    const response = await this.#http.get<{ organization: OrganizationRecord }>("/api/v1/organization", options);
+    return response.organization;
+  }
+
+  async createBusinessUser(input: CreateBusinessUserInput = {}): Promise<BusinessUser> {
+    requireKnownKeys(input, ["displayName", "externalId", "signal"], "Business User creation");
+    const response = await this.#http.post<{ user: BusinessUserRecord }>(
+      "/api/v1/organization/users",
+      { ...(input.displayName === undefined ? {} : { displayName: input.displayName }), ...(input.externalId === undefined ? {} : { externalId: input.externalId }) },
+      { outcomeUnknown: true, ...(input.signal ? { signal: input.signal } : {}) },
+    );
+    return new BusinessUser(this.#http, response.user.userId, response.user);
+  }
+
+  async listBusinessUsers(options?: { signal?: AbortSignal }): Promise<BusinessUser[]> {
+    const response = await this.#http.get<{ users: BusinessUserRecord[] }>("/api/v1/organization/users", options);
+    return response.users.map(record => new BusinessUser(this.#http, record.userId, record));
+  }
+
+  async getBusinessUser(id: string, options?: { signal?: AbortSignal }): Promise<BusinessUser> {
+    const response = await this.#http.get<{ user: BusinessUserRecord }>(`/api/v1/organization/users/${encodeURIComponent(id)}`, options);
+    return new BusinessUser(this.#http, response.user.userId, response.user);
+  }
+
+  businessUser(id: string): BusinessUser {
+    return new BusinessUser(this.#http, id);
   }
 }

@@ -32,6 +32,7 @@ export type {
   MessageRecord,
   SessionModel,
   SessionRecord,
+  SessionTemplateProvenance,
   TurnRecord,
 } from "./session.js";
 export type { CreateTurnInput, TurnResult, TurnStreamEvent } from "./turn.js";

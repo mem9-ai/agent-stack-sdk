@@ -52,8 +52,10 @@ export class Agent {
     return this;
   }
 
-  async unlink(options?: { signal?: AbortSignal }): Promise<void> {
-    await this.#http.delete(`/api/v1/agents/${encodeURIComponent(this.id)}`, options);
+  async unlink(options?: { signal?: AbortSignal }): Promise<this> {
+    const response = await this.#http.delete<{ agent: AgentRecord }>(`/api/v1/agents/${encodeURIComponent(this.id)}`, options);
+    this.#record = response.agent;
+    return this;
   }
 
   async revealMemoryKey(options?: { signal?: AbortSignal }): Promise<string> {
@@ -62,7 +64,8 @@ export class Agent {
   }
 
   async replaceMemoryKey(mem9Key: string, options?: { signal?: AbortSignal }): Promise<this> {
-    await this.#http.put(`/api/v1/agents/${encodeURIComponent(this.id)}/memory/mem9/key`, { mem9Key }, { outcomeUnknown: true, ...options });
+    const response = await this.#http.put<{ agent: AgentRecord }>(`/api/v1/agents/${encodeURIComponent(this.id)}/memory/mem9/key`, { mem9Key }, { outcomeUnknown: true, ...options });
+    this.#record = response.agent;
     return this;
   }
 

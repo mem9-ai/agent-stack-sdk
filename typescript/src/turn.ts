@@ -111,6 +111,7 @@ const validPayload = (event: string, payload: Record<string, unknown>): boolean 
           "claude-sonnet-5",
           "claude-opus-5",
           "DeepSeek-V4-Flash",
+          "gpt-5.4",
         ])
       );
     }

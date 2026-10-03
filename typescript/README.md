@@ -48,13 +48,16 @@ its Business Users. `businessUser(id)` reconstructs a retained credential handle
 `UserClient` uses a User Key for that User's private resources. The published
 Template directory returns summaries and pagination only. `createAgent` selects
 one Template; repeated creation recovers the same effective User × Template
-association. `Agent` supports read, refresh and unlink. It also retains private
+association. `Agent` supports read, refresh and unlink, retaining the returned archived
+association after unlink. It also retains private
 Memory key reveal/replace; `UserClient` retains Memory key validation.
 
 Each new Session uses the latest available publication and fixes its executable
 behavior and answer model at creation. A later publication affects new Sessions.
 Current authorization and dependency availability still govern execution.
-`UserClient` lists and reconstructs Sessions. `Session` reads supported metadata,
+`Session.data.template` reports the fixed publication identity, version and
+content digest without exposing its private execution recipe. `UserClient` lists
+and reconstructs Sessions. `Session` reads supported metadata,
 renames, changes its billing tag and deletes; its model is read-only.
 
 The clients derive Organization and User authority from their API Key. Credentials

@@ -15,12 +15,18 @@ export type SessionModel =
   | "claude-haiku-4-5"
   | "claude-sonnet-5"
   | "claude-opus-5"
-  | "DeepSeek-V4-Flash";
-
+  | "DeepSeek-V4-Flash"
+  | "gpt-5.4";
 
 export interface BillingTag {
   key: string;
   value: string;
+}
+
+export interface SessionTemplateProvenance {
+  templateId: string;
+  version: number;
+  contentDigest: string;
 }
 
 export interface SessionRecord {
@@ -39,6 +45,7 @@ export interface SessionRecord {
   model: SessionModel;
   modelRevision: number;
   createdWithAgentId: string;
+  template: SessionTemplateProvenance | null;
   modelPolicyStatus: "allowed" | "organization_disallowed";
   status: "active" | "deleted";
   activeTurnId: string | null;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, UserClient } from "../dist/index.js";
+import { UserClient } from "../dist/index.js";
 
 const servers = [];
 const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
@@ -34,7 +34,7 @@ test("published Template selection creates and reads one Agent association, then
     calls.push({ method: request.method, url: request.url, headers: request.headers, body });
     response.setHeader("content-type", "application/json");
     if (request.url.startsWith("/api/v1/agent-templates")) return response.end(JSON.stringify({ templates: [summary], hasMore: true, nextCursor: "next-page" }));
-    if (request.method === "DELETE") return response.writeHead(204).end();
+    if (request.method === "DELETE") return response.end(JSON.stringify({ agent: { ...agentRecord, status: "archived" } }));
     if (request.method === "GET" && request.url === "/api/v1/agents") return response.end(JSON.stringify({ agents: [agentRecord] }));
     if (request.method === "POST" && calls.filter(call => call.method === "POST").length === 1) return response.writeHead(503).end(JSON.stringify({ error: { code: "service_unavailable", message: "Try later" } }));
     response.end(JSON.stringify({ agent: agentRecord }));
@@ -46,6 +46,7 @@ test("published Template selection creates and reads one Agent association, then
   assert.deepEqual((await user.listAgents()).map(agent => agent.data), [agentRecord]);
   assert.deepEqual((await user.getAgent("agent_1")).data, agentRecord);
   await agent.unlink();
+  assert.equal(agent.data.status, "archived");
   const creates = calls.filter(call => call.method === "POST");
   assert.equal(creates.length, 2);
   assert.equal(creates[0].headers["x-request-id"], creates[1].headers["x-request-id"]);
@@ -82,14 +83,14 @@ test("retained private Memory credential operations use User Key authority", asy
     response.setHeader("content-type", "application/json");
     if (request.url.endsWith("key-validations")) return response.end(JSON.stringify({ valid: true }));
     if (request.url.endsWith("/key") && request.method === "GET") return response.end(JSON.stringify({ mem9Key: "test-memory-key" }));
-    response.end(JSON.stringify({ agent: agentRecord }));
+    response.end(JSON.stringify({ agent: request.method === "PUT" ? { ...agentRecord, updatedAt: "2026-10-04T01:00:00Z" } : agentRecord }));
   });
   const user = userClient(baseUrl);
   const agent = await user.getAgent("agent_1");
   assert.deepEqual(await user.validateMemoryKey("test-memory-key"), { valid: true });
   assert.equal(await agent.revealMemoryKey(), "test-memory-key");
   await agent.replaceMemoryKey("replacement-memory-key");
-  assert.deepEqual(agent.data, agentRecord);
+  assert.deepEqual(agent.data, { ...agentRecord, updatedAt: "2026-10-04T01:00:00Z" });
   assert.deepEqual(calls.map(call => [call.method, call.url]), [
     ["GET", "/api/v1/agents/agent_1"], ["POST", "/api/v1/agents/memory/mem9/key-validations"],
     ["GET", "/api/v1/agents/agent_1/memory/mem9/key"], ["PUT", "/api/v1/agents/agent_1/memory/mem9/key"],

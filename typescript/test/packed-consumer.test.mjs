@@ -54,7 +54,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
 
   await writeFile(
     path.join(temporary, "consumer.ts"),
-    `import type { Agent, AgentRecord, AgentTemplatePage, BusinessUser, BusinessUserRecord, Session, SessionRecord, TurnResult } from "@mem9/tidb-link";
+    `import type { Agent, AgentRecord, AgentTemplatePage, BusinessUser, BusinessUserRecord, Session, SessionRecord, SessionTemplateProvenance, TurnResult } from "@mem9/tidb-link";
     import { TIDB_LINK_API_VERSION, TIDB_LINK_REVISION, TiDBLinkApiError, TiDBLinkError, OrganizationClient, UserClient } from "@mem9/tidb-link";
     // @ts-expect-error Previous public behavior types and ServiceUser have no aliases.
     import { AgentConfigPatch, TemplateContent, HardwareRequirement, PublicAgentConfig, ServiceUser, ApplyTemplateInput, SelectableSessionModel } from "@mem9/tidb-link";
@@ -76,6 +76,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const association: Readonly<AgentRecord> = agent.data;
       const session: Session = await agent.createSession();
       const metadata: Readonly<SessionRecord> | undefined = session.data;
+      const provenance: SessionTemplateProvenance | null | undefined = metadata?.template;
+      // @ts-expect-error Public Session metadata excludes the private execution recipe.
+      void metadata?.executionConfiguration;
+      void provenance;
       await user.listSessions();
       await session.rename("Support");
       await session.setBillingTag(null);
@@ -192,7 +196,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const requests = [];
     const businessUserRecord = { userId: "busr_1", organizationId: "org_1", displayName: "Customer", externalId: "customer-42", status: "active" };
     const association = { agentId: "agent_1", organizationId: "org_1", ownerUserId: "busr_1", agentTemplateId: "template_1", status: "active" };
-    const sessionRecord = { sessionId: "session_1", model: "gpt-5.6-sol", createdWithAgentId: "agent_1", status: "active", name: null, billingTag: null };
+    const sessionRecord = { sessionId: "session_1", template: { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) }, model: "gpt-5.6-sol", createdWithAgentId: "agent_1", status: "active", name: null, billingTag: null };
     const server = createServer(async (request, response) => {
       let body = "";
       for await (const chunk of request) body += chunk;
@@ -203,7 +207,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       if (request.url.startsWith("/api/v1/organization/users")) return response.end(JSON.stringify(request.method === "GET" && request.url === "/api/v1/organization/users" ? { users: [businessUserRecord] } : { user: businessUserRecord }));
       if (request.url === "/api/v1/agent-templates") return response.end(JSON.stringify({ templates: [{ agentTemplateId: "template_1", displayName: "Support", description: "Support", latestPublishedVersion: 2 }], hasMore: false, nextCursor: null }));
       if (request.url === "/api/v1/agents" && request.method === "GET") return response.end(JSON.stringify({ agents: [association] }));
-      if (request.url.startsWith("/api/v1/agents")) return request.method === "DELETE" ? response.writeHead(204).end() : response.end(JSON.stringify({ agent: association }));
+      if (request.url.startsWith("/api/v1/agents")) return response.end(JSON.stringify({ agent: request.method === "DELETE" ? { ...association, status: "archived" } : association }));
       if (request.url === "/api/v1/sessions" && request.method === "GET") return response.end(JSON.stringify({ sessions: [sessionRecord] }));
       response.end(JSON.stringify({ session: sessionRecord }));
     });
@@ -224,8 +228,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       assert.equal((await user.listAgents())[0].id, agent.id);
       assert.equal((await user.getAgent(agent.id)).id, agent.id);
       const session = await agent.createSession();
+      assert.deepEqual(session.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
       assert.equal((await user.listSessions())[0].id, session.id);
       await session.refresh(); await session.rename("Support"); await session.setBillingTag(null); await session.delete(); await agent.unlink();
+      assert.equal(agent.data.status, "archived");
       const rotated = await businessUser.rotateApiKey("uak_key");
       assert.equal(rotated.token, rotatedKey);
       assert.equal((await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents()).length, 1);

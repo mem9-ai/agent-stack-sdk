@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, OutcomeUnknownError, UserClient } from "../dist/index.js";
+import { UserClient } from "../dist/index.js";
 
 const servers = [];
 const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
@@ -28,23 +28,12 @@ const clientFor = (baseUrl) =>
 
 const agent = {
   agentId: "agent_1",
-  name: "Agent One",
-  sandboxProfile: "default",
-  agentTemplateId: null,
-  agentTemplate: null,
-  config: {
-    memory: {
-      enabled: false,
-      provider: "mem9",
-      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
-    },
-    sessionRecall: { enabled: false },
-    generatedMedia: { enabled: true },
-  },
-  configVersion: 1,
+  organizationId: "org_1",
+  ownerUserId: "user_1",
+  agentTemplateId: "template_1",
   status: "active",
-  createdAt: "2026-08-25T00:00:00.000Z",
-  updatedAt: "2026-08-25T00:00:00.000Z",
+  createdAt: "2026-10-04T00:00:00Z",
+  updatedAt: "2026-10-04T00:00:00Z",
 };
 
 const sessionRecord = (overrides = {}) => ({
@@ -63,6 +52,7 @@ const sessionRecord = (overrides = {}) => ({
   model: "gpt-5.6-terra",
   modelRevision: 1,
   createdWithAgentId: "agent_1",
+  template: { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) },
   modelPolicyStatus: "allowed",
   status: "active",
   activeTurnId: null,
@@ -90,6 +80,7 @@ test("the fixed Session lifecycle supports list, read, display metadata and dele
   const session = await remoteAgent.createSession({ billingTag: { key: "customer", value: "acme" } });
   assert.equal(session.id, "session_1");
   assert.equal(session.model, "gpt-5.6-terra");
+  assert.deepEqual(session.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
   assert.equal(session.setModel, undefined);
   assert.deepEqual((await user.listSessions()).map(session => session.data), [sessionRecord()]);
   await session.refresh();

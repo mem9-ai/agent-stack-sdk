@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const expectedServiceRevision = "e1d534d925d46e1658f8d93a2da35c7ed94a754a";
+const expectedServiceRevision = "8703fc32ac89fcb59f1e583f9f95ecaaa84dd501";
+const expectedContractCommit = "1aed4e709df232e330f003de5e394a5420d91d60";
 const stableIdentityPattern = "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$";
 const contractRoot = process.env.TIDB_LINK_CONTRACT;
 if (!contractRoot) throw new Error("TIDB_LINK_CONTRACT is required");
@@ -66,7 +67,12 @@ const propertyNames = (value, names = new Set(), seen = new Set()) => {
   return names;
 };
 
-test("the SDK declaration maps to one immutable TiDB Link contract", () => {
+test("the SDK declaration maps to one immutable TiDB Link contract", async () => {
+  for (const name of ["ci.yml", "release-typescript.yml"]) {
+    const workflow = await readFile(new URL(`../../.github/workflows/${name}`, import.meta.url), "utf8");
+    const pin = workflow.match(/^  TIDB_LINK_CONTRACT_COMMIT: ([a-f0-9]{40})$/m)?.[1];
+    assert.equal(pin, expectedContractCommit, `${name} immutable contract pin`);
+  }
   assert.equal(metadata.tidbLinkRevision, expectedServiceRevision);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
   assert.equal(document.info.title, "TiDB Link Customer API");

@@ -457,12 +457,31 @@ test("receipt projections and malformed diagnostics exclude unexpected secret an
 
 test("input conflicts and durable refusals retain their explicit service outcome", async () => {
   let requests = 0;
+  const calls = [];
   const refused = interaction({ mode: "rejected", message: null, rejection: { code: "interaction_admission_closed" }, result: { status: "interrupted", completedAt: "2026-10-04T00:00:01Z" } });
-  const baseUrl = await serve((_request, response) => {
-    requests += 1; response.setHeader("content-type", "application/json");
-    if (requests <= 3) return response.writeHead(409).end(JSON.stringify({ error: { code: ["interaction_input_conflict", "interaction_target_conflict", "interaction_admission_closed"][requests - 1], message: "Refused" } }));
-    response.end(JSON.stringify({ interaction: refused }));
+  const baseUrl = await serve(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ method: request.method, url: request.url, body: raw ? JSON.parse(raw) : null });
+    response.setHeader("content-type", "application/json");
+    if (request.method === "GET" && request.url === "/api/v1/sessions/session_1/interactions/message-001") return response.end(JSON.stringify({ interaction: refused }));
+    requests += 1;
+    response.writeHead(409).end(JSON.stringify({ error: { code: ["interaction_input_conflict", "interaction_target_conflict", "interaction_admission_closed"][Math.min(requests, 3) - 1], message: "Refused" } }));
   });
   for (const code of ["interaction_input_conflict", "interaction_target_conflict", "interaction_admission_closed"]) await assert.rejects(sessionFor(baseUrl).turn({ inputId: "message-001", text: "Hello" }), error => error instanceof ConflictError && error.code === code && error.inputId === "message-001");
-  assert.deepEqual(await sessionFor(baseUrl).turn({ inputId: "message-001", text: "Hello" }), { type: "receipt", replayed: true, interaction: refused });
+  assert.equal(requests, 3);
+  await assert.rejects(sessionFor(baseUrl).turn({ inputId: "message-001", text: "Hello" }), error => error instanceof ConflictError && error.status === 409 && error.code === "interaction_admission_closed" && error.inputId === "message-001");
+  assert.equal(requests, 4);
+  assert.deepEqual(await sessionFor(baseUrl).getInteraction("message-001"), refused);
+  assert.equal(requests, 4);
+  assert.equal(calls.length, 5);
+  assert.deepEqual(calls.slice(-3).map(call => [call.method, call.url]), [
+    ["POST", "/api/v1/sessions/session_1/turns"],
+    ["POST", "/api/v1/sessions/session_1/turns"],
+    ["GET", "/api/v1/sessions/session_1/interactions/message-001"],
+  ]);
+  assert.deepEqual(calls.filter(call => call.method === "POST").slice(-2).map(call => call.body), [
+    { inputId: "message-001", input: { type: "text", text: "Hello" } },
+    { inputId: "message-001", input: { type: "text", text: "Hello" } },
+  ]);
 });

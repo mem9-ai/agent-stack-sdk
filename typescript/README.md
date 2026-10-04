@@ -80,9 +80,11 @@ the credential in errors. One-time issuance responses require a valid User Key.
 `session.turn({inputId,text})` collects an answer, structured clarification or a
 saved receipt. `session.streamTurn` yields native progress/terminal events for a
 new Turn, or one discriminated SDK `type: "receipt"` item for active-message
-admission or identical replay. A receipt is saved input admission and outcome,
-not an assistant answer or a transient NDJSON event. `replayed` distinguishes an
-identical replay; `interaction.mode === "rejected"` preserves a saved refusal.
+admission or identical replay of an admitted input. A receipt is saved input
+admission and outcome, not an assistant answer or a transient NDJSON event.
+`replayed` distinguishes an identical admitted replay. Saved refusals remain
+HTTP 409 on resubmission; read their `mode: "rejected"`, refusal code and result
+through `getInteraction`.
 
 ```ts
 for await (const item of session.streamTurn({ inputId: "message-002", text: "Plan the work" })) {
@@ -130,7 +132,8 @@ request open when a user closes a page.
 - Reissue an uncertain Session creation with its original key and body. Query
   `getInteraction(inputId)` after an uncertain message or cancellation, and use
   `getTurn` for current saved content. An unrecorded input is a scoped 404; saved
-  refusals remain readable. Identical input resubmission returns a saved receipt.
+  refusals remain readable. Identical admitted input resubmission returns a saved
+  receipt; rejected resubmissions remain HTTP 409 with their original refusal code.
 - Session keys and input IDs contain 1–128 safe ASCII letters/digits/underscore/
   dot/colon/hyphen and begin with a letter or digit. Persist each identity and
   request intent before sending it. Reuse it only for that exact submission.

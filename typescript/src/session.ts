@@ -1,4 +1,4 @@
-import { TiDBLinkError } from "./errors.js";
+import { OutcomeUnknownError, TiDBLinkError } from "./errors.js";
 import { HttpClient, requireKnownKeys, requireStableIdentity } from "./http.js";
 import {
   collectTurn,
@@ -236,5 +236,16 @@ export const createSessionForAgent = async (
       ...(options?.signal ? { signal: options.signal } : {}),
     },
   );
-  return new Session(http, result.data.session.sessionId, result.data.session);
+  const data = result.data;
+  if (
+    typeof data !== "object" || data === null || Array.isArray(data) ||
+    typeof data.session !== "object" || data.session === null || Array.isArray(data.session) ||
+    typeof data.session.sessionId !== "string" || data.session.sessionId.length === 0
+  ) {
+    throw new OutcomeUnknownError(
+      "TiDB Link accepted Session creation but returned an unusable Session",
+      { idempotencyKey: options.idempotencyKey, requestId: result.requestId },
+    );
+  }
+  return new Session(http, data.session.sessionId, data.session);
 };

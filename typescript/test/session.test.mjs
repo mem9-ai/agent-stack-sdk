@@ -132,6 +132,45 @@ test("an uncertain Session creation preserves the caller's key for explicit reco
   assert.equal(calls.length, 4);
 });
 
+test("an unusable successful Session response preserves identity without leaking diagnostics", async () => {
+  const calls = [];
+  const marker = "SENSITIVE_SESSION_RESPONSE_MARKER";
+  const baseUrl = await serve(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ method: request.method, url: request.url, headers: request.headers, body: raw ? JSON.parse(raw) : null });
+    response.setHeader("content-type", "application/json");
+    if (request.method === "GET") return response.end(JSON.stringify({ agent }));
+    const first = calls.filter(call => call.method === "POST").length === 1;
+    response.setHeader("x-request-id", "creation-unusable-response");
+    response.writeHead(201).end(JSON.stringify({ session: first ? sessionRecord({ sessionId: "", debug: marker }) : sessionRecord() }));
+  });
+  const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
+  const options = { idempotencyKey: "session-creation:unusable" };
+  await assert.rejects(remoteAgent.createSession(options), error => {
+    assert.equal(error.name, "OutcomeUnknownError");
+    assert(error instanceof OutcomeUnknownError);
+    assert.equal(error.idempotencyKey, options.idempotencyKey);
+    assert.equal(error.requestId, "creation-unusable-response");
+    assert.equal(error.message, "TiDB Link accepted Session creation but returned an unusable Session");
+    assert.equal(error.cause, undefined);
+    assert.equal(Object.hasOwn(error, "cause"), false);
+    for (const rendered of [error.message, String(error), String(error.stack), JSON.stringify(error), String(error.cause)]) {
+      assert(!rendered.includes(marker));
+    }
+    return true;
+  });
+  assert.equal(calls.filter(call => call.method === "POST").length, 1);
+  const recovered = await remoteAgent.createSession(options);
+  assert.equal(recovered.id, "session_1");
+  assert.deepEqual(recovered.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
+  const creations = calls.filter(call => call.method === "POST");
+  assert.equal(creations.length, 2);
+  assert.deepEqual(creations.map(call => call.url), ["/api/v1/sessions", "/api/v1/sessions"]);
+  assert.deepEqual(creations.map(call => call.headers["idempotency-key"]), [options.idempotencyKey, options.idempotencyKey]);
+  assert.deepEqual(creations.map(call => call.body), [{ agentId: "agent_1" }, { agentId: "agent_1" }]);
+});
+
 test("saved interactions page by sequence and link original inputs to ordered Turn content", async () => {
   const timestamp = "2026-10-04T00:00:00Z";
   const records = [

@@ -181,9 +181,12 @@ test("saved interactions page by sequence and link original inputs to ordered Tu
   ];
   const turn = { id: "turn_1", sessionId: "session_1", status: "succeeded", billingTag: null, userMessage: { ...records[0].message, sessionId: "session_1", turnId: "turn_1" }, userMessages: records.slice(0, 2).map(record => ({ ...record.message, sessionId: "session_1", turnId: "turn_1" })), operations: [{ id: "operation_1", status: "succeeded" }], assistantMessage: { id: "assistant_1", role: "assistant", content: "Done", sessionId: "session_1", turnId: "turn_1", createdAt: timestamp }, createdAt: timestamp };
   const urls = [];
+  const methods = [];
   const baseUrl = await serve((request, response) => {
     urls.push(request.url);
+    methods.push(request.method);
     response.setHeader("content-type", "application/json");
+    if (request.method === "GET" && request.url === "/api/v1/sessions/session_1/turns") return response.end(JSON.stringify({ turns: [turn] }));
     if (request.url.endsWith("/turns/turn_1")) return response.end(JSON.stringify({ turn }));
     if (request.url.endsWith("/interactions/cancel-001")) return response.end(JSON.stringify({ interaction: records[2] }));
     if (request.url.includes("/interactions/missing")) return response.writeHead(404).end(JSON.stringify({ error: { code: "interaction_not_found", message: "Missing" } }));
@@ -200,6 +203,9 @@ test("saved interactions page by sequence and link original inputs to ordered Tu
   assert.deepEqual(received, records);
   assert.deepEqual(await session.getInteraction("cancel-001"), records[2]);
   assert.deepEqual(await session.getTurn("turn_1"), turn);
+  assert.deepEqual(await session.history(), [turn]);
+  assert.equal(methods.at(-1), "GET");
+  assert.equal(urls.at(-1), "/api/v1/sessions/session_1/turns");
   await assert.rejects(session.getInteraction("missing"), error => error instanceof TiDBLinkApiError && error.code === "interaction_not_found");
   assert.deepEqual(urls.slice(0, 4), ["/api/v1/sessions/session_1/interactions?limit=1", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F1", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F2", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F3"]);
 });

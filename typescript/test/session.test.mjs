@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, OutcomeUnknownError, UserClient } from "../dist/index.js";
+import { ConflictError, OutcomeUnknownError, TiDBLinkApiError, UserClient } from "../dist/index.js";
 
 const servers = [];
 const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
@@ -28,23 +28,12 @@ const clientFor = (baseUrl) =>
 
 const agent = {
   agentId: "agent_1",
-  name: "Agent One",
-  sandboxProfile: "default",
-  agentTemplateId: null,
-  agentTemplate: null,
-  config: {
-    memory: {
-      enabled: false,
-      provider: "mem9",
-      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
-    },
-    sessionRecall: { enabled: false },
-    generatedMedia: { enabled: true },
-  },
-  configVersion: 1,
+  organizationId: "org_1",
+  ownerUserId: "user_1",
+  agentTemplateId: "template_1",
   status: "active",
-  createdAt: "2026-08-25T00:00:00.000Z",
-  updatedAt: "2026-08-25T00:00:00.000Z",
+  createdAt: "2026-10-04T00:00:00Z",
+  updatedAt: "2026-10-04T00:00:00Z",
 };
 
 const sessionRecord = (overrides = {}) => ({
@@ -63,6 +52,7 @@ const sessionRecord = (overrides = {}) => ({
   model: "gpt-5.6-terra",
   modelRevision: 1,
   createdWithAgentId: "agent_1",
+  template: { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) },
   modelPolicyStatus: "allowed",
   status: "active",
   activeTurnId: null,
@@ -72,141 +62,150 @@ const sessionRecord = (overrides = {}) => ({
   ...overrides,
 });
 
-test("an Agent creates a persistent Session and retains its model ETag", async () => {
+test("the fixed Session lifecycle supports list, read, display metadata and deletion", async () => {
   const calls = [];
   const baseUrl = await serve(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
     calls.push({ method: request.method, url: request.url, headers: request.headers, body });
     response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.setHeader("etag", '"agent-v1"');
-      response.end(JSON.stringify({ agent }));
-      return;
-    }
-    response.setHeader("etag", '"session-v1"');
+    if (request.url === "/api/v1/agents/agent_1") return response.end(JSON.stringify({ agent }));
+    if (request.url === "/api/v1/sessions" && request.method === "GET") return response.end(JSON.stringify({ sessions: [sessionRecord()] }));
+    const updates = request.url.endsWith("/name") ? { name: JSON.parse(body).name } : request.url.endsWith("/billing-tag") ? { billingTag: JSON.parse(body).billingTag } : request.method === "DELETE" ? { status: "deleted" } : {};
+    response.end(JSON.stringify({ session: sessionRecord(updates) }));
+  });
+  const user = clientFor(baseUrl);
+  const remoteAgent = await user.getAgent("agent_1");
+  await assert.rejects(remoteAgent.createSession({ model: "gpt-5.6-sol" }), /model is not supported/);
+  const session = await remoteAgent.createSession({ idempotencyKey: "metadata-session", billingTag: { key: "customer", value: "acme" } });
+  assert.equal(session.id, "session_1");
+  assert.equal(session.model, "gpt-5.6-terra");
+  assert.deepEqual(session.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
+  assert.equal(session.setModel, undefined);
+  assert.deepEqual((await user.listSessions()).map(session => session.data), [sessionRecord()]);
+  await session.refresh();
+  await session.rename("Customer conversation");
+  assert.equal(session.data.name, "Customer conversation");
+  await session.setBillingTag(null);
+  assert.equal(session.data.billingTag, null);
+  await session.delete();
+  assert.equal(session.data.status, "deleted");
+  assert.deepEqual(calls.map(call => [call.method, call.url]), [
+    ["GET", "/api/v1/agents/agent_1"], ["POST", "/api/v1/sessions"], ["GET", "/api/v1/sessions"], ["GET", "/api/v1/sessions/session_1"],
+    ["POST", "/api/v1/sessions/session_1/name"], ["PATCH", "/api/v1/sessions/session_1/billing-tag"], ["DELETE", "/api/v1/sessions/session_1"],
+  ]);
+  assert.deepEqual(JSON.parse(calls[1].body), { agentId: "agent_1", billingTag: { key: "customer", value: "acme" } });
+});
+
+test("an uncertain Session creation preserves the caller's key for explicit recovery", async () => {
+  const calls = [];
+  const baseUrl = await serve(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ url: request.url, headers: request.headers, body: raw ? JSON.parse(raw) : null });
+    if (request.method === "GET") return response.end(JSON.stringify({ agent }));
+    if (calls.length === 2) return request.socket.destroy();
+    response.setHeader("content-type", "application/json");
+    if (JSON.parse(raw).billingTag) return response.writeHead(409).end(JSON.stringify({ error: { code: "session_creation_conflict", message: "Key reused with a different request" } }));
     response.writeHead(201).end(JSON.stringify({ session: sessionRecord() }));
   });
   const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
-
-  await assert.rejects(
-    remoteAgent.createSession({ model: "gpt-5.6-sol" }),
-    /Session options.model is not supported/,
-  );
-  assert.equal(calls.length, 1);
-  const session = await remoteAgent.createSession({
-    billingTag: { key: "customer", value: "acme" },
+  const options = { idempotencyKey: "session-creation:001" };
+  await assert.rejects(remoteAgent.createSession(options), error => {
+    assert(error instanceof OutcomeUnknownError);
+    assert.equal(error.idempotencyKey, options.idempotencyKey);
+    return true;
   });
-
-  assert.equal(session.id, "session_1");
-  assert.equal(session.model, "gpt-5.6-terra");
-  assert.deepEqual(JSON.parse(calls[1].body), {
-    agentId: "agent_1",
-    billingTag: { key: "customer", value: "acme" },
-  });
-  assert.equal(calls[1].headers["idempotency-key"], undefined);
-  assert.equal(calls[1].headers["x-agent9-project-id"], undefined);
-  assert.equal(calls[1].headers["x-ti-project-id"], undefined);
+  assert.equal(calls.length, 2);
+  const recovered = await remoteAgent.createSession(options);
+  assert.equal(recovered.id, "session_1");
+  assert.equal(recovered.data.template.version, 2);
+  await assert.rejects(remoteAgent.createSession({ ...options, billingTag: { key: "customer", value: "changed" } }), error => error instanceof ConflictError && error.code === "session_creation_conflict");
+  for (const call of calls.slice(1)) {
+    assert.equal(call.headers["idempotency-key"], options.idempotencyKey);
+    for (const key of ["cookie", "x-ti-user-id", "x-ti-organization-id"]) assert.equal(call.headers[key], undefined);
+  }
+  assert.deepEqual(calls.slice(1, 3).map(call => call.body), [{ agentId: "agent_1" }, { agentId: "agent_1" }]);
+  for (const idempotencyKey of [undefined, "", "bad/key", "a".repeat(129), "_wrong", "a\n", "a\r", 42]) await assert.rejects(remoteAgent.createSession({ idempotencyKey }), /idempotencyKey/);
+  const controller = new AbortController(); controller.abort(new Error("before dispatch"));
+  await assert.rejects(remoteAgent.createSession({ ...options, signal: controller.signal }), /before dispatch/);
+  assert.equal(calls.length, 4);
 });
 
-test("a Session updates the model with its retained ETag and never overwrites a conflict", async () => {
+test("an unusable successful Session response preserves identity without leaking diagnostics", async () => {
   const calls = [];
+  const marker = "SENSITIVE_SESSION_RESPONSE_MARKER";
   const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    calls.push({ method: request.method, url: request.url, headers: request.headers, body });
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ method: request.method, url: request.url, headers: request.headers, body: raw ? JSON.parse(raw) : null });
     response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.setHeader("etag", '"session-v1"');
-      response.end(JSON.stringify({ session: sessionRecord() }));
-      return;
-    }
-    if (calls.length === 2) {
-      assert.equal(request.headers["if-match"], '"session-v1"');
-      response.setHeader("etag", '"session-v2"');
-      response.end(
-        JSON.stringify({
-          session: sessionRecord({ model: "claude-sonnet-5", modelRevision: 2 }),
-        }),
-      );
-      return;
-    }
-    assert.equal(request.headers["if-match"], '"session-v2"');
-    response.writeHead(412).end(
-      JSON.stringify({ error: { code: "precondition_failed", message: "Stale Session" } }),
-    );
-  });
-  const session = await clientFor(baseUrl).getSession("session_1");
-
-  await session.setModel("claude-sonnet-5");
-  assert.equal(session.model, "claude-sonnet-5");
-  await assert.rejects(session.setModel("gpt-5.6-sol"), ConflictError);
-
-  assert.equal(session.model, "claude-sonnet-5");
-  assert.deepEqual(
-    calls.map(({ method, url }) => [method, url]),
-    [
-      ["GET", "/api/sessions/session_1"],
-      ["PATCH", "/api/sessions/session_1/model"],
-      ["PATCH", "/api/sessions/session_1/model"],
-    ],
-  );
-});
-
-test("a reconstructed Session reads ordered history and one known Turn", async () => {
-  const turn = {
-    id: "turn_1",
-    sessionId: "session_1",
-    status: "succeeded",
-    billingTag: null,
-    userMessage: {
-      id: "message_1",
-      sessionId: "session_1",
-      turnId: "turn_1",
-      role: "user",
-      content: "Hello",
-      createdAt: "2026-08-25T00:00:00.000Z",
-    },
-    operations: [],
-    assistantMessage: {
-      id: "message_2",
-      sessionId: "session_1",
-      turnId: "turn_1",
-      role: "assistant",
-      content: "Hi",
-      createdAt: "2026-08-25T00:00:01.000Z",
-    },
-    createdAt: "2026-08-25T00:00:00.000Z",
-    completedAt: "2026-08-25T00:00:01.000Z",
-  };
-  const baseUrl = await serve((request, response) => {
-    response.setHeader("content-type", "application/json");
-    response.end(
-      request.url?.endsWith("/turn_1")
-        ? JSON.stringify({ turn })
-        : JSON.stringify({ turns: [turn] }),
-    );
-  });
-  const session = clientFor(baseUrl).session("session_1");
-
-  assert.deepEqual(await session.history(), [turn]);
-  assert.deepEqual(await session.getTurn("turn_1"), turn);
-});
-
-test("a lost Session creation response is outcome unknown and is not retried", async () => {
-  let creates = 0;
-  const baseUrl = await serve((request, response) => {
-    response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.setHeader("etag", '"agent-v1"');
-      response.end(JSON.stringify({ agent }));
-      return;
-    }
-    creates += 1;
-    request.socket.destroy();
+    if (request.method === "GET") return response.end(JSON.stringify({ agent }));
+    const first = calls.filter(call => call.method === "POST").length === 1;
+    response.setHeader("x-request-id", "creation-unusable-response");
+    response.writeHead(201).end(JSON.stringify({ session: first ? sessionRecord({ sessionId: "", debug: marker }) : sessionRecord() }));
   });
   const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
+  const options = { idempotencyKey: "session-creation:unusable" };
+  await assert.rejects(remoteAgent.createSession(options), error => {
+    assert.equal(error.name, "OutcomeUnknownError");
+    assert(error instanceof OutcomeUnknownError);
+    assert.equal(error.idempotencyKey, options.idempotencyKey);
+    assert.equal(error.requestId, "creation-unusable-response");
+    assert.equal(error.message, "TiDB Link accepted Session creation but returned an unusable Session");
+    assert.equal(error.cause, undefined);
+    assert.equal(Object.hasOwn(error, "cause"), false);
+    for (const rendered of [error.message, String(error), String(error.stack), JSON.stringify(error), String(error.cause)]) {
+      assert(!rendered.includes(marker));
+    }
+    return true;
+  });
+  assert.equal(calls.filter(call => call.method === "POST").length, 1);
+  const recovered = await remoteAgent.createSession(options);
+  assert.equal(recovered.id, "session_1");
+  assert.deepEqual(recovered.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
+  const creations = calls.filter(call => call.method === "POST");
+  assert.equal(creations.length, 2);
+  assert.deepEqual(creations.map(call => call.url), ["/api/v1/sessions", "/api/v1/sessions"]);
+  assert.deepEqual(creations.map(call => call.headers["idempotency-key"]), [options.idempotencyKey, options.idempotencyKey]);
+  assert.deepEqual(creations.map(call => call.body), [{ agentId: "agent_1" }, { agentId: "agent_1" }]);
+});
 
-  await assert.rejects(remoteAgent.createSession(), OutcomeUnknownError);
-  assert.equal(creates, 1);
+test("saved interactions page by sequence and link original inputs to ordered Turn content", async () => {
+  const timestamp = "2026-10-04T00:00:00Z";
+  const records = [
+    { inputId: "start-001", sequence: 1, kind: "message", mode: "started", turnId: "turn_1", message: { id: "message_1", role: "user", content: "Hello", createdAt: timestamp }, createdAt: timestamp, appliedAt: timestamp, rejection: null, result: { status: "succeeded", completedAt: timestamp } },
+    { inputId: "steer-001", sequence: 2, kind: "message", mode: "steered", turnId: "turn_1", message: { id: "message_2", role: "user", content: "Add details", createdAt: timestamp }, createdAt: timestamp, appliedAt: null, rejection: null, result: { status: "failed", completedAt: timestamp } },
+    { inputId: "cancel-001", sequence: 3, kind: "cancel", mode: "cancelled", turnId: "turn_2", message: null, createdAt: timestamp, appliedAt: null, rejection: null, result: { status: "interrupted", completedAt: timestamp } },
+    { inputId: "refused-001", sequence: 4, kind: "message", mode: "rejected", turnId: "turn_3", message: null, createdAt: timestamp, appliedAt: null, rejection: { code: "interaction_admission_closed" }, result: { status: "running", completedAt: null } },
+  ];
+  const turn = { id: "turn_1", sessionId: "session_1", status: "succeeded", billingTag: null, userMessage: { ...records[0].message, sessionId: "session_1", turnId: "turn_1" }, userMessages: records.slice(0, 2).map(record => ({ ...record.message, sessionId: "session_1", turnId: "turn_1" })), operations: [{ id: "operation_1", status: "succeeded" }], assistantMessage: { id: "assistant_1", role: "assistant", content: "Done", sessionId: "session_1", turnId: "turn_1", createdAt: timestamp }, createdAt: timestamp };
+  const urls = [];
+  const methods = [];
+  const baseUrl = await serve((request, response) => {
+    urls.push(request.url);
+    methods.push(request.method);
+    response.setHeader("content-type", "application/json");
+    if (request.method === "GET" && request.url === "/api/v1/sessions/session_1/turns") return response.end(JSON.stringify({ turns: [turn] }));
+    if (request.url.endsWith("/turns/turn_1")) return response.end(JSON.stringify({ turn }));
+    if (request.url.endsWith("/interactions/cancel-001")) return response.end(JSON.stringify({ interaction: records[2] }));
+    if (request.url.includes("/interactions/missing")) return response.writeHead(404).end(JSON.stringify({ error: { code: "interaction_not_found", message: "Missing" } }));
+    const cursor = new URL(request.url, "http://fixture").searchParams.get("cursor");
+    const offset = cursor ? Number(cursor.slice(5)) : 0;
+    response.end(JSON.stringify({ interactions: [records[offset]], hasMore: offset < 3, nextCursor: offset < 3 ? "page/" + (offset + 1) : null }));
+  });
+  const session = clientFor(baseUrl).session("session_1");
+  const received = []; let cursor;
+  do {
+    const page = await session.listInteractions({ limit: 1, ...(cursor ? { cursor } : {}) });
+    received.push(...page.interactions); cursor = page.nextCursor;
+  } while (cursor);
+  assert.deepEqual(received, records);
+  assert.deepEqual(await session.getInteraction("cancel-001"), records[2]);
+  assert.deepEqual(await session.getTurn("turn_1"), turn);
+  assert.deepEqual(await session.history(), [turn]);
+  assert.equal(methods.at(-1), "GET");
+  assert.equal(urls.at(-1), "/api/v1/sessions/session_1/turns");
+  await assert.rejects(session.getInteraction("missing"), error => error instanceof TiDBLinkApiError && error.code === "interaction_not_found");
+  assert.deepEqual(urls.slice(0, 4), ["/api/v1/sessions/session_1/interactions?limit=1", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F1", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F2", "/api/v1/sessions/session_1/interactions?limit=1&cursor=page%2F3"]);
 });

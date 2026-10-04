@@ -1,9 +1,7 @@
 # `@mem9/tidb-link`
 
 Official TypeScript SDK for TiDB Link. The package requires Node.js 22.12 or
-newer and has no runtime dependencies.
-
-The SDK is ESM-only and ships TypeScript declarations.
+newer, uses ESM and has no runtime dependencies.
 
 ## Install
 
@@ -13,126 +11,144 @@ npm install @mem9/tidb-link
 
 ## Quick start
 
-The Organization API Key authenticates its Organization; the server authorizes each supported handler. Create the Service User
-in the Console first, then store its ID in your customer mapping. Store the
-one-time User API Key in your secret manager.
+Use an Organization Key to provision a native Business User in the key's
+Organization. Store its identity in your customer mapping and the one-time User
+Key in your secret manager. This creates an application identity without granting
+Console membership.
 
 ```ts
 import { OrganizationClient, UserClient } from "@mem9/tidb-link";
 
-export async function runCustomerTurn(input: {
-  baseUrl: string;
-  organizationApiKey: string;
-  serviceUserId: string;
-  agentTemplateId: string;
-  templateVersion: number;
-  customerName: string;
-  prompt: string;
-}) {
-  const organization = new OrganizationClient({
-    baseUrl: input.baseUrl,
-    apiKey: input.organizationApiKey,
-  });
-
-  const serviceUser = organization.serviceUser(input.serviceUserId);
-  const { token: userApiKey } = await serviceUser.createApiKey({
-    name: "saas-backend",
-  });
-
-  // Persist serviceUser.id and userApiKey securely here. The plaintext key is
-  // not available from list or revoke responses.
-  const user = new UserClient({
-    baseUrl: input.baseUrl,
-    apiKey: userApiKey,
-  });
-  const agent = await user.createAgent({
-    agentTemplateId: input.agentTemplateId,
-    templateVersion: input.templateVersion,
-    name: `${input.customerName} Agent`,
-  });
-  const session = await agent.createSession();
-  return session.turn({ text: input.prompt });
+const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+const current = await organization.getOrganization();
+const businessUser = await organization.createBusinessUser({
+  externalId: "customer-42",
+  displayName: "Customer",
+});
+const { token } = await businessUser.createApiKey({ name: "saas-backend" });
+// Persist businessUser.id and token securely before proceeding.
+const user = new UserClient({ baseUrl, apiKey: token });
+const page = await user.listAgentTemplates();
+const agent = await user.createAgent({ agentTemplateId: page.templates[0]!.agentTemplateId });
+// Persist these identities with the original request before dispatch.
+const creationKey = "customer-42:conversation-001";
+const inputId = "message-001";
+const session = await agent.createSession({ idempotencyKey: creationKey });
+const result = await session.turn({ inputId, text: "Hello" });
+if (result.type === "receipt") {
+  const saved = await session.getInteraction(inputId);
+  const currentTurn = await session.getTurn(saved.turnId);
+} else {
+  console.log(result.text);
 }
 ```
 
-`session.turn()` returns either an `answer` or a structured `clarification`.
-Use `session.streamTurn()` when progress events are needed:
-
-```ts
-for await (const event of session.streamTurn({ text: "Continue" })) {
-  if (event.event === "progress") process.stdout.write(event.payload.text);
-}
-```
+The typed, runnable functions are in `examples/quickstart.ts`. Retain a customer's
+User Key across requests; key issuance and rotation expose plaintext only in their
+successful response. After an uncertain Business User creation, list Users and
+match your unique `externalId` before provisioning again.
 
 ## Clients and resources
 
-- `OrganizationClient` accepts an Organization API Key with
-  Organization scope. It reconstructs a `ServiceUser` handle from a retained
-  User ID; Service User creation remains a Console action.
-- `ServiceUser` creates, lists, rotates, revokes, and bulk-revokes User API
-  Keys. Plaintext is returned only by successful create and rotate calls.
-- `UserClient` accepts a User API Key and manages only that User's resources.
-  It manages the current User's Agents, AgentTemplates, and Sessions.
-- `Agent` retains its latest ETag for rename, configure, and archive. A stale
-  write throws `ConflictError`; call `refresh()` before reconciling.
-- `Agent` exposes Memory enablement plus provider and credential state. Creation
-  can provision or accept a mem9 Key. `UserClient` validates a key, while
-  creator-only `Agent` methods reveal or replace it without putting plaintext in
-  Agent records.
-- `Session` retains its model ETag, reads Turn history, and offers collected or
-  streaming Turn APIs. Model changes affect future AgentRuns only. Clarification
-  replies preserve canonical ordered string values and their source Turn.
+`OrganizationClient` reads the current Organization and creates, lists and reads
+its Business Users. `businessUser(id)` reconstructs a retained credential handle.
+`BusinessUser` creates, lists, rotates, revokes and bulk-revokes User Keys.
 
-The clients never accept caller-supplied Organization or User identity headers.
-Identity comes from the API Key.
+`UserClient` uses a User Key for that User's private resources. The published
+Template directory returns summaries and pagination only. `createAgent` selects
+one Template; repeated creation recovers the same effective User × Template
+association. `Agent` supports read, refresh and unlink, retaining the returned archived
+association after unlink. It also retains private
+Memory key reveal/replace; `UserClient` retains Memory key validation.
 
-Credentials use `ti_org_<id>_<secret>` for `OrganizationClient` and
-`ti_user_<id>_<secret>` for `UserClient`. IDs contain 1–64 ASCII letters or digits;
-the secret contains exactly 43 base64url characters. Constructors reject a key
-of the other kind, malformed values and previous credential formats before making
-a request. One-time create/rotate responses must contain a valid User Key.
-The renamed package, error classes and compatibility exports have no old aliases.
+Each new Session uses the latest available publication and fixes its executable
+behavior and answer model at creation. A later publication affects new Sessions.
+Current authorization and dependency availability still govern execution.
+`Session.data.template` reports the fixed publication identity, version and
+content digest without exposing its private execution recipe. `UserClient` lists
+and reconstructs Sessions. `Session` reads supported metadata,
+renames, changes its billing tag and deletes; its model is read-only.
 
-## Errors and retry behavior
+The clients derive Organization and User authority from their API Key. Credentials
+use `ti_org_<id>_<secret>` and `ti_user_<id>_<secret>` respectively. IDs contain
+1–64 ASCII letters or digits and secrets contain exactly 43 base64url characters.
+Invalid, previous-format or other-kind keys fail before dispatch without including
+the credential in errors. One-time issuance responses require a valid User Key.
 
-- `TiDBLinkApiError` preserves HTTP status, stable service error code,
-  request identity, and display-safe details.
-- `ConflictError` represents an explicit service conflict, including stale
-  ETags.
-- `TurnFailedError` and `TurnInterruptedError` represent known terminal Turn
-  outcomes.
-- `OutcomeUnknownError` means the operation may have happened. Do not repeat a
-  credential, Session, or Turn mutation unless the service contract makes that
-  specific request idempotent.
-- Safe reads and server-idempotent Agent creation use bounded retries with one
-  stable request identity. Credential create/rotate and Turn creation are never
-  replayed automatically.
-- `AbortSignal` stops local waiting. It does not promise remote cancellation or
-  exactly-once external effects.
+## Turn results and connections
+
+`session.turn({inputId,text})` collects an answer, structured clarification or a
+saved receipt. `session.streamTurn` yields native progress/terminal events for a
+new Turn, or one discriminated SDK `type: "receipt"` item for active-message
+admission or identical replay of an admitted input. A receipt is saved input
+admission and outcome, not an assistant answer or a transient NDJSON event.
+`replayed` distinguishes an identical admitted replay. Saved refusals remain
+HTTP 409 on resubmission; read their `mode: "rejected"`, refusal code and result
+through `getInteraction`.
+
+```ts
+for await (const item of session.streamTurn({ inputId: "message-002", text: "Plan the work" })) {
+  if ("type" in item) continue; // Saved receipt: read its interaction/result.
+  if (item.event === "turn_started") {
+    const steering = await session.turn({ inputId: "steer-001", text: "Include costs" });
+    // An application can stop the same task with a separate input identity.
+    const stopping = await session.stopTurn(item.turnId, { inputId: "cancel-001" });
+  }
+  if (item.event === "progress") process.stdout.write(item.payload.text);
+}
+const page = await session.listInteractions({ limit: 50 });
+const saved = await session.getInteraction("message-002");
+const currentTurn = await session.getTurn(saved.turnId);
+```
+
+An active plain-text message is admitted into the same Turn. `appliedAt` reports
+native incorporation; cancellation admission and a terminal outcome are separate
+facts. Query the saved interaction's `result` to distinguish running, succeeded,
+failed and interrupted. Paginate with `nextCursor`, and read a record by original
+inputId. Turn content contains ordered `userMessages`, the initial `userMessage`,
+final assistant and public Operations.
+
+The interaction retains its original execution generation's terminal result.
+An advanced explicit checkpoint retry can change the current Turn returned by
+`getTurn`; repeating an original inputId recovers its saved generation and never
+starts that retry. `getTurn` is current saved content, not an immutable transcript
+of each past execution generation.
+
+The request that starts execution owns its stream. Consume it through terminal
+and EOF; ending iteration or aborting before completion closes that owning
+request and requests interruption. Auxiliary steering/cancel receipts leave it
+open. Normal completion keeps the Session available. The customer backend owns
+its downstream application-user connections and can keep the upstream execution
+request open when a user closes a page.
+
+## Errors and recovery
+
+- `TiDBLinkApiError` preserves status, service error code, tracing identity and
+  display-safe details. `ConflictError` includes conflicting Session/input reuse.
+- `TurnFailedError` and `TurnInterruptedError` distinguish known terminal outcomes.
+- `OutcomeUnknownError` means a dispatched mutation or stream may have been
+  accepted. Session creation errors preserve `idempotencyKey`; message/cancel
+  errors preserve `inputId` and the known Turn. Request tracing is separate.
+- Reissue an uncertain Session creation with its original key and body. Query
+  `getInteraction(inputId)` after an uncertain message or cancellation, and use
+  `getTurn` for current saved content. An unrecorded input is a scoped 404; saved
+  refusals remain readable. Identical admitted input resubmission returns a saved
+  receipt; rejected resubmissions remain HTTP 409 with their original refusal code.
+- Session keys and input IDs contain 1–128 safe ASCII letters/digits/underscore/
+  dot/colon/hyphen and begin with a letter or digit. Persist each identity and
+  request intent before sending it. Reuse it only for that exact submission.
+- Safe reads and server-idempotent Agent association creation use bounded retries.
+  Session creation, input streams, cancellation and one-time key create/rotate
+  each make one automatic dispatch. Execution streams are never replayed.
 
 ## Compatibility
 
-`@mem9/tidb-link` 0.3.x targets TiDB Link OpenAPI `0.0.1` at revision
-`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87`, exported as
-`TIDB_LINK_API_VERSION` and `TIDB_LINK_REVISION`.
+This source targets TiDB Link OpenAPI `0.0.1`. The exact supported backend revision
+is exported as `TIDB_LINK_REVISION` and declared in `package.json`. CI validates the
+SDK against immutable generated OpenAPI bytes for that revision. SDK source
+updates and npm package publication are separate actions.
 
-Credential creation and Session creation still report ambiguous transport
-outcomes explicitly and are not retried. Progress-stream resumption is outside
-the current supported surface.
-
-## Published templates and descriptive Hardware
-
-New Agents require an explicit `agentTemplateId`. Add `templateVersion` to choose
-an exact publication; ID-only selection pins latest once on the server. Published
-content is available through `getPublishedTemplateVersion`. `Agent.data` reports
-its immutable creation origin, independent instructions and current application.
-
-`config.hardware.requirements` and `overrides.hardware.requirements` contain exact
-Definition IDs and capability names. They describe metadata without assigning a
-device or granting execution. Explicit empty arrays survive upgrades. Preview an
-idle Agent upgrade with `previewTemplateApplication`, then use `applyTemplate`
-with the expected application, selected reset paths and one stable retry key.
-`hardware.requirements` is a supported reset path. Existing default-Agent ensure
-only returns an established mapping; if absent, explicitly create from a published
-Template first. This SDK exposes personal User-key APIs; Console unsaved Draft
-Preview remains a separate browser-cookie workflow.
+The supported customer workflow exposes message/cancellation and saved results.
+Console Template authoring and Draft Preview remain separate. Application-side
+function-result submission, independent progress subscriptions and transient
+stream replay are outside this SDK surface.

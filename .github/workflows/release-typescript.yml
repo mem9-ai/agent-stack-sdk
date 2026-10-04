@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 env:
-  TIDB_LINK_CONTRACT_COMMIT: 48c3a0dd06d02fea7d5935e37e2484f97a770362
+  TIDB_LINK_CONTRACT_COMMIT: 1aed4e709df232e330f003de5e394a5420d91d60
 
 jobs:
   publish:

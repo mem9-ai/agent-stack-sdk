@@ -39,9 +39,9 @@ test("an Organization client retries a safe read with one request identity", asy
     apiKey: organizationApiKey,
   });
 
-  assert.deepEqual(await client.serviceUser("user_1").listApiKeys(), []);
+  assert.deepEqual(await client.businessUser("user_1").listApiKeys(), []);
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].url, "/api/admin/org/users/user_1/api-keys");
+  assert.equal(requests[0].url, "/api/v1/organization/users/user_1/api-keys");
   assert.equal(requests[0].headers.authorization, `Bearer ${organizationApiKey}`);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
   assert.equal(requests[0].headers["x-agent9-workspace-id"], undefined);
@@ -73,7 +73,7 @@ test("an Organization service conflict preserves safe error details", async () =
     apiKey: organizationApiKey,
   });
 
-  await assert.rejects(client.serviceUser("user_1").listApiKeys(), (error) => {
+  await assert.rejects(client.businessUser("user_1").listApiKeys(), (error) => {
     assert(error instanceof ConflictError);
     assert(error instanceof TiDBLinkApiError);
     assert(error instanceof TiDBLinkError);
@@ -135,7 +135,7 @@ test("clients accept only the frozen typed credential grammar before dispatch", 
       const apiKey = `ti_${kind}_${id}_${secret}`;
       const client = new Client({ baseUrl, apiKey });
       assert(!JSON.stringify(client).includes(apiKey));
-      if (kind === "org") await client.serviceUser("user_1").listApiKeys();
+      if (kind === "org") await client.businessUser("user_1").listApiKeys();
       else await client.listAgents();
       assert.equal(calls.at(-1).headers.authorization, `Bearer ${apiKey}`);
     }
@@ -143,7 +143,7 @@ test("clients accept only the frozen typed credential grammar before dispatch", 
   assert.equal(calls.length, 4);
 });
 
-test("an Organization client manages a Service User's credentials", async () => {
+test("an Organization client manages a Business User's credentials", async () => {
   const calls = [];
   const apiKey = {
     apiKeyId: "uak_1",
@@ -164,11 +164,11 @@ test("an Organization client manages a Service User's credentials", async () => 
     for await (const chunk of request) body += chunk;
     calls.push({ method: request.method, url: request.url, body, headers: request.headers });
     response.setHeader("content-type", "application/json");
-    if (request.url === "/api/admin/org/users/user_1/api-keys") {
+    if (request.url === "/api/v1/organization/users/user_1/api-keys") {
       response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_1_" + "a".repeat(43) }));
       return;
     }
-    if (request.url === "/api/admin/org/user-api-keys/uak_1/rotate") {
+    if (request.url === "/api/v1/organization/user-api-keys/uak_1/rotate") {
       response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_2_" + "b".repeat(43) }));
       return;
     }
@@ -183,19 +183,19 @@ test("an Organization client manages a Service User's credentials", async () => 
     apiKey: organizationApiKey,
   });
 
-  const serviceUser = client.serviceUser("user_1");
-  assert.equal(serviceUser.id, "user_1");
-  assert.equal((await serviceUser.createApiKey({ name: "backend" })).token, "ti_user_1_" + "a".repeat(43));
-  assert.equal((await serviceUser.rotateApiKey("uak_1")).token, "ti_user_2_" + "b".repeat(43));
-  assert.equal((await serviceUser.revokeApiKey("uak_1")).status, "revoked");
+  const businessUser = client.businessUser("user_1");
+  assert.equal(businessUser.id, "user_1");
+  assert.equal((await businessUser.createApiKey({ name: "backend" })).token, "ti_user_1_" + "a".repeat(43));
+  assert.equal((await businessUser.rotateApiKey("uak_1")).token, "ti_user_2_" + "b".repeat(43));
+  assert.equal((await businessUser.revokeApiKey("uak_1")).status, "revoked");
 
   assert.deepEqual(JSON.parse(calls[0].body), { name: "backend" });
   assert.deepEqual(
     calls.map(({ method, url }) => [method, url]),
     [
-      ["POST", "/api/admin/org/users/user_1/api-keys"],
-      ["POST", "/api/admin/org/user-api-keys/uak_1/rotate"],
-      ["POST", "/api/admin/org/user-api-keys/uak_1/revoke"],
+      ["POST", "/api/v1/organization/users/user_1/api-keys"],
+      ["POST", "/api/v1/organization/user-api-keys/uak_1/rotate"],
+      ["POST", "/api/v1/organization/user-api-keys/uak_1/revoke"],
     ],
   );
 });
@@ -212,7 +212,7 @@ test("a lost credential response is outcome unknown and is not retried", async (
   });
 
   await assert.rejects(
-    client.serviceUser("user_1").createApiKey({ name: "backend" }),
+    client.businessUser("user_1").createApiKey({ name: "backend" }),
     (error) => {
       assert(error instanceof OutcomeUnknownError);
       assert.match(error.requestId, /^[0-9a-f-]{36}$/);
@@ -242,8 +242,8 @@ test("unusable credential responses are outcome unknown", async () => {
   for (let attempt = 0; attempt < bodies.length; attempt += 1) {
     await assert.rejects(
       attempt % 2 === 0
-        ? client.serviceUser("user_1").createApiKey({ name: "backend" })
-        : client.serviceUser("user_1").rotateApiKey("uak_1"),
+        ? client.businessUser("user_1").createApiKey({ name: "backend" })
+        : client.businessUser("user_1").rotateApiKey("uak_1"),
       (error) => {
         assert(error instanceof OutcomeUnknownError);
         for (const token of [organizationApiKey, ...invalidTokens]) {
@@ -264,19 +264,19 @@ test("credential cancellation is outcome unknown only after dispatch", async () 
     requests += 1;
     controller.abort(new Error("stop after dispatch"));
   });
-  const serviceUser = new OrganizationClient({ baseUrl, apiKey: organizationApiKey }).serviceUser(
+  const businessUser = new OrganizationClient({ baseUrl, apiKey: organizationApiKey }).businessUser(
     "user_1",
   );
 
   await assert.rejects(
-    serviceUser.createApiKey({ name: "backend", signal: controller.signal }),
+    businessUser.createApiKey({ name: "backend", signal: controller.signal }),
     OutcomeUnknownError,
   );
 
   const beforeDispatch = new AbortController();
   beforeDispatch.abort(new Error("stop before dispatch"));
   await assert.rejects(
-    serviceUser.createApiKey({ name: "backend", signal: beforeDispatch.signal }),
+    businessUser.createApiKey({ name: "backend", signal: beforeDispatch.signal }),
     /stop before dispatch/,
   );
   assert.equal(requests, 1);
@@ -307,8 +307,39 @@ test("offboarding revokes every active key and leaves revoked keys alone", async
     apiKey: organizationApiKey,
   });
 
-  const result = await client.serviceUser("user_1").revokeAllApiKeys();
+  const result = await client.businessUser("user_1").revokeAllApiKeys();
 
   assert.deepEqual(result, [{ apiKeyId: "uak_active", status: "revoked" }]);
-  assert.deepEqual(revoked, ["/api/admin/org/user-api-keys/uak_active/revoke"]);
+  assert.deepEqual(revoked, ["/api/v1/organization/user-api-keys/uak_active/revoke"]);
+});
+
+
+test("Organization admission returns native Business Users and reconstructs their credential handle", async () => {
+  const calls = [];
+  const organization = { organizationId: "org_1", slug: "acme", name: "Acme", createdAt: "2026-10-04T00:00:00Z", updatedAt: "2026-10-04T00:00:00Z" };
+  const record = { userId: "busr_" + "a".repeat(32), organizationId: "org_1", displayName: "Customer", externalId: "customer-42", status: "active", createdAt: "2026-10-04T00:00:00Z", updatedAt: "2026-10-04T00:00:00Z" };
+  const baseUrl = await serve(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    calls.push({ method: request.method, url: request.url, headers: request.headers, body });
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify(request.url === "/api/v1/organization" ? { organization } : request.url === "/api/v1/organization/users" && request.method === "GET" ? { users: [record] } : { user: record }));
+  });
+  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+  assert.deepEqual(await client.getOrganization(), organization);
+  const created = await client.createBusinessUser({ displayName: "Customer", externalId: "customer-42" });
+  assert.deepEqual(created.data, record);
+  assert.equal(created.id, record.userId);
+  assert.deepEqual((await client.listBusinessUsers()).map(user => user.data), [record]);
+  assert.deepEqual((await client.getBusinessUser(record.userId)).data, record);
+  await assert.rejects(client.createBusinessUser({ organizationId: "foreign" }), /organizationId is not supported/);
+  assert.deepEqual(calls.map(call => [call.method, call.url]), [
+    ["GET", "/api/v1/organization"], ["POST", "/api/v1/organization/users"],
+    ["GET", "/api/v1/organization/users"], ["GET", "/api/v1/organization/users/" + record.userId],
+  ]);
+  assert.deepEqual(JSON.parse(calls[1].body), { displayName: "Customer", externalId: "customer-42" });
+  for (const { headers } of calls) {
+    assert.equal(headers.authorization, "Bearer " + organizationApiKey);
+    for (const name of ["cookie", "x-ti-target-organization-id", "x-ti-organization-id", "x-ti-user-id"]) assert.equal(headers[name], undefined);
+  }
 });

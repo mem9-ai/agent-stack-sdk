@@ -54,73 +54,85 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
 
   await writeFile(
     path.join(temporary, "consumer.ts"),
-    `import type {
-      Agent,
-      AgentConfigPatch,
-      TemplateContent,
-      HardwareRequirement,
-      PublicAgentConfig,
-      ServiceUser,
-      Session,
-      TurnResult,
-    } from "@mem9/tidb-link";
-    import {
-      TIDB_LINK_API_VERSION,
-      TIDB_LINK_REVISION,
-      TiDBLinkApiError,
-      TiDBLinkError,
-      OrganizationClient,
-      UserClient,
-    } from "@mem9/tidb-link";
+    `import type { Agent, AgentRecord, AgentTemplatePage, BusinessUser, BusinessUserRecord, Session, SessionRecord, SessionTemplateProvenance, TurnResult, TurnStreamEvent, Interaction, InteractionReceipt, InteractionPage } from "@mem9/tidb-link";
+    import { TIDB_LINK_API_VERSION, TIDB_LINK_REVISION, TiDBLinkApiError, TiDBLinkError, OrganizationClient, UserClient } from "@mem9/tidb-link";
+    // @ts-expect-error Previous public behavior types and ServiceUser have no aliases.
+    import { AgentConfigPatch, TemplateContent, HardwareRequirement, PublicAgentConfig, ServiceUser, ApplyTemplateInput, SelectableSessionModel } from "@mem9/tidb-link";
     // @ts-expect-error Previous compatibility constants and error exports have no aliases.
-    import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@mem9/tidb-link";
-    // @ts-expect-error Workspace authority was removed from the supported SDK.
-    import { WorkspaceClient } from "@mem9/tidb-link";
-
+    import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError, WorkspaceClient } from "@mem9/tidb-link";
     declare const baseUrl: string;
     declare const organizationApiKey: string;
     const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
-    const serviceUser: ServiceUser = organization.serviceUser("user_1");
-    declare const publicConfig: PublicAgentConfig;
     async function quickStart(): Promise<TurnResult> {
-      const { token } = await serviceUser.createApiKey({ name: "backend" });
+      await organization.getOrganization();
+      const businessUser: BusinessUser = await organization.createBusinessUser({ displayName: "Customer", externalId: "customer-42" });
+      const record: Readonly<BusinessUserRecord> | undefined = businessUser.data;
+      const existing: BusinessUser[] = await organization.listBusinessUsers();
+      await organization.getBusinessUser(businessUser.id);
+      const { token } = await businessUser.createApiKey({ name: "backend" });
       const user = new UserClient({ baseUrl, apiKey: token });
-      const agents: Agent[] = await user.listAgents();
-      const agent = agents[0] ?? await user.createAgent({ agentTemplateId: "template_1", templateVersion: 1, name: "Customer Agent" });
-      const requirement: HardwareRequirement = {definitionId:"hdef_"+"a".repeat(32),capabilityNames:["set_level"]};
-      const config: AgentConfigPatch = { memory: { enabled: true }, hardware:{requirements:[requirement]} };
-      const published = await user.getPublishedTemplateVersion("template_1",1);
-      const content: TemplateContent = published.content;
-      void content;
-      // @ts-expect-error Content version 1 cannot declare Hardware.
-      const invalidContent: TemplateContent = { ...published.content,schemaVersion:"agent-template-content@1",hardware:{requirements:[]} };
-      // @ts-expect-error Every new Agent needs an explicit Template selector.
-      user.createAgent({name:"Missing selection"});
-      void invalidContent;
-      await agent.configure(config);
-      const session: Session = await agent.createSession();
-      return session.turn({ text: "Hello" });
+      const summaries: AgentTemplatePage = await user.listAgentTemplates({ limit: 20 });
+      const agent: Agent = await user.createAgent({ agentTemplateId: summaries.templates[0]!.agentTemplateId });
+      const association: Readonly<AgentRecord> = agent.data;
+      const session: Session = await agent.createSession({ idempotencyKey: "customer-session-001" });
+      const metadata: Readonly<SessionRecord> | undefined = session.data;
+      const provenance: SessionTemplateProvenance | null | undefined = metadata?.template;
+      // @ts-expect-error Public Session metadata excludes the private execution recipe.
+      void metadata?.executionConfiguration;
+      void provenance;
+      await user.listSessions();
+      await session.rename("Support");
+      await session.setBillingTag(null);
+      await user.validateMemoryKey("test-memory-key");
+      await agent.revealMemoryKey();
+      await agent.replaceMemoryKey("replacement-memory-key");
+      void record; void existing; void association; void metadata;
+            const page: InteractionPage = await session.listInteractions({ limit: 1 });
+      const saved: Interaction = await session.getInteraction("message-001");
+      const cancelled: InteractionReceipt = await session.stopTurn(saved.turnId, { inputId: "cancel-001" });
+      const content = await session.getTurn(saved.turnId);
+      void content.userMessages; void page; void cancelled;
+      for await (const item of session.streamTurn({ inputId: "message-002", text: "Hello" })) {
+        if ("type" in item) { const receipt: InteractionReceipt = item; void receipt; }
+        else { const event: TurnStreamEvent = item; void event; }
+      }
+      return session.turn({ inputId: "message-001", text: "Hello" });
     }
-    // @ts-expect-error Organization API Keys cannot create Service Users through the public contract.
-    organization.createServiceUser({ displayName: "Customer" });
-    // @ts-expect-error Project selection was removed from User authority.
-    new UserClient({ baseUrl, apiKey: "ti_user_key_${"x".repeat(43)}", projectId: "removed" });
-    // @ts-expect-error Runtime selection is not an Agent configuration capability.
-    const removedRuntime: AgentConfigPatch = { runtime: { backend: "codex", authId: "removed" } };
+    const user = new UserClient({ baseUrl, apiKey: "from-secret-manager" });
+    // @ts-expect-error Every new Agent requires a Template association.
+    user.createAgent({});
+    // @ts-expect-error Published version is selected at Session creation by the service.
+    user.createAgent({ agentTemplateId: "template_1", templateVersion: 1 });
+    // @ts-expect-error Ordinary behavior belongs to the published Template.
+    user.createAgent({ agentTemplateId: "template_1", config: {} });
+    // @ts-expect-error Model selection belongs to the published Template.
+    user.createAgent({ agentTemplateId: "template_1", model: "gpt-5.6-sol" });
+    // @ts-expect-error Organization identity comes from the key.
+    organization.createBusinessUser({ organizationId: "foreign" });
+    declare const agent: Agent;
+    // @ts-expect-error Agent association has no configuration mutation.
+    agent.configure({});
+    // @ts-expect-error Published content is not a public summary.
+    user.getPublishedTemplateVersion("template_1", 1);
     declare const session: Session;
-    // @ts-expect-error Historical Session models cannot be selected for new Runs.
-    session.setModel("gpt-5.4");
-    // @ts-expect-error Structured Turn output is not supported.
-    session.turn({ text: "Hello", outputSchema: { type: "object" } });
-    void TIDB_LINK_API_VERSION;
-    void TIDB_LINK_REVISION;
+    // @ts-expect-error Session execution model is fixed.
+    session.setModel("gpt-5.6-sol");
+    // @ts-expect-error Session creation does not choose a model.
+    agent.createSession({ model: "gpt-5.6-sol" });
+    // @ts-expect-error Session creation requires a stable identity.
+    agent.createSession();
+    // @ts-expect-error Messages require a stable original input identity.
+    session.turn({ text: "Hello" });
+    // @ts-expect-error Cancellation requires a stable original input identity.
+    session.stopTurn("turn_1", {});
+    declare const receipt: InteractionReceipt;
+    // @ts-expect-error An SDK receipt is not a native transient stream event.
+    const nativeReceipt: TurnStreamEvent = receipt;
+    // @ts-expect-error Structured Turn output is unsupported.
+    session.turn({ inputId: "message-001", text: "Hello", outputSchema: { type: "object" } });
+    void TIDB_LINK_API_VERSION; void TIDB_LINK_REVISION;
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
-    void apiError;
-    void publicConfig;
-    void WorkspaceClient;
-    void removedRuntime;
-    void serviceUser;
-    void quickStart;
+    void apiError; void quickStart;
     `,
   );
   const tsc = path.join(
@@ -162,7 +174,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87",
+    "8703fc32ac89fcb59f1e583f9f95ecaaa84dd501",
   );
   assert.match(installedPackage.version, /^0\./);
   assert.deepEqual((await readdir(installedRoot)).sort(), [
@@ -200,34 +212,83 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const userKey = "ti_user_key_" + "y".repeat(43);
     const rotatedKey = "ti_user_key_" + "z".repeat(43);
     const requests = [];
-    const server = createServer((request, response) => {
-      requests.push({ method: request.method, url: request.url, key: request.headers.authorization });
+    let executionResponse;
+    const started = { inputId: "message-001", sequence: 1, kind: "message", mode: "started", turnId: "turn_1", message: { id: "user-message_1", role: "user", content: "Hello", createdAt: "2026-10-04T00:00:00Z" }, createdAt: "2026-10-04T00:00:00Z", appliedAt: "2026-10-04T00:00:00Z", rejection: null, result: { status: "interrupted", completedAt: "2026-10-04T00:00:01Z" } };
+    const steered = { ...started, inputId: "steer-001", sequence: 2, mode: "steered", message: { ...started.message, id: "user-message_2", content: "Add details" } };
+    const cancelled = { ...started, inputId: "cancel-001", sequence: 3, kind: "cancel", mode: "cancelled", message: null, appliedAt: null };
+    const event = (name, seq, payload) => ({ event: name, seq, turnId: "turn_1", sessionId: "session_1", createdAt: "2026-10-04T00:00:00Z", payload });
+    const businessUserRecord = { userId: "busr_1", organizationId: "org_1", displayName: "Customer", externalId: "customer-42", status: "active" };
+    const association = { agentId: "agent_1", organizationId: "org_1", ownerUserId: "busr_1", agentTemplateId: "template_1", status: "active" };
+    const sessionRecord = { sessionId: "session_1", template: { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) }, model: "gpt-5.6-sol", createdWithAgentId: "agent_1", status: "active", name: null, billingTag: null };
+    const server = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      requests.push({ method: request.method, url: request.url, key: request.headers.authorization, body: body ? JSON.parse(body) : null });
       response.setHeader("content-type", "application/json");
-      if (request.url === "/api/agents") {
-        response.end(JSON.stringify({ agents: [] }));
-      } else {
-        const token = request.url.endsWith("/rotate") ? rotatedKey : userKey;
-        response.writeHead(201).end(JSON.stringify({ apiKey: { apiKeyId: "uak_key" }, token }));
+      if (request.url.endsWith("/api-keys") || request.url.endsWith("/rotate")) return response.end(JSON.stringify({ apiKey: { apiKeyId: "uak_key" }, token: request.url.endsWith("/rotate") ? rotatedKey : userKey }));
+      if (request.url === "/api/v1/organization") return response.end(JSON.stringify({ organization: { organizationId: "org_1" } }));
+      if (request.url.startsWith("/api/v1/organization/users")) return response.end(JSON.stringify(request.method === "GET" && request.url === "/api/v1/organization/users" ? { users: [businessUserRecord] } : { user: businessUserRecord }));
+      if (request.url === "/api/v1/agent-templates") return response.end(JSON.stringify({ templates: [{ agentTemplateId: "template_1", displayName: "Support", description: "Support", latestPublishedVersion: 2 }], hasMore: false, nextCursor: null }));
+      if (request.url === "/api/v1/agents" && request.method === "GET") return response.end(JSON.stringify({ agents: [association] }));
+      if (request.url.startsWith("/api/v1/agents")) return response.end(JSON.stringify({ agent: request.method === "DELETE" ? { ...association, status: "archived" } : association }));
+      if (request.url.endsWith("/turns/turn_1/stop")) return response.writeHead(202).end(JSON.stringify({ interaction: cancelled }));
+      if (request.url.endsWith("/interactions/message-001")) return response.end(JSON.stringify({ interaction: started }));
+      if (request.url.includes("/interactions?")) return response.end(JSON.stringify({ interactions: [started, steered, cancelled], hasMore: false, nextCursor: null }));
+      if (request.url.endsWith("/turns/turn_1")) return response.end(JSON.stringify({ turn: { id: "turn_1", sessionId: "session_1", status: "interrupted", billingTag: null, userMessage: started.message, userMessages: [started.message, steered.message], operations: [], assistantMessage: null, createdAt: started.createdAt } }));
+      if (request.url.endsWith("/turns")) {
+        const input = JSON.parse(body);
+        if (input.inputId === "steer-001") return response.writeHead(202).end(JSON.stringify({ interaction: steered }));
+        if (executionResponse) return response.end(JSON.stringify({ interaction: started }));
+        executionResponse = response;
+        response.writeHead(201, { "content-type": "application/x-ndjson" });
+        return response.write(JSON.stringify(event("turn_started", 0, { inputId: "message-001" })) + String.fromCharCode(10));
       }
+      if (request.url === "/api/v1/sessions" && request.method === "GET") return response.end(JSON.stringify({ sessions: [sessionRecord] }));
+      response.end(JSON.stringify({ session: sessionRecord }));
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
       const baseUrl = "http://127.0.0.1:" + server.address().port;
       const org = new sdk.OrganizationClient({ baseUrl, apiKey: orgKey });
-      const serviceUser = org.serviceUser("user_1");
-      const { token } = await serviceUser.createApiKey({ name: "test" });
+      assert.equal((await org.getOrganization()).organizationId, "org_1");
+      const businessUser = await org.createBusinessUser({ externalId: "customer-42" });
+      assert(businessUser instanceof sdk.BusinessUser);
+      assert.equal((await org.getBusinessUser(businessUser.id)).id, "busr_1");
+      assert.equal((await org.listBusinessUsers()).length, 1);
+      const { token } = await businessUser.createApiKey({ name: "test" });
       assert.equal(token, userKey);
       const user = new sdk.UserClient({ baseUrl, apiKey: token });
-      assert.deepEqual(await user.listAgents(), []);
-      const rotated = await serviceUser.rotateApiKey("uak_key");
+      const page = await user.listAgentTemplates();
+      const agent = await user.createAgent({ agentTemplateId: page.templates[0].agentTemplateId });
+      assert.equal((await user.listAgents())[0].id, agent.id);
+      assert.equal((await user.getAgent(agent.id)).id, agent.id);
+      const session = await agent.createSession({ idempotencyKey: "customer-session-001" });
+      assert.deepEqual(session.data.template, { templateId: "template_1", version: 2, contentDigest: "a".repeat(64) });
+      assert.equal((await user.listSessions())[0].id, session.id);
+      const owner = session.streamTurn({ inputId: "message-001", text: "Hello" });
+      assert.equal((await owner.next()).value.event, "turn_started");
+      const active = await session.turn({ inputId: "steer-001", text: "Add details" });
+      assert.equal(active.type, "receipt"); assert.equal(active.replayed, false); assert.equal(active.interaction.mode, "steered");
+      assert.equal((await session.stopTurn("turn_1", { inputId: "cancel-001" })).interaction.kind, "cancel");
+      executionResponse.end(JSON.stringify(event("turn_finished", 1, { status: "interrupted" })) + String.fromCharCode(10));
+      assert.equal((await owner.next()).value.event, "turn_finished"); assert.equal((await owner.next()).done, true);
+      assert.equal((await session.turn({ inputId: "message-001", text: "Hello" })).replayed, true);
+      assert.deepEqual((await session.listInteractions({ limit: 3 })).interactions, [started, steered, cancelled]);
+      assert.deepEqual(await session.getInteraction("message-001"), started);
+      assert.equal((await session.getTurn("turn_1")).userMessages.length, 2);
+      await session.refresh(); await session.rename("Support"); await session.setBillingTag(null); await session.delete(); await agent.unlink();
+      assert.equal(agent.data.status, "archived");
+      const rotated = await businessUser.rotateApiKey("uak_key");
       assert.equal(rotated.token, rotatedKey);
-      assert.deepEqual(await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents(), []);
-      assert.deepEqual(requests, [
-        {method:"POST",url:"/api/admin/org/users/user_1/api-keys",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/agents",key:"Bearer " + userKey},
-        {method:"POST",url:"/api/admin/org/user-api-keys/uak_key/rotate",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/agents",key:"Bearer " + rotatedKey},
-      ]);
+      assert.equal((await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents()).length, 1);
+      assert.equal(requests[1].url, "/api/v1/organization/users");
+      assert.deepEqual(requests[1].body, { externalId: "customer-42" });
+      assert.deepEqual(requests[6].body, { agentTemplateId: "template_1" });
+      assert.equal(requests.at(-1).key, "Bearer " + rotatedKey);
+      assert(requests.every(request => request.url.startsWith("/api/v1/")));
+      for (const name of ["ServiceUser", "WorkspaceClient"]) assert.equal(sdk[name], undefined);
+      for (const method of ["configure", "applyTemplate", "previewTemplateApplication", "rename", "archive", "makeDefault"]) assert.equal(agent[method], undefined);
+      assert.equal(session.setModel, undefined);
       for (const [Client, apiKey] of [[sdk.UserClient, orgKey], [sdk.OrganizationClient, "ag9_oak." + "key." + "x".repeat(32)]]) {
         assert.throws(() => new Client({baseUrl,apiKey}), (error) => {
           assert(error instanceof TypeError);
@@ -236,7 +297,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
           return true;
         });
       }
-      assert.equal(requests.length, 4);
       for (const client of [org, user]) {
         for (const key of [orgKey, userKey, rotatedKey]) assert(!JSON.stringify(client).includes(key));
       }

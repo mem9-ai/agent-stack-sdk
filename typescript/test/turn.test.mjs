@@ -95,13 +95,13 @@ test("malformed Turn payloads are rejected at the package boundary", async () =>
   const invalid = [
     event("progress", 0, { text: "Missing start" }),
     event("turn_started", 0, { execution: { model: "unsupported-model" } }),
-    event("progress", 0, { text: 42 }),
-    event("assistant_message", 0, {
+    event("progress", 1, { text: 42 }),
+    event("assistant_message", 1, {
       messageId: "message_1",
       text: "Choose one",
       clarificationItem: { prompt: "Choose one", answerChoices: ["A", "B"] },
     }),
-    event("assistant_message", 0, {
+    event("assistant_message", 1, {
       messageId: "message_1",
       text: "Choose one",
       clarificationItem: {
@@ -110,7 +110,7 @@ test("malformed Turn payloads are rejected at the package boundary", async () =>
         answerChoices: ["A", "B", "C", "D"],
       },
     }),
-    event("assistant_message", 0, {
+    event("assistant_message", 1, {
       messageId: "message_1",
       text: "Choose one",
       clarificationItem: {
@@ -121,20 +121,24 @@ test("malformed Turn payloads are rejected at the package boundary", async () =>
       },
     }),
   ];
+  const started = event("turn_started", 0, {});
   let request = 0;
   const baseUrl = await serve((_request, response) => {
-    writeEvents(response, [invalid[request++]]);
+    const sample = invalid[request++];
+    writeEvents(response, sample.seq === 1 ? [started, sample] : [sample]);
   });
 
   for (let attempt = 0; attempt < invalid.length; attempt += 1) {
+    const received = [];
     await assert.rejects(
       async () => {
-        for await (const _item of sessionFor(baseUrl).streamTurn({ inputId: "message-001", text: "Hello" })) {
-          // consume
+        for await (const item of sessionFor(baseUrl).streamTurn({ inputId: "message-001", text: "Hello" })) {
+          received.push(item);
         }
       },
       InvalidTurnEventError,
     );
+    assert.deepEqual(received, attempt >= 2 ? [started] : []);
   }
 });
 
@@ -338,15 +342,14 @@ const bounded = async (promise, label) => {
 
 test("normal terminal consumption waits for EOF without cancelling the owning response", async context => {
   let owner;
-  const opened = Promise.withResolvers();
-  const closed = Promise.withResolvers();
+  let opened = Promise.withResolvers();
+  let closed = Promise.withResolvers();
   let endedNormally = false;
   const baseUrl = await serve((_request, response) => {
     owner = response;
     response.once("close", () => closed.resolve(response.writableEnded));
     response.writeHead(201, { "content-type": "application/x-ndjson" });
-    response.write([event("turn_started", 0, {}), event("assistant_message", 1, { messageId: "message_1", text: "Done" }), event("turn_finished", 2, { status: "succeeded" })].map(item => JSON.stringify(item)).join("\n") + "\n");
-    opened.resolve();
+    response.write([event("turn_started", 0, {}), event("assistant_message", 1, { messageId: "message_1", text: "Done" }), event("turn_finished", 2, { status: "succeeded" })].map(item => JSON.stringify(item)).join("\n") + "\n", () => opened.resolve());
   });
   context.after(() => owner?.destroy());
   const iterator = sessionFor(baseUrl).streamTurn({ inputId: "message-001", text: "Hello" });
@@ -361,6 +364,21 @@ test("normal terminal consumption waits for EOF without cancelling the owning re
   assert.deepEqual(await bounded(ending, "normal EOF"), { value: undefined, done: true });
   assert.equal(await bounded(closed.promise, "normal server close"), true);
   assert.equal(endedNormally, true);
+
+  opened = Promise.withResolvers();
+  closed = Promise.withResolvers();
+  const collected = sessionFor(baseUrl).turn({ inputId: "message-001", text: "Hello" });
+  await bounded(opened.promise, "collected owning response terminal write");
+  let observation;
+  try {
+    const pending = new Promise(resolve => { observation = setTimeout(() => resolve("awaiting-eof"), 25); });
+    assert.equal(await Promise.race([collected.then(() => "returned-early"), pending]), "awaiting-eof");
+  } finally { clearTimeout(observation); }
+  assert.equal(owner.destroyed, false);
+  assert.equal(owner.writableEnded, false);
+  owner.end();
+  assert.deepEqual(await bounded(collected, "collected normal EOF"), { type: "answer", turnId: "turn_1", messageId: "message_1", text: "Done" });
+  assert.equal(await bounded(closed.promise, "collected normal server close"), true);
 });
 
 

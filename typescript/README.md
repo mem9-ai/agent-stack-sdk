@@ -64,6 +64,28 @@ for await (const event of session.streamTurn({ text: "Continue" })) {
 }
 ```
 
+### Draft text and the current Session SSE API
+
+`streamTurn()` exposes the retained NDJSON Turn events. An `assistant_draft`
+event's `payload.text` is the complete provisional draft: replace the current
+Turn's displayed text rather than appending. A later draft may revise earlier
+text or clear it with an empty string. `progress` is a separate status message,
+and `assistant_message` carries the saved assistant message; use `turn_finished`
+to determine the outcome.
+
+This SDK version targets the service revision declared in `package.json` and
+uses `/api/sessions/.../turns`. It does not implement the current
+`/api/v1/user/sessions/{id}/events` command and independent SSE subscription API.
+For that API, use a streaming HTTP client and the service's
+[SSE guide](https://github.com/mem9-ai/agent-stack/blob/main/apps/site/src/content/docs/docs/guides/streaming.md).
+Each SSE data frame contains a JSON envelope. Its
+`agent.session.turn.output_text.snapshot` type carries the complete draft in
+`data.payload.text`; replace the draft for the envelope's `turnId`, including
+revisions and empty resets. A snapshot after cursor reconnection is usable
+without prior draft frames. `agent.session.turn.progress` remains separate from
+answer text. The service emits no `output_text.delta` alias. Package publication
+and support for that current API are separate from this documentation update.
+
 ## Clients and resources
 
 - `OrganizationClient` accepts an Organization API Key with

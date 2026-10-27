@@ -36,7 +36,7 @@ export async function provisionUser({
         !(error instanceof ConflictError && error.code === "resource_conflict")
       )
         throw error;
-      user = await find();
+      user = await find().catch(() => undefined);
       if (!user) throw error;
     }
   }

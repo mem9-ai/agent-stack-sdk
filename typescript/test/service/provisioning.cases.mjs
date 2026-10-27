@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { readFile, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { test } from "node:test";
 import {
   OrganizationClient,
@@ -8,6 +13,7 @@ import {
 } from "@mem9/agent-stack";
 import { provisionUser } from "@mem9/agent-stack/examples/provision-user.mjs";
 
+const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
 const apiKey = process.env.SDK_ORGANIZATION_KEY;
 const foreignApiKey = process.env.SDK_FOREIGN_ORGANIZATION_KEY;
@@ -143,4 +149,46 @@ test("provisioning, scoped identity and key lifecycle work in an installed consu
   assert.equal((await userRequest(fresh.token)).status, 200);
   await organization.revokeUserApiKey(example.apiKey.apiKeyId);
   await organization.revokeUserApiKey(fresh.apiKey.apiKeyId);
+  const credentialFile = path.join(process.cwd(), "user-credential.json");
+  const executable = fileURLToPath(
+    import.meta.resolve("@mem9/agent-stack/examples/provision-user.mjs"),
+  );
+  const commandEnv = {
+    ...process.env,
+    AGENT_SERVICE_URL: baseUrl,
+    ORGANIZATION_API_KEY: apiKey,
+    END_USER_EXTERNAL_ID: `sdk-cli-${randomUUID()}`,
+    USER_CREDENTIAL_FILE: credentialFile,
+  };
+  try {
+    const output = await exec(process.execPath, [executable], {
+      env: commandEnv,
+    });
+    const content = await readFile(credentialFile, "utf8");
+    const saved = JSON.parse(content);
+    assert.equal((await userRequest(saved.token)).status, 200);
+    if (process.platform !== "win32") {
+      assert.equal((await stat(credentialFile)).mode & 0o777, 0o600);
+    }
+    assert.equal((output.stdout + output.stderr).includes(saved.token), false);
+    const count = (await organization.listUserApiKeys(saved.user.userId))
+      .length;
+    let rejectedOutput;
+    await assert.rejects(
+      exec(process.execPath, [executable], { env: commandEnv }),
+      (error) => {
+        rejectedOutput = (error.stdout ?? "") + (error.stderr ?? "");
+        return error.code === 1;
+      },
+    );
+    assert.equal(rejectedOutput.includes(saved.token), false);
+    assert.equal((await readFile(credentialFile, "utf8")) === content, true);
+    assert.equal(
+      (await organization.listUserApiKeys(saved.user.userId)).length,
+      count,
+    );
+    await organization.revokeUserApiKey(saved.apiKey.apiKeyId);
+  } finally {
+    await rm(credentialFile, { force: true });
+  }
 });

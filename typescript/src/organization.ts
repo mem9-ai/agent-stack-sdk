@@ -84,7 +84,10 @@ export class OrganizationClient {
   readonly #http: HttpClient;
 
   constructor(options: OrganizationClientOptions) {
-    if (!options.apiKey.startsWith("ti_org_")) {
+    if (
+      !/^ti_org_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.test(options.apiKey) ||
+      options.apiKey.trim() !== options.apiKey
+    ) {
       throw new TypeError(
         "OrganizationClient requires an Organization API Key",
       );
@@ -190,7 +193,7 @@ export class OrganizationClient {
     const response = await this.#http.post<{ apiKey: UserApiKey }>(
       `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
       undefined,
-      { ...options, idempotent: true, outcomeUnknown: true },
+      { ...options, outcomeUnknown: true },
     );
     return response.apiKey;
   }

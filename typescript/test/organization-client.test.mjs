@@ -94,13 +94,11 @@ test("an Organization client retries a safe read with one request identity", asy
     requests.push({ url: request.url, headers: request.headers });
     response.setHeader("content-type", "application/json");
     if (requests.length === 1) {
-      response
-        .writeHead(503)
-        .end(
-          JSON.stringify({
-            error: { code: "service_unavailable", message: "Try later" },
-          }),
-        );
+      response.writeHead(503).end(
+        JSON.stringify({
+          error: { code: "service_unavailable", message: "Try later" },
+        }),
+      );
       return;
     }
     response.end(JSON.stringify({ apiKeys: [] }));
@@ -372,26 +370,22 @@ for (const failure of ["disconnect", "conflict"]) {
         user = { userId: "user_1", externalId: "customer-1" };
         if (failure === "disconnect") request.socket.destroy();
         else
-          response
-            .writeHead(409)
-            .end(
-              JSON.stringify({
-                error: { code: "resource_conflict", message: "Already exists" },
-              }),
-            );
+          response.writeHead(409).end(
+            JSON.stringify({
+              error: { code: "resource_conflict", message: "Already exists" },
+            }),
+          );
       } else {
         assert.equal(request.url, "/api/v1/org/users/user_1/api-keys");
         issuances++;
         if (issuances > 1) request.socket.destroy();
         else
-          response
-            .writeHead(201)
-            .end(
-              JSON.stringify({
-                apiKey: { apiKeyId: "key_1" },
-                token: "one-time",
-              }),
-            );
+          response.writeHead(201).end(
+            JSON.stringify({
+              apiKey: { apiKeyId: "key_1" },
+              token: "one-time",
+            }),
+          );
       }
     });
     const input = { baseUrl, organizationApiKey, externalId: " customer-1 " };
@@ -401,3 +395,86 @@ for (const failure of ["disconnect", "conflict"]) {
     assert.equal(issuances, 2);
   });
 }
+
+test("revocation aborted after dispatch retains its uncertain outcome and request identity", async () => {
+  const controller = new AbortController();
+  let requests = 0;
+  const baseUrl = await serve(() => {
+    requests++;
+    controller.abort(new Error("stop revocation"));
+  });
+  const client = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  });
+  await assert.rejects(
+    client.revokeUserApiKey("key_1", {
+      requestId: "revoke_1",
+      signal: controller.signal,
+    }),
+    (error) => {
+      assert(error instanceof OutcomeUnknownError);
+      assert.equal(error.requestId, "revoke_1");
+      return true;
+    },
+  );
+  assert.equal(requests, 1);
+});
+
+test("malformed credentials are rejected without appearing in nested errors", async () => {
+  const { inspect } = await import("node:util");
+  const secret = "fictionalSecret".repeat(4);
+  for (const apiKey of [
+    "ti_org_key1_\n" + secret,
+    organizationApiKey + "\n",
+    "ti_org_key1_" + secret,
+  ]) {
+    assert.throws(
+      () =>
+        new OrganizationClient({
+          baseUrl: "https://agent.example.com",
+          apiKey,
+        }),
+      (error) => {
+        assert(error instanceof TypeError);
+        assert.equal(inspect(error).includes(secret), false);
+        assert.equal(inspect(error).includes(apiKey), false);
+        return true;
+      },
+    );
+  }
+});
+
+test("failed reconciliation preserves the original uncertain creation identity", async () => {
+  const { provisionUser } = await import("../examples/provision-user.mjs");
+  let creating = false;
+  const baseUrl = await serve((request, response) => {
+    if (request.url === "/api/v1/org") {
+      response.end(
+        JSON.stringify({ organization: { organizationId: "org_1" } }),
+      );
+    } else if (request.method === "GET" && !creating) {
+      response.end(JSON.stringify({ users: [] }));
+    } else {
+      const requestId =
+        request.method === "POST" ? "original_creation" : "reconciliation";
+      creating = true;
+      response.writeHead(503, { "x-request-id": requestId }).end(
+        JSON.stringify({
+          error: {
+            code: "service_unavailable",
+            message: "Temporarily unavailable",
+          },
+        }),
+      );
+    }
+  });
+  await assert.rejects(
+    provisionUser({ baseUrl, organizationApiKey, externalId: "customer-1" }),
+    (error) => {
+      assert(error instanceof OutcomeUnknownError);
+      assert.equal(error.requestId, "original_creation");
+      return true;
+    },
+  );
+});

@@ -106,10 +106,10 @@ Every Organization method accepts a final `{ requestId?, signal? }` option.
 request identity takes precedence over the one sent.
 
 Safe reads use bounded retries with the same request identity. User creation and
-key creation/rotation are never automatically replayed. Disconnects, unusable
+key creation/rotation/revocation are never automatically replayed. Disconnects, unusable
 success responses, HTTP 408 and server failures during these mutations raise
 `OutcomeUnknownError`. For an HTTP failure, its `cause` retains the
-`AgentStackApiError`. Revoke can be retried safely, but a final ambiguous failure
+`AgentStackApiError`. Repeating revoke is safe, but an ambiguous failure
 still reports an unknown outcome. `AbortSignal` stops the local request; after
 dispatch it does not establish whether a mutation happened. Redirects are refused.
 

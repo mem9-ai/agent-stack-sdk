@@ -35,9 +35,12 @@ export interface HttpStream {
 
 export const requireEtag = <T>(result: HttpResult<T>): string => {
   if (!result.etag) {
-    throw new AgentStackError("Agent Service response omitted a required ETag", {
-      requestId: result.requestId,
-    });
+    throw new AgentStackError(
+      "Agent Service response omitted a required ETag",
+      {
+        requestId: result.requestId,
+      },
+    );
   }
   return result.etag;
 };
@@ -71,9 +74,17 @@ const errorInput = async (
     value = undefined;
   }
   const envelope = value as {
-    error?: { code?: unknown; message?: unknown; details?: unknown };
+    error?: {
+      code?: unknown;
+      message?: unknown;
+      details?: unknown;
+      requestId?: unknown;
+    };
   };
-  const error = envelope?.error;
+  const error =
+    typeof envelope?.error === "object" && envelope.error !== null
+      ? envelope.error
+      : undefined;
   return {
     status: response.status,
     code: typeof error?.code === "string" ? error.code : "http_error",
@@ -81,7 +92,11 @@ const errorInput = async (
       typeof error?.message === "string"
         ? error.message
         : `Agent Service request failed with status ${response.status}`,
-    requestId: response.headers.get("x-request-id") ?? fallbackRequestId,
+    requestId:
+      response.headers.get("x-request-id") ??
+      (typeof error?.requestId === "string"
+        ? error.requestId
+        : fallbackRequestId),
     ...(error && "details" in error ? { details: error.details } : {}),
   };
 };
@@ -111,30 +126,46 @@ export class HttpClient {
     this.#projectId = input.projectId;
   }
 
-  #headers(options: RequestOptions, stableRequestId: string): Record<string, string> {
+  #headers(
+    options: RequestOptions,
+    stableRequestId: string,
+  ): Record<string, string> {
     return {
       accept: "application/json",
       authorization: `Bearer ${this.#apiKey}`,
       "x-request-id": stableRequestId,
       ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
-      ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+      ...(options.idempotencyKey
+        ? { "idempotency-key": options.idempotencyKey }
+        : {}),
       ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
-      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.body === undefined
+        ? {}
+        : { "content-type": "application/json" }),
     };
   }
 
-  get<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<T> {
+  get<T>(
+    path: string,
+    options?: Pick<RequestOptions, "signal" | "requestId">,
+  ): Promise<T> {
     return this.request(path, { ...options, retry: "safe" });
   }
 
-  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<HttpResult<T>> {
+  getResponse<T>(
+    path: string,
+    options?: Pick<RequestOptions, "signal" | "requestId">,
+  ): Promise<HttpResult<T>> {
     return this.response(path, { ...options, retry: "safe" });
   }
 
   post<T>(
     path: string,
     body: unknown,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal"> & {
+    options?: Pick<
+      RequestOptions,
+      "outcomeUnknown" | "requestId" | "signal"
+    > & {
       idempotent?: boolean;
     },
   ): Promise<T> {
@@ -196,6 +227,7 @@ export class HttpClient {
     try {
       response = await fetch(`${this.#baseUrl}${path}`, {
         method: "POST",
+        redirect: "error",
         headers: {
           ...this.#headers(requestOptions, stableRequestId),
           accept: "application/x-ndjson",
@@ -216,10 +248,16 @@ export class HttpClient {
         ? new ConflictError(input)
         : new AgentStackApiError(input);
     }
-    if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
-      throw new OutcomeUnknownError("Agent Service returned an invalid Turn stream", {
-        requestId: response.headers.get("x-request-id") ?? stableRequestId,
-      });
+    if (
+      !response.body ||
+      !response.headers.get("content-type")?.includes("application/x-ndjson")
+    ) {
+      throw new OutcomeUnknownError(
+        "Agent Service returned an invalid Turn stream",
+        {
+          requestId: response.headers.get("x-request-id") ?? stableRequestId,
+        },
+      );
     }
     return {
       response,
@@ -231,16 +269,22 @@ export class HttpClient {
     return (await this.response<T>(path, options)).data;
   }
 
-  async response<T>(path: string, options: RequestOptions = {}): Promise<HttpResult<T>> {
+  async response<T>(
+    path: string,
+    options: RequestOptions = {},
+  ): Promise<HttpResult<T>> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
     }
     if (
       options.idempotencyKey !== undefined &&
-      (options.idempotencyKey.length > 255 || !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
+      (options.idempotencyKey.length > 255 ||
+        !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
     ) {
-      throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
+      throw new TypeError(
+        "idempotencyKey must be 1-255 visible ASCII characters",
+      );
     }
     options.signal?.throwIfAborted();
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
@@ -249,8 +293,11 @@ export class HttpClient {
       try {
         response = await fetch(`${this.#baseUrl}${path}`, {
           method: options.method ?? "GET",
+          redirect: "error",
           headers: this.#headers(options, stableRequestId),
-          ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          ...(options.body === undefined
+            ? {}
+            : { body: JSON.stringify(options.body) }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
@@ -259,7 +306,9 @@ export class HttpClient {
           await sleep(100 * 2 ** (attempt - 1), options.signal);
           continue;
         }
-        const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : ConnectionError;
+        const ErrorClass = options.outcomeUnknown
+          ? OutcomeUnknownError
+          : ConnectionError;
         throw new ErrorClass(
           options.outcomeUnknown
             ? "Agent Service request outcome is unknown; do not repeat it automatically"
@@ -279,13 +328,16 @@ export class HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (cause) {
-            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : AgentStackError;
+            const ErrorClass = options.outcomeUnknown
+              ? OutcomeUnknownError
+              : AgentStackError;
             throw new ErrorClass(
               options.outcomeUnknown
                 ? "Agent Service accepted the request but returned an unusable response"
                 : "Agent Service returned invalid JSON",
               {
-                requestId: response.headers.get("x-request-id") ?? stableRequestId,
+                requestId:
+                  response.headers.get("x-request-id") ?? stableRequestId,
                 cause,
               },
             );
@@ -305,9 +357,25 @@ export class HttpClient {
       }
 
       const input = await errorInput(response, stableRequestId);
-      throw input.status === 409 || input.status === 412
-        ? new ConflictError(input)
-        : new AgentStackApiError(input);
+      const error =
+        input.status === 409 || input.status === 412
+          ? new ConflictError(input)
+          : new AgentStackApiError(input);
+      if (
+        options.outcomeUnknown &&
+        (input.status >= 500 || input.status === 408)
+      ) {
+        throw new OutcomeUnknownError(
+          "Agent Service could not confirm the mutation outcome",
+          {
+            ...(input.requestId === undefined
+              ? {}
+              : { requestId: input.requestId }),
+            cause: error,
+          },
+        );
+      }
+      throw error;
     }
     throw new Error("unreachable");
   }

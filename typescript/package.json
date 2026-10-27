@@ -12,17 +12,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./examples/provision-user.mjs": "./examples/provision-user.mjs"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "examples/provision-user.mjs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test",
-    "pack:check": "npm pack --dry-run"
+    "test": "npm run build && node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run",
+    "test:service": "npm run build && node test/service/run.mjs"
   },
   "publishConfig": {
     "access": "public"
@@ -35,5 +38,7 @@
   "bugs": {
     "url": "https://github.com/mem9-ai/agent-stack-sdk/issues"
   },
-  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme"
+  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme",
+  "agentServiceRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "agentServiceOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
 }

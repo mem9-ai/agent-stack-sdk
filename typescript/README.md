@@ -1,111 +1,148 @@
 # `@mem9/agent-stack`
 
-Official TypeScript SDK for Agent Stack. The package requires Node.js 22.12 or
-newer and has no runtime dependencies.
+Official TypeScript SDK for Node.js 22.12 or newer. ESM only, with TypeScript
+declarations and no runtime dependencies.
 
-The SDK is ESM-only and ships TypeScript declarations.
+## Current refresh scope
 
-## Install
-
-```sh
-npm install @mem9/agent-stack
-```
+This slice refreshes Organization information, End User provisioning and User API
+Key management for [service revision b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
+It replaces the removed Workspace/Service User provisioning surface. The existing
+Agent, Session, Turn and Project exports are retained for subsequent refresh
+slices; they are **not verified or supported against this baseline**. Do not use
+them as the next step in this provisioning example.
 
 ## Quick start
 
-The Workspace API Key needs `user-api-keys:manage`. Store the returned Service
-User ID in your customer mapping and store the one-time User API Key in your
-secret manager before continuing.
+Install the package built from this checkout. This change does not publish a new
+npm release:
 
-```ts
-import { listProjects, UserClient, WorkspaceClient } from "@mem9/agent-stack";
-
-export async function runCustomerTurn(input: {
-  baseUrl: string;
-  workspaceApiKey: string;
-  customerName: string;
-  prompt: string;
-}) {
-  const workspace = new WorkspaceClient({
-    baseUrl: input.baseUrl,
-    apiKey: input.workspaceApiKey,
-  });
-
-  const serviceUser = await workspace.createServiceUser({
-    displayName: input.customerName,
-  });
-  const { token: userApiKey } = await serviceUser.createApiKey({
-    name: "saas-backend",
-  });
-
-  // Persist serviceUser.id and userApiKey securely here. The plaintext key is
-  // not available from list or revoke responses.
-  const [project] = await listProjects({ baseUrl: input.baseUrl, apiKey: userApiKey });
-  if (!project) throw new Error("No Project is available");
-  const user = new UserClient({
-    baseUrl: input.baseUrl,
-    apiKey: userApiKey,
-    projectId: project.projectId,
-  });
-  const agent = await user.createAgent({ name: `${input.customerName} Agent` });
-  const session = await agent.createSession();
-  return session.turn({ text: input.prompt });
-}
+```sh
+npm run build
+npm pack --workspace @mem9/agent-stack
+# In your application directory:
+npm install /path/to/mem9-agent-stack-0.1.0.tgz
 ```
 
-`session.turn()` returns either an `answer` or a structured `clarification`.
-Use `session.streamTurn()` when progress events are needed:
+An application backend uses an Organization API Key (`ti_org_…`). The service
+derives its Organization from that key; no Organization, User or Project selector
+is accepted by this client.
 
 ```ts
-for await (const event of session.streamTurn({ text: "Continue" })) {
-  if (event.event === "progress") process.stdout.write(event.payload.text);
-}
+import { OrganizationClient } from "@mem9/agent-stack";
+
+const organization = new OrganizationClient({
+  baseUrl: process.env.AGENT_SERVICE_URL!,
+  apiKey: process.env.ORGANIZATION_API_KEY!,
+});
+const current = await organization.getOrganization();
+const user = await organization.createEndUser({
+  externalId: "your-application-user-id",
+  displayName: "Customer",
+});
+const issued = await organization.createUserApiKey(user.userId, {
+  name: "backend",
+});
+// Store user.userId in your application mapping and issued.token in your secret manager.
 ```
 
-## Clients and resources
+`externalId` is unique within the Organization. Creating it again returns
+`ConflictError` with code `resource_conflict`; it does not return the existing
+User. Use `listEndUsers()` and match `externalId` when finding an existing mapping
+or reconciling an uncertain creation, then `getEndUser(userId)` to retrieve it.
+These User and Key lists return complete arrays; this baseline has no pagination.
+A request ID identifies a request for diagnosis and does not deduplicate creation.
 
-- `WorkspaceClient` accepts a Workspace API Key. It creates Service Users and
-  reconstructs a `ServiceUser` handle from a retained User ID.
-- `ServiceUser` creates, lists, rotates, revokes, and bulk-revokes User API
-  Keys. Plaintext is returned only by successful create and rotate calls.
-- `listProjects()` accepts a User or Workspace API Key and discovers Projects
-  before a project-bound client is constructed.
-- `UserClient` accepts a User API Key and is permanently bound to one Project.
-  It manages the current User's Agents, AgentTemplates, and Sessions.
-- `Agent` retains its latest ETag for rename, configure, and archive. A stale
-  write throws `ConflictError`; call `refresh()` before reconciling.
-- `Session` retains its model ETag, reads Turn history, and offers collected or
-  streaming Turn APIs. Model changes affect future AgentRuns only.
+The packaged example performs that lookup and reconciliation:
 
-The clients never accept caller-supplied Workspace, Organization, or User
-identity headers. Identity comes from the API Key. `UserClient` alone sends the
-required Project selection header.
+```js
+import { provisionUser } from "@mem9/agent-stack/examples/provision-user.mjs";
+const { organization, user, apiKey, token } = await provisionUser({
+  baseUrl: process.env.AGENT_SERVICE_URL,
+  organizationApiKey: process.env.ORGANIZATION_API_KEY,
+  externalId: "your-application-user-id",
+});
+// Persist the mapping and token securely; never log token.
+```
 
-## Errors and retry behavior
+It can also run directly after setting `AGENT_SERVICE_URL`,
+`ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID`, and `USER_CREDENTIAL_FILE`:
 
-- `AgentStackApiError` preserves HTTP status, stable service error code,
-  request identity, and display-safe details.
-- `ConflictError` represents an explicit service conflict, including stale
-  ETags.
-- `TurnFailedError` and `TurnInterruptedError` represent known terminal Turn
-  outcomes.
-- `OutcomeUnknownError` means the operation may have happened. Do not repeat a
-  credential, Session, or Turn mutation unless the service contract makes that
-  specific request idempotent.
-- Safe reads and server-idempotent Agent creation use bounded retries with one
-  stable request identity. Credential create/rotate and Turn creation are never
-  replayed automatically.
-- `AbortSignal` stops local waiting. It does not promise remote cancellation or
-  exactly-once external effects.
+```sh
+node node_modules/@mem9/agent-stack/examples/provision-user.mjs
+```
 
-## Compatibility
+The CLI reserves a new private file before issuing a key and writes the result,
+including the token, there. It refuses to overwrite an existing file. A failed
+run can leave an empty file; inspect the failure before trying again. **Every
+successful invocation issues a new key**, even for an existing User. Reuse the
+stored credential during normal application startup.
 
-`@mem9/agent-stack` 0.1.x targets Agent Service OpenAPI `0.0.1`, exported as
-`AGENT_SERVICE_API_VERSION`.
+## Key management
 
-Agent Service `0.0.1` does not yet expose three guarantees required for the
-complete v1 product contract: atomic/idempotent Service User provisioning,
-idempotent Session creation with an atomic initial model, and Turn lookup by a
-stable request identity. The SDK therefore reports ambiguous current-service
-outcomes explicitly and never claims those unavailable guarantees. Progress
-stream resumption is intentionally outside v1.
+```ts
+const keys = await organization.listUserApiKeys(user.userId);
+const replacement = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
+// Save replacement.token; the previous token immediately stops authenticating.
+const revoked = await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
+```
+
+Create and rotate return `{ apiKey, token }`. List and revoke return metadata
+without the token or stored hash. Rotation preserves the key ID; revocation is
+idempotent. Only active ordinary End Users can own keys. Missing, foreign or
+disabled targets preserve the service's refusal.
+
+The returned User API Key (`ti_user_…`) authenticates that User's public APIs.
+It grants no Organization management authority; `OrganizationClient` rejects it.
+An Organization key likewise grants no User identity. Until the User client
+refresh is delivered, verify the credential with the service's public User API,
+for example `GET /api/v1/user/agents` using `Authorization: Bearer <token>`.
+
+## Errors and uncertain outcomes
+
+Every Organization method accepts a final `{ requestId?, signal? }` option.
+`AgentStackApiError` preserves status, service code, request identity and details;
+`ConflictError` preserves explicit 409/412 conflicts. The service's response
+request identity takes precedence over the one sent.
+
+Safe reads use bounded retries with the same request identity. User creation and
+key creation/rotation are never automatically replayed. Disconnects, unusable
+success responses, HTTP 408 and server failures during these mutations raise
+`OutcomeUnknownError`. For an HTTP failure, its `cause` retains the
+`AgentStackApiError`. Revoke can be retried safely, but a final ambiguous failure
+still reports an unknown outcome. `AbortSignal` stops the local request; after
+dispatch it does not establish whether a mutation happened. Redirects are refused.
+
+After uncertain User creation, list and match the original `externalId`.
+After uncertain issuance or rotation, listing keys can confirm metadata but
+**cannot recover the one-time token**. Reconcile metadata and explicitly revoke
+any unwanted key before deciding whether to issue again. The example never
+repeats an uncertain credential operation.
+
+## Compatibility and verification
+
+`AGENT_SERVICE_REVISION` and `agentServiceRevision` in the package identify the
+exact service revision above. Package metadata also pins the SHA-256 of that
+revision's `docs/openapi.yaml`. `AGENT_SERVICE_API_VERSION` remains `0.0.1`; the
+version string alone does not establish compatibility. The verified scope is the
+provisioning slice described here, not every retained export or every public API.
+
+`npm test` covers the simulated HTTP failure boundary and installs the actual
+packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
+example against the real service, use the service's Node.js 26 runtime, install its
+pinned dependencies, generate Prisma, build its Hardware contract and prepare its
+current schema in a **dedicated test database**. See the selected service's
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/docs/prisma-first-tidb-validation-and-rollout.md).
+
+```sh
+AGENT_SERVICE_ROOT=/path/to/agent-stack \
+TEST_TIDB_DATABASE_URL=mysql://root@127.0.0.1:4000/tidb_link_sdk_test \
+TIDB_SSL=off npm run test:service
+```
+
+This command requires a clean service checkout at the exact revision and resets
+all rows in the selected test database before and after the run. It uses the
+service's existing AppModule test fixture, genuine credentials and real TiDB;
+fixtures prepare Organizations and controlled dependencies. No production
+supplier credentials are needed. A mismatch or unavailable service fails this
+check instead of silently skipping it.

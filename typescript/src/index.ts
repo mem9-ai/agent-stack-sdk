@@ -1,13 +1,16 @@
-/** OpenAPI version; compatibility also requires the exact provisioning baseline below. */
-export const AGENT_SERVICE_API_VERSION = "0.0.1" as const;
+/** TiDB Link OpenAPI version supported by this SDK release. */
+export const TIDB_LINK_API_VERSION = "0.0.1" as const;
+/** Historical service baseline for retained APIs awaiting their refresh. */
+export const TIDB_LINK_REVISION =
+  "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
 
-/** Exact service revision verified for Organization/End User/Key provisioning only. */
-export const AGENT_SERVICE_REVISION =
+/** Exact service revision verified for Organization, End User and User Key provisioning. */
+export const TIDB_LINK_PROVISIONING_REVISION =
   "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
 export {
-  AgentStackApiError,
-  AgentStackError,
+  TiDBLinkApiError,
+  TiDBLinkError,
   ConflictError,
   ConnectionError,
   InvalidTurnEventError,
@@ -17,35 +20,43 @@ export {
 } from "./errors.js";
 export { OrganizationClient } from "./organization.js";
 export type {
-  OrganizationClientOptions,
   Organization,
   EndUser,
   CreateEndUserInput,
   RequestOptions,
+  IssuedUserApiKey,
+  OrganizationClientOptions,
+  UserApiKey,
 } from "./organization.js";
-export type { IssuedUserApiKey, UserApiKey } from "./organization.js";
-export { Agent, listProjects, UserClient } from "./user.js";
+export { Agent, UserClient } from "./user.js";
 export type {
+  HardwareRequirement,
+  PublishedTemplateVersion,
+  ApplyTemplateInput,
+  TemplateApplicationPreview,
+  TemplateOverridePath,
+  TemplateContent,
+  TemplateOverrides,
+  TemplateApplicationReference,
   AgentConfigInput,
   AgentConfigPatch,
   AgentRecord,
-  AgentRuntimeConfigInput,
   AgentTemplate,
   AgentTemplateProvenance,
   CreateAgentInput,
   EnabledAgentCapability,
-  ManagedToolReference,
+  McpServerReference,
+  MemoryCredentialInput,
   PublicAgentConfig,
-  PublicAgentLarkConfig,
-  PublicAgentRuntimeConfig,
-  ProjectDiscoveryOptions,
-  ProjectRecord,
   UserClientOptions,
 } from "./user.js";
 export { Session } from "./session.js";
 export type {
+  BillingTag,
   ClarificationItem,
   MessageRecord,
+  SelectableSessionModel,
+  SessionModel,
   SessionRecord,
   TurnRecord,
 } from "./session.js";

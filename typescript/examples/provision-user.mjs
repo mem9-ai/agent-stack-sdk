@@ -4,7 +4,7 @@ import {
   ConflictError,
   OrganizationClient,
   OutcomeUnknownError,
-} from "@mem9/agent-stack";
+} from "@mem9/tidb-link";
 
 /** Each successful invocation issues a new credential. Retain it in your secret manager. */
 export async function provisionUser({

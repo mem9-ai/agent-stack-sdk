@@ -1,4 +1,4 @@
-# `@mem9/agent-stack`
+# `@mem9/tidb-link`
 
 Official TypeScript SDK for Node.js 22.12 or newer. ESM only, with TypeScript
 declarations and no runtime dependencies.
@@ -8,7 +8,7 @@ declarations and no runtime dependencies.
 This slice refreshes Organization information, End User provisioning and User API
 Key management for [service revision b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
 It replaces the removed Workspace/Service User provisioning surface. The existing
-Agent, Session, Turn and Project exports are retained for subsequent refresh
+Agent, Session and Turn exports are retained for subsequent refresh
 slices; they are **not verified or supported against this baseline**. Do not use
 them as the next step in this provisioning example.
 
@@ -19,9 +19,9 @@ npm release:
 
 ```sh
 npm run build
-npm pack --workspace @mem9/agent-stack
+npm pack --workspace @mem9/tidb-link
 # In your application directory:
-npm install /path/to/mem9-agent-stack-0.1.0.tgz
+npm install /path/to/mem9-tidb-link-0.3.0.tgz
 ```
 
 An application backend uses an Organization API Key (`ti_org_…`). The service
@@ -29,7 +29,7 @@ derives its Organization from that key; no Organization, User or Project selecto
 is accepted by this client.
 
 ```ts
-import { OrganizationClient } from "@mem9/agent-stack";
+import { OrganizationClient } from "@mem9/tidb-link";
 
 const organization = new OrganizationClient({
   baseUrl: process.env.AGENT_SERVICE_URL!,
@@ -56,7 +56,7 @@ A request ID identifies a request for diagnosis and does not deduplicate creatio
 The packaged example performs that lookup and reconciliation:
 
 ```js
-import { provisionUser } from "@mem9/agent-stack/examples/provision-user.mjs";
+import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
 const { organization, user, apiKey, token } = await provisionUser({
   baseUrl: process.env.AGENT_SERVICE_URL,
   organizationApiKey: process.env.ORGANIZATION_API_KEY,
@@ -69,7 +69,7 @@ It can also run directly after setting `AGENT_SERVICE_URL`,
 `ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID`, and `USER_CREDENTIAL_FILE`:
 
 ```sh
-node node_modules/@mem9/agent-stack/examples/provision-user.mjs
+node node_modules/@mem9/tidb-link/examples/provision-user.mjs
 ```
 
 The CLI reserves a new private file before issuing a key and writes the result,
@@ -101,7 +101,7 @@ for example `GET /api/v1/user/agents` using `Authorization: Bearer <token>`.
 ## Errors and uncertain outcomes
 
 Every Organization method accepts a final `{ requestId?, signal? }` option.
-`AgentStackApiError` preserves status, service code, request identity and details;
+`TiDBLinkApiError` preserves status, service code, request identity and details;
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
 request identity takes precedence over the one sent.
 
@@ -109,7 +109,7 @@ Safe reads use bounded retries with the same request identity. User creation and
 key creation/rotation/revocation are never automatically replayed. Disconnects, unusable
 success responses, HTTP 408 and server failures during these mutations raise
 `OutcomeUnknownError`. For an HTTP failure, its `cause` retains the
-`AgentStackApiError`. Repeating revoke is safe, but an ambiguous failure
+`TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous failure
 still reports an unknown outcome. `AbortSignal` stops the local request; after
 dispatch it does not establish whether a mutation happened. Redirects are refused.
 
@@ -121,11 +121,17 @@ repeats an uncertain credential operation.
 
 ## Compatibility and verification
 
-`AGENT_SERVICE_REVISION` and `agentServiceRevision` in the package identify the
-exact service revision above. Package metadata also pins the SHA-256 of that
-revision's `docs/openapi.yaml`. `AGENT_SERVICE_API_VERSION` remains `0.0.1`; the
+`TIDB_LINK_PROVISIONING_REVISION` and `tidbLinkProvisioningRevision` in the package identify the
+exact service revision above. Package metadata `tidbLinkProvisioningOpenApiSha256` pins the SHA-256 of that
+revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
 version string alone does not establish compatibility. The verified scope is the
 provisioning slice described here, not every retained export or every public API.
+
+`TIDB_LINK_REVISION` / `tidbLinkRevision` retain revision
+`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed User/Agent/Session/Turn
+APIs. The existing immutable contract checks preserve evidence for that historical
+surface; they do not certify it against the provisioning baseline. Run them with
+`TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract`, using the immutable artifact selected by this repository's CI workflow. It contains `openapi.json` and `metadata.json`.
 
 `npm test` covers the simulated HTTP failure boundary and installs the actual
 packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and

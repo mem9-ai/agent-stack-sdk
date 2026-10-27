@@ -8,10 +8,10 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import {
   OrganizationClient,
-  AgentStackApiError,
+  TiDBLinkApiError,
   ConflictError,
-} from "@mem9/agent-stack";
-import { provisionUser } from "@mem9/agent-stack/examples/provision-user.mjs";
+} from "@mem9/tidb-link";
+import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
 
 const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
@@ -23,7 +23,7 @@ assert(
 );
 
 const refusal = (status, code) => (error) =>
-  error instanceof AgentStackApiError &&
+  error instanceof TiDBLinkApiError &&
   error.status === status &&
   error.code === code &&
   typeof error.requestId === "string" &&
@@ -151,7 +151,7 @@ test("provisioning, scoped identity and key lifecycle work in an installed consu
   await organization.revokeUserApiKey(fresh.apiKey.apiKeyId);
   const credentialFile = path.join(process.cwd(), "user-credential.json");
   const executable = fileURLToPath(
-    import.meta.resolve("@mem9/agent-stack/examples/provision-user.mjs"),
+    import.meta.resolve("@mem9/tidb-link/examples/provision-user.mjs"),
   );
   const commandEnv = {
     ...process.env,

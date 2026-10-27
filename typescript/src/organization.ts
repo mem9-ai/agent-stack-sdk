@@ -1,5 +1,5 @@
 import { OutcomeUnknownError } from "./errors.js";
-import { HttpClient } from "./http.js";
+import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
 
 export interface OrganizationClientOptions {
   baseUrl: string;
@@ -68,15 +68,19 @@ const issuedUserApiKey = (
     Array.isArray(result.apiKey) ||
     typeof (result.apiKey as UserApiKey).apiKeyId !== "string" ||
     !(result.apiKey as UserApiKey).apiKeyId ||
-    typeof result.token !== "string" ||
-    result.token.length === 0
+    !isApiKey(result.token, "user")
   ) {
     throw new OutcomeUnknownError(
-      "Agent Service accepted the credential request but omitted the one-time credential",
+      "TiDB Link accepted the credential request but omitted the one-time credential",
       { requestId },
     );
   }
   return result as IssuedUserApiKey;
+};
+
+const requestOptions = (options: RequestOptions = {}): RequestOptions => {
+  requireKnownKeys(options, ["requestId", "signal"], "Request options");
+  return options;
 };
 
 /** Customer operations authorized by an Organization API Key. */
@@ -84,10 +88,8 @@ export class OrganizationClient {
   readonly #http: HttpClient;
 
   constructor(options: OrganizationClientOptions) {
-    if (
-      !/^ti_org_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.test(options.apiKey) ||
-      options.apiKey.trim() !== options.apiKey
-    ) {
+    requireKnownKeys(options, ["baseUrl", "apiKey"], "OrganizationClient options");
+    if (!isApiKey(options.apiKey, "org")) {
       throw new TypeError(
         "OrganizationClient requires an Organization API Key",
       );
@@ -98,7 +100,7 @@ export class OrganizationClient {
   async getOrganization(options?: RequestOptions): Promise<Organization> {
     const response = await this.#http.get<{ organization: Organization }>(
       "/api/v1/org",
-      options,
+      requestOptions(options),
     );
     return response.organization;
   }
@@ -117,7 +119,7 @@ export class OrganizationClient {
           ? {}
           : { externalId: input.externalId }),
       },
-      { ...options, outcomeUnknown: true },
+      { ...requestOptions(options), outcomeUnknown: true },
     );
     if (
       !result.data?.user ||
@@ -137,7 +139,7 @@ export class OrganizationClient {
   async listEndUsers(options?: RequestOptions): Promise<EndUser[]> {
     const response = await this.#http.get<{ users: EndUser[] }>(
       "/api/v1/org/users",
-      options,
+      requestOptions(options),
     );
     return response.users;
   }
@@ -145,7 +147,7 @@ export class OrganizationClient {
   async getEndUser(userId: string, options?: RequestOptions): Promise<EndUser> {
     const response = await this.#http.get<{ user: EndUser }>(
       `/api/v1/org/users/${encodeURIComponent(userId)}`,
-      options,
+      requestOptions(options),
     );
     return response.user;
   }
@@ -158,7 +160,7 @@ export class OrganizationClient {
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
       { name: input.name },
-      { ...options, outcomeUnknown: true },
+      { ...requestOptions(options), outcomeUnknown: true },
     );
     return issuedUserApiKey(result.data, result.requestId);
   }
@@ -169,7 +171,7 @@ export class OrganizationClient {
   ): Promise<UserApiKey[]> {
     const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
       `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
-      options,
+      requestOptions(options),
     );
     return response.apiKeys;
   }
@@ -181,7 +183,7 @@ export class OrganizationClient {
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
       undefined,
-      { ...options, outcomeUnknown: true },
+      { ...requestOptions(options), outcomeUnknown: true },
     );
     return issuedUserApiKey(result.data, result.requestId);
   }
@@ -193,7 +195,7 @@ export class OrganizationClient {
     const response = await this.#http.post<{ apiKey: UserApiKey }>(
       `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
       undefined,
-      { ...options, outcomeUnknown: true },
+      { ...requestOptions(options), outcomeUnknown: true },
     );
     return response.apiKey;
   }

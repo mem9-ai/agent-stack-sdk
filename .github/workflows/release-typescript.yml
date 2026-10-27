@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  TIDB_LINK_CONTRACT_COMMIT: 48c3a0dd06d02fea7d5935e37e2484f97a770362
 
 jobs:
   publish:
@@ -18,11 +22,32 @@ jobs:
           node-version: 22.12.0
           registry-url: https://registry.npmjs.org
           cache: npm
+      - run: |
+          mkdir -p "$RUNNER_TEMP/tidb-link-contract"
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$TIDB_LINK_CONTRACT_COMMIT/openapi.json" \
+            --output "$RUNNER_TEMP/tidb-link-contract/openapi.json"
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/mem9-ai/agent-stack-sdk/$TIDB_LINK_CONTRACT_COMMIT/metadata.json" \
+            --output "$RUNNER_TEMP/tidb-link-contract/metadata.json"
       - run: npm ci
+      - run: npm run test:service-contract
+        env:
+          TIDB_LINK_CONTRACT: ${{ runner.temp }}/tidb-link-contract
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
       - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p 'require("./typescript/package.json").version')"
-      - run: npm publish --workspace @mem9/agent-stack --access public
+      - run: npm publish --workspace @mem9/tidb-link --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Record compatibility mapping
+        run: |
+          {
+            echo "## Published TypeScript SDK"
+            echo
+            echo "- Package: \`@mem9/tidb-link@$(node -p 'require("./typescript/package.json").version')\`"
+            echo "- SDK commit: \`$GITHUB_SHA\`"
+            echo "- TiDB Link commit: \`$(node -p 'require("./typescript/package.json").tidbLinkRevision')\`"
+            echo "- TiDB Link API: \`$(node -p 'require("./typescript/package.json").tidbLinkApiVersion')\`"
+          } >> "$GITHUB_STEP_SUMMARY"

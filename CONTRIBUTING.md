@@ -14,18 +14,29 @@ npm test
 npm run pack:check
 ```
 
-Run `npm run test:service` for the selected actual-service baseline using the
-dedicated database setup in [the package README](typescript/README.md#compatibility-and-verification).
-The default tests supplement this with a local HTTP failure boundary and an
-independently installed packed consumer. Keep the
+The cross-repository check also needs the pinned contract artifact containing
+`openapi.json` and `metadata.json`:
+
+```sh
+TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract
+```
+
+CI downloads that immutable public artifact automatically.
+
+For current Organization/End User/Key provisioning, run `npm run test:service`
+with the exact service checkout and a dedicated TiDB test database; setup is in
+[the package README](typescript/README.md#compatibility-and-verification).
+This verifies the installed packed SDK and example against the actual service.
+The default HTTP tests supplement reproducible failure cases. Keep the
 package free of runtime dependencies and do not commit credentials, recorded
 production responses, or plaintext API Keys.
 
-Agent Service OpenAPI is the public contract source. A public API change must
-update the service contract first, then update this SDK, its compatibility
-declaration, tests, quick start, and release notes together. An API version string
-alone does not establish compatibility; pin the exact service revision and its
-OpenAPI fingerprint for the supported slice.
+TiDB Link OpenAPI is the public contract source. CI verifies the package
+against the immutable historical service revision retained for unrefreshed User,
+Agent, Session and Turn APIs. The provisioning revision and OpenAPI fingerprint
+in `typescript/package.json` identify the separately verified current slice.
+A public API change updates that service contract first, then updates the SDK,
+its compatibility declaration, tests, quick start, and release notes together.
 
 Open an issue before adding a new product area. The SDK intentionally exposes a
-narrow supported surface rather than every Agent Service route.
+narrow supported surface rather than every TiDB Link route.

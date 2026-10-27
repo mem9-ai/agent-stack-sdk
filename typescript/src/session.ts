@@ -1,4 +1,4 @@
-import { HttpClient, requireEtag } from "./http.js";
+import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
 import {
   collectTurn,
   type CreateTurnInput,
@@ -7,23 +7,40 @@ import {
   type TurnStreamEvent,
 } from "./turn.js";
 
+export type SelectableSessionModel =
+  | "gpt-6-astra"
+  | "gpt-5.6-sol"
+  | "gpt-5.6-terra"
+  | "gpt-5.6-luna"
+  | "claude-haiku-4-5"
+  | "claude-sonnet-5"
+  | "claude-opus-5"
+  | "DeepSeek-V4-Flash";
+
+export type SessionModel = SelectableSessionModel | "gpt-5.4";
+
+export interface BillingTag {
+  key: string;
+  value: string;
+}
+
 export interface SessionRecord {
+  organizationId: string;
   sessionId: string;
-  workspaceId: string;
-  projectId: string;
   name: string | null;
   autoTitle: string | null;
-  ownerUserId: string | null;
-  startedByUserId: string | null;
-  createdByType: "user" | "scheduler" | "lark";
+  ownerUserId: string;
+  startedByUserId: string;
+  createdByType: "user" | "scheduler" | "voice";
   readOnly: boolean;
   sourceSchedulerId: string | null;
   sourceSchedulerFireId: string | null;
-  clientTag: "tui" | null;
-  model: string;
+  sourceVoiceSessionId: string | null;
+  billingTag: BillingTag | null;
+  model: SessionModel;
   modelRevision: number;
-  createdWithAgentId: string | null;
-  modelPolicyStatus: "allowed" | "workspace_disallowed";
+  createdWithAgentId: string;
+  modelPolicyStatus: "allowed" | "organization_disallowed";
   status: "active" | "deleted";
   activeTurnId: string | null;
   createdAt: string;
@@ -45,19 +62,20 @@ export type ClarificationItem =
       prompt: string;
       selectionMode: "single";
       answerChoices: [string, string, string?];
-      response?: { text: string; answers: [string]; responseTurnId: string };
+      response?: { answers: [string]; responseTurnId: string };
     }
   | {
       prompt: string;
       selectionMode: "multiple";
       answerChoices: [string, string, ...string[]];
-      response?: { text: string; answers: [string, ...string[]]; responseTurnId: string };
+      response?: { answers: [string, ...string[]]; responseTurnId: string };
     };
 
 export interface TurnRecord {
   id: string;
   sessionId: string;
   status: "running" | "succeeded" | "failed" | "interrupted";
+  billingTag: BillingTag | null;
   userMessage: MessageRecord;
   userFiles?: unknown[];
   operations: unknown[];
@@ -86,7 +104,7 @@ export class Session {
     return this.#record;
   }
 
-  get model(): string | undefined {
+  get model(): SessionModel | undefined {
     return this.#record?.model;
   }
 
@@ -100,7 +118,7 @@ export class Session {
     return this;
   }
 
-  async setModel(model: string, options?: { signal?: AbortSignal }): Promise<this> {
+  async setModel(model: SelectableSessionModel, options?: { signal?: AbortSignal }): Promise<this> {
     if (!this.#etag) await this.refresh(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
       `/api/sessions/${encodeURIComponent(this.id)}/model`,
@@ -144,11 +162,15 @@ export class Session {
 export const createSessionForAgent = async (
   http: HttpClient,
   agentId: string,
-  options?: { signal?: AbortSignal },
+  options?: { billingTag?: BillingTag | null; signal?: AbortSignal },
 ): Promise<Session> => {
+  if (options) requireKnownKeys(options, ["billingTag", "signal"], "Session options");
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/api/sessions",
-    { agentId },
+    {
+      agentId,
+      ...(options?.billingTag === undefined ? {} : { billingTag: options.billingTag }),
+    },
     {
       outcomeUnknown: true,
       ...(options?.signal ? { signal: options.signal } : {}),

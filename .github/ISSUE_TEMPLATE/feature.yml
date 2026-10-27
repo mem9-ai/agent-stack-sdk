@@ -8,7 +8,7 @@ body:
     id: problem
     attributes:
       label: Product problem
-      description: Describe the public Agent Service workflow this should support.
+      description: Describe the public TiDB Link workflow this should support.
     validations:
       required: true
   - type: textarea

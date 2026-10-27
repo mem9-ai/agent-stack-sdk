@@ -40,7 +40,7 @@ const revision = execFileSync("git", ["rev-parse", "HEAD"], {
 }).trim();
 assert.equal(
   revision,
-  manifest.agentServiceRevision,
+  manifest.tidbLinkProvisioningRevision,
   "Agent Service revision does not match the SDK baseline",
 );
 assert.equal(
@@ -54,7 +54,7 @@ assert.equal(
 const openapi = await readFile(path.join(serviceRoot, "docs/openapi.yaml"));
 assert.equal(
   createHash("sha256").update(openapi).digest("hex"),
-  manifest.agentServiceOpenApiSha256,
+  manifest.tidbLinkProvisioningOpenApiSha256,
   "Agent Service OpenAPI does not match the SDK baseline",
 );
 await mkdir(path.join(serviceRoot, ".agent9"), { recursive: true });

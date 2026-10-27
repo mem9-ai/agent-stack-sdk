@@ -1,4 +1,4 @@
-export class AgentStackError extends Error {
+export class TiDBLinkError extends Error {
   readonly requestId: string | undefined;
 
   constructor(message: string, options?: { requestId?: string; cause?: unknown }) {
@@ -8,7 +8,7 @@ export class AgentStackError extends Error {
   }
 }
 
-export class AgentStackApiError extends AgentStackError {
+export class TiDBLinkApiError extends TiDBLinkError {
   readonly status: number;
   readonly code: string;
   readonly details?: unknown;
@@ -27,12 +27,12 @@ export class AgentStackApiError extends AgentStackError {
   }
 }
 
-export class ConflictError extends AgentStackApiError {}
+export class ConflictError extends TiDBLinkApiError {}
 
-export class ConnectionError extends AgentStackError {}
+export class ConnectionError extends TiDBLinkError {}
 
 /** The request may have succeeded, so repeating it could create another effect. */
-export class OutcomeUnknownError extends AgentStackError {
+export class OutcomeUnknownError extends TiDBLinkError {
   readonly turnId: string | undefined;
 
   constructor(
@@ -46,7 +46,7 @@ export class OutcomeUnknownError extends AgentStackError {
 
 export class InvalidTurnEventError extends OutcomeUnknownError {}
 
-export class TurnFailedError extends AgentStackError {
+export class TurnFailedError extends TiDBLinkError {
   readonly code: string;
   readonly turnId: string;
 
@@ -57,7 +57,7 @@ export class TurnFailedError extends AgentStackError {
   }
 }
 
-export class TurnInterruptedError extends AgentStackError {
+export class TurnInterruptedError extends TiDBLinkError {
   readonly turnId: string;
 
   constructor(turnId: string, message = "Turn was interrupted") {

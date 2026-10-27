@@ -1,6 +1,6 @@
 import {
-  AgentStackApiError,
-  AgentStackError,
+  TiDBLinkApiError,
+  TiDBLinkError,
   ConflictError,
   ConnectionError,
   OutcomeUnknownError,
@@ -35,12 +35,9 @@ export interface HttpStream {
 
 export const requireEtag = <T>(result: HttpResult<T>): string => {
   if (!result.etag) {
-    throw new AgentStackError(
-      "Agent Service response omitted a required ETag",
-      {
-        requestId: result.requestId,
-      },
-    );
+    throw new TiDBLinkError("TiDB Link response omitted a required ETag", {
+      requestId: result.requestId,
+    });
   }
   return result.etag;
 };
@@ -66,7 +63,7 @@ const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => {
 const errorInput = async (
   response: Response,
   fallbackRequestId: string,
-): Promise<ConstructorParameters<typeof AgentStackApiError>[0]> => {
+): Promise<ConstructorParameters<typeof TiDBLinkApiError>[0]> => {
   let value: unknown;
   try {
     value = await response.json();
@@ -74,29 +71,17 @@ const errorInput = async (
     value = undefined;
   }
   const envelope = value as {
-    error?: {
-      code?: unknown;
-      message?: unknown;
-      details?: unknown;
-      requestId?: unknown;
-    };
+    error?: { code?: unknown; message?: unknown; details?: unknown; requestId?: unknown };
   };
-  const error =
-    typeof envelope?.error === "object" && envelope.error !== null
-      ? envelope.error
-      : undefined;
+  const error = typeof envelope?.error === "object" && envelope.error !== null ? envelope.error : undefined;
   return {
     status: response.status,
     code: typeof error?.code === "string" ? error.code : "http_error",
     message:
       typeof error?.message === "string"
         ? error.message
-        : `Agent Service request failed with status ${response.status}`,
-    requestId:
-      response.headers.get("x-request-id") ??
-      (typeof error?.requestId === "string"
-        ? error.requestId
-        : fallbackRequestId),
+        : `TiDB Link request failed with status ${response.status}`,
+    requestId: response.headers.get("x-request-id") ?? (typeof error?.requestId === "string" ? error.requestId : fallbackRequestId),
     ...(error && "details" in error ? { details: error.details } : {}),
   };
 };
@@ -115,57 +100,57 @@ const normalizeBaseUrl = (value: string): string => {
   return url.toString().replace(/\/$/, "");
 };
 
+export function requireKnownKeys(
+  value: unknown,
+  allowed: readonly string[],
+  label: string,
+): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object`);
+  }
+  const unknown = Object.keys(value).find((key) => !allowed.includes(key));
+  if (unknown) throw new TypeError(`${label}.${unknown} is not supported`);
+}
+
+/** Check the frozen wire grammar without retaining or exposing the credential. */
+export const isApiKey = (value: unknown, kind: "org" | "user"): value is string => {
+  if (typeof value !== "string") return false;
+  const match = /^ti_(org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.exec(value);
+  return match !== null && match[0] === value && match[1] === kind;
+};
+
 export class HttpClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
-  readonly #projectId: string | undefined;
 
-  constructor(input: { baseUrl: string; apiKey: string; projectId?: string }) {
+  constructor(input: { baseUrl: string; apiKey: string }) {
     this.#baseUrl = normalizeBaseUrl(input.baseUrl);
     this.#apiKey = input.apiKey;
-    this.#projectId = input.projectId;
   }
 
-  #headers(
-    options: RequestOptions,
-    stableRequestId: string,
-  ): Record<string, string> {
+  #headers(options: RequestOptions, stableRequestId: string): Record<string, string> {
     return {
       accept: "application/json",
       authorization: `Bearer ${this.#apiKey}`,
       "x-request-id": stableRequestId,
-      ...(this.#projectId ? { "x-agent9-project-id": this.#projectId } : {}),
-      ...(options.idempotencyKey
-        ? { "idempotency-key": options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
       ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
-      ...(options.body === undefined
-        ? {}
-        : { "content-type": "application/json" }),
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
     };
   }
 
-  get<T>(
-    path: string,
-    options?: Pick<RequestOptions, "signal" | "requestId">,
-  ): Promise<T> {
+  get<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<T> {
     return this.request(path, { ...options, retry: "safe" });
   }
 
-  getResponse<T>(
-    path: string,
-    options?: Pick<RequestOptions, "signal" | "requestId">,
-  ): Promise<HttpResult<T>> {
+  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<HttpResult<T>> {
     return this.response(path, { ...options, retry: "safe" });
   }
 
   post<T>(
     path: string,
     body: unknown,
-    options?: Pick<
-      RequestOptions,
-      "outcomeUnknown" | "requestId" | "signal"
-    > & {
+    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal"> & {
       idempotent?: boolean;
     },
   ): Promise<T> {
@@ -246,18 +231,12 @@ export class HttpClient {
       const input = await errorInput(response, stableRequestId);
       throw input.status === 409 || input.status === 412
         ? new ConflictError(input)
-        : new AgentStackApiError(input);
+        : new TiDBLinkApiError(input);
     }
-    if (
-      !response.body ||
-      !response.headers.get("content-type")?.includes("application/x-ndjson")
-    ) {
-      throw new OutcomeUnknownError(
-        "Agent Service returned an invalid Turn stream",
-        {
-          requestId: response.headers.get("x-request-id") ?? stableRequestId,
-        },
-      );
+    if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
+      throw new OutcomeUnknownError("TiDB Link returned an invalid Turn stream", {
+        requestId: response.headers.get("x-request-id") ?? stableRequestId,
+      });
     }
     return {
       response,
@@ -269,22 +248,16 @@ export class HttpClient {
     return (await this.response<T>(path, options)).data;
   }
 
-  async response<T>(
-    path: string,
-    options: RequestOptions = {},
-  ): Promise<HttpResult<T>> {
+  async response<T>(path: string, options: RequestOptions = {}): Promise<HttpResult<T>> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
     }
     if (
       options.idempotencyKey !== undefined &&
-      (options.idempotencyKey.length > 255 ||
-        !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
+      (options.idempotencyKey.length > 255 || !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
     ) {
-      throw new TypeError(
-        "idempotencyKey must be 1-255 visible ASCII characters",
-      );
+      throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
     }
     options.signal?.throwIfAborted();
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
@@ -295,9 +268,7 @@ export class HttpClient {
           method: options.method ?? "GET",
           redirect: "error",
           headers: this.#headers(options, stableRequestId),
-          ...(options.body === undefined
-            ? {}
-            : { body: JSON.stringify(options.body) }),
+          ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
@@ -306,13 +277,11 @@ export class HttpClient {
           await sleep(100 * 2 ** (attempt - 1), options.signal);
           continue;
         }
-        const ErrorClass = options.outcomeUnknown
-          ? OutcomeUnknownError
-          : ConnectionError;
+        const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : ConnectionError;
         throw new ErrorClass(
           options.outcomeUnknown
-            ? "Agent Service request outcome is unknown; do not repeat it automatically"
-            : "Could not reach Agent Service",
+            ? "TiDB Link request outcome is unknown; do not repeat it automatically"
+            : "Could not reach TiDB Link",
           {
             requestId: stableRequestId,
             cause,
@@ -328,16 +297,13 @@ export class HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (cause) {
-            const ErrorClass = options.outcomeUnknown
-              ? OutcomeUnknownError
-              : AgentStackError;
+            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : TiDBLinkError;
             throw new ErrorClass(
               options.outcomeUnknown
-                ? "Agent Service accepted the request but returned an unusable response"
-                : "Agent Service returned invalid JSON",
+                ? "TiDB Link accepted the request but returned an unusable response"
+                : "TiDB Link returned invalid JSON",
               {
-                requestId:
-                  response.headers.get("x-request-id") ?? stableRequestId,
+                requestId: response.headers.get("x-request-id") ?? stableRequestId,
                 cause,
               },
             );
@@ -357,23 +323,14 @@ export class HttpClient {
       }
 
       const input = await errorInput(response, stableRequestId);
-      const error =
-        input.status === 409 || input.status === 412
-          ? new ConflictError(input)
-          : new AgentStackApiError(input);
-      if (
-        options.outcomeUnknown &&
-        (input.status >= 500 || input.status === 408)
-      ) {
-        throw new OutcomeUnknownError(
-          "Agent Service could not confirm the mutation outcome",
-          {
-            ...(input.requestId === undefined
-              ? {}
-              : { requestId: input.requestId }),
-            cause: error,
-          },
-        );
+      const error = input.status === 409 || input.status === 412
+        ? new ConflictError(input)
+        : new TiDBLinkApiError(input);
+      if (options.outcomeUnknown && (input.status >= 500 || input.status === 408)) {
+        throw new OutcomeUnknownError("TiDB Link could not confirm the mutation outcome", {
+          ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
+          cause: error,
+        });
       }
       throw error;
     }

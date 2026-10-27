@@ -28,6 +28,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("dist/index.js"));
   assert(files.includes("dist/index.d.ts"));
   assert(files.includes("examples/provision-user.mjs"));
+  assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -36,6 +37,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "README.md" ||
         file === "package.json" ||
         file === "examples/provision-user.mjs" ||
+        file === "examples/prepare-realtime-connection.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -67,12 +69,19 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       IssuedUserApiKey,
       UserApiKey,
       Session,
+      RealtimeAudioFormats,
+      RealtimeConnectGrant,
+      RealtimeConnection,
+      RealtimeModelCatalog,
+      RealtimeModelSelection,
+      OpenRealtimeConnectionResult,
       TurnResult,
     } from "@mem9/tidb-link";
     import {
       TIDB_LINK_API_VERSION,
       TIDB_LINK_REVISION,
       TIDB_LINK_PROVISIONING_REVISION,
+      TIDB_LINK_REALTIME_REVISION,
       TiDBLinkApiError,
       TiDBLinkError,
       OrganizationClient,
@@ -120,6 +129,21 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const session: Session = await agent.createSession();
       return session.turn({ text: "Hello" });
     }
+    async function realtimeWorkflow(session: Session): Promise<RealtimeConnection> {
+      const user = new UserClient({ baseUrl, apiKey: userApiKey });
+      const catalog: RealtimeModelCatalog = await user.listRealtimeModels();
+      const current: RealtimeModelSelection = await session.getRealtimeModelSelection();
+      const selected: RealtimeModelSelection = await session.setRealtimeModel(catalog.models[0]!.id, { ifMatch: current.etag });
+      const audio: RealtimeAudioFormats = {
+        input: { encoding: "pcm16", sampleRate: 16000, channels: 1 },
+        output: { encoding: "opus", sampleRate: 24000, channels: 1, packetDurationMs: 20, bitrate: 24000 },
+      };
+      const prepared: OpenRealtimeConnectionResult = await session.openRealtimeConnection({ audio });
+      const grant: RealtimeConnectGrant = await session.createRealtimeConnectToken();
+      void selected; void prepared; void grant;
+      const inspected: RealtimeConnection = await session.getRealtimeConnection();
+      return session.endRealtimeConnection().then(() => inspected);
+    }
     // @ts-expect-error Retired Service User handles are not an Organization capability.
     organization.serviceUser("user_1");
     // @ts-expect-error Native End User creation replaces the retired Service User operation.
@@ -136,6 +160,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     void TIDB_LINK_API_VERSION;
     void TIDB_LINK_REVISION;
     void TIDB_LINK_PROVISIONING_REVISION;
+    void TIDB_LINK_REALTIME_REVISION;
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
     void apiError;
     void publicConfig;
@@ -143,6 +168,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     void removedRuntime;
     void provisionEndUser;
     void retainedUserWorkflow;
+    void realtimeWorkflow;
     `,
   );
   const tsc = path.join(
@@ -194,6 +220,14 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     installedPackage.tidbLinkProvisioningOpenApiSha256,
     "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
   );
+  assert.equal(
+    installedPackage.tidbLinkRealtimeRevision,
+    "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  );
+  assert.equal(
+    installedPackage.tidbLinkRealtimeOpenApiSha256,
+    "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  );
   assert.equal(installedPackage.name, "@mem9/tidb-link");
   assert.match(installedPackage.version, /^0\./);
   assert.equal(installedPackage.type, "module");
@@ -211,7 +245,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     withFileTypes: true,
   });
   const credentialPattern =
-    /ti_(?:org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}|ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
+    /ti_(?:org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}|rct_[A-Za-z0-9_-]{16,}|ag9_oak\.[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_-]{32,}|ag9_uak_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{32,}/;
   for (const file of publishedFiles) {
     if (!file.isFile()) continue;
     const contents = await readFile(
@@ -230,8 +264,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
     assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
     assert.equal(sdk.TIDB_LINK_PROVISIONING_REVISION, ${JSON.stringify(installedPackage.tidbLinkProvisioningRevision)});
+    assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
+    const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
     assert.equal(typeof provisionUser, "function");
+    assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
     for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError"]) {
       assert.equal(sdk[name], undefined);
@@ -245,6 +282,29 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       response.setHeader("content-type", "application/json");
       if (request.url === "/api/agents") {
         response.end(JSON.stringify({ agents: [] }));
+      } else if (request.url === "/api/v1/realtime-models") {
+        response.end(JSON.stringify({
+          defaultModel: "voice-a",
+          models: [{ id: "voice-a", label: "Voice A", available: true, isDefault: true, languages: ["en-US"], endpointingModes: ["client"], audio: { input: [], output: [] } }],
+        }));
+      } else if (request.url === "/api/v1/user/sessions/session_1") {
+        response.end(JSON.stringify({ session: {
+          realtimeModel: "voice-a", realtimeModelRevision: 1,
+          realtimeModelEtag: "realtime-v1", realtimeVoice: { language: "en-US" },
+        } }));
+      } else if (request.url === "/api/v1/user/sessions/session_1/realtime") {
+        response.writeHead(201).end(JSON.stringify({
+          realtimeConnection: {
+            object: "realtime_connection", id: "rtc_1", sessionId: "session_1", agentId: "agent_1",
+            provider: { name: "mock", region: "test", model: "voice-a" }, status: "connecting",
+            audio: { input: { encoding: "pcm16", sampleRate: 16000, channels: 1 }, output: { encoding: "pcm16", sampleRate: 24000, channels: 1 } },
+            activeTaskTurnId: null, usage: { inputAudioSec: 0, outputAudioSec: 0, thoughtTokens: 0, textTokens: 0 },
+            metadata: {}, createdAt: "2026-10-27T00:00:00.000Z", endedAt: null,
+          },
+          websocketUrl: "wss://voice.example/ws",
+          connectToken: "rct_" + "p".repeat(24),
+          connectTokenExpiresAt: "2026-10-27T00:01:00.000Z",
+        }));
       } else {
         const token = request.url.endsWith("/rotate") ? rotatedKey : userKey;
         response.writeHead(201).end(JSON.stringify({ apiKey: { apiKeyId: "uak_key" }, token }));
@@ -261,11 +321,22 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const rotated = await org.rotateUserApiKey("uak_key");
       assert.equal(rotated.token, rotatedKey);
       assert.deepEqual(await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents(), []);
+      const prepared = await prepareRealtimeConnection({
+        baseUrl,
+        userApiKey: rotated.token,
+        sessionId: "session_1",
+      });
+      assert.equal(prepared.realtimeConnection.id, "rtc_1");
+      assert.match(prepared.connectToken, /^rct_/);
+      assert.equal(JSON.stringify(new sdk.UserClient({ baseUrl, apiKey: rotated.token })).includes(prepared.connectToken), false);
       assert.deepEqual(requests, [
         {method:"POST",url:"/api/v1/org/users/user_1/api-keys",key:"Bearer " + orgKey},
         {method:"GET",url:"/api/agents",key:"Bearer " + userKey},
         {method:"POST",url:"/api/v1/org/user-api-keys/uak_key/rotate",key:"Bearer " + orgKey},
         {method:"GET",url:"/api/agents",key:"Bearer " + rotatedKey},
+        {method:"GET",url:"/api/v1/realtime-models",key:"Bearer " + rotatedKey},
+        {method:"GET",url:"/api/v1/user/sessions/session_1",key:"Bearer " + rotatedKey},
+        {method:"POST",url:"/api/v1/user/sessions/session_1/realtime",key:"Bearer " + rotatedKey},
       ]);
       for (const [Client, apiKey] of [[sdk.UserClient, orgKey], [sdk.OrganizationClient, "ag9_oak." + "key." + "x".repeat(32)]]) {
         assert.throws(() => new Client({baseUrl,apiKey}), (error) => {
@@ -275,7 +346,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
           return true;
         });
       }
-      assert.equal(requests.length, 4);
+      assert.equal(requests.length, 7);
       for (const client of [org, user]) {
         for (const key of [orgKey, userKey, rotatedKey]) assert(!JSON.stringify(client).includes(key));
       }

@@ -12,7 +12,7 @@ const MAX_ATTEMPTS = 3;
 type RetryMode = "never" | "safe";
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "PUT";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   idempotencyKey?: string;
   ifMatch?: string;
@@ -192,6 +192,13 @@ export class HttpClient {
     options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
   ): Promise<T> {
     return this.request(path, { ...options, method: "PUT", body });
+  }
+
+  delete<T>(
+    path: string,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+  ): Promise<T> {
+    return this.request(path, { ...options, method: "DELETE" });
   }
 
   async openStream(

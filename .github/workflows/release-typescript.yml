@@ -50,5 +50,6 @@ jobs:
             echo "- SDK commit: \`$GITHUB_SHA\`"
             echo "- Retained User/Agent/Session/Turn baseline: \`$(node -p 'require("./typescript/package.json").tidbLinkRevision')\`"
             echo "- Organization/End User/Key provisioning baseline: \`$(node -p 'require("./typescript/package.json").tidbLinkProvisioningRevision')\`"
+            echo "- Realtime Model/Connection preparation baseline: \`$(node -p 'require("./typescript/package.json").tidbLinkRealtimeRevision')\`"
             echo "- TiDB Link API: \`$(node -p 'require("./typescript/package.json").tidbLinkApiVersion')\`"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -23,10 +23,10 @@ TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract
 
 CI downloads that immutable public artifact automatically.
 
-For current Organization/End User/Key provisioning, run `npm run test:service`
-with the exact service checkout and a dedicated TiDB test database; setup is in
-[the package README](typescript/README.md#compatibility-and-verification).
-This verifies the installed packed SDK and example against the actual service.
+For current Organization/End User/Key provisioning and Realtime preparation,
+run `npm run test:service` with the exact service checkout and a dedicated TiDB
+test database; setup is in [the package README](typescript/README.md#compatibility-and-verification).
+This verifies the installed packed SDK and both examples against the actual service.
 The default HTTP tests supplement reproducible failure cases. Keep the
 package free of runtime dependencies and do not commit credentials, recorded
 production responses, or plaintext API Keys.

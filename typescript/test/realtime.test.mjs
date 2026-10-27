@@ -224,7 +224,7 @@ test("a Session prepares a Realtime Connection and returns its one-time connect 
   const result = {
     realtimeConnection: connection,
     websocketUrl: "wss://voice.example/api/v1/user/sessions/session_1/realtime/ws",
-    connectToken: "rct_once-only-secret",
+    connectToken: "rct_" + "a".repeat(43),
     connectTokenExpiresAt: "2026-10-27T12:01:00.000Z",
   };
   const baseUrl = await serve(async (request, response) => {
@@ -302,7 +302,7 @@ test("a Session requests a fresh one-time Realtime connect token", async () => {
   const calls = [];
   const grant = {
     websocketUrl: "wss://voice.example/api/v1/user/sessions/session_1/realtime/ws",
-    connectToken: "rct_fresh-secret",
+    connectToken: "rct_" + "b".repeat(43),
     connectTokenExpiresAt: "2026-10-27T12:01:00.000Z",
   };
   const baseUrl = await serve((request, response) => {
@@ -412,5 +412,39 @@ for (const [name, invoke, expected] of [
       expected,
     );
     assert.equal(calls[0].idempotencyKey, undefined);
+  });
+}
+
+for (const [name, invoke] of [
+  [
+    "Realtime Model selection",
+    (session) => session.setRealtimeModel("voice-b", { ifMatch: '"realtime-v1"' }),
+  ],
+  ["Realtime Connection preparation", (session) => session.openRealtimeConnection()],
+  ["Realtime connect-token issuance", (session) => session.createRealtimeConnectToken()],
+  ["Realtime Connection termination", (session) => session.endRealtimeConnection()],
+]) {
+  test(`an unusable successful ${name} response is outcome unknown`, async () => {
+    const calls = [];
+    const baseUrl = await serve(async (request, response) => {
+      for await (const _chunk of request) {
+        // Consume the mutation before returning an unusable success receipt.
+      }
+      calls.push([request.method, request.url]);
+      response.setHeader("content-type", "application/json");
+      response.setHeader("x-request-id", "service-receipt-id");
+      response.writeHead(request.method === "POST" ? 201 : 200).end("{}");
+    });
+
+    await assert.rejects(
+      invoke(clientFor(baseUrl).session("session_1")),
+      (error) => {
+        assert.equal(error.name, "OutcomeUnknownError");
+        assert.equal(error.requestId, "service-receipt-id");
+        assert.doesNotMatch(String(error), /rct_/u);
+        return true;
+      },
+    );
+    assert.equal(calls.length, 1);
   });
 }

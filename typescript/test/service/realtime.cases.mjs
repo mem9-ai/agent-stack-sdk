@@ -157,6 +157,20 @@ test("the installed SDK discovers, selects and manages Realtime Connections", as
     foreign.session(sessionId).getRealtimeConnection(),
     refusal(404, "session_not_found"),
   );
+  await assert.rejects(
+    foreign.session(sessionId).setRealtimeModel("voice-b", {
+      ifMatch: selected.etag,
+    }),
+    refusal(404, "session_not_found"),
+  );
+  await assert.rejects(
+    foreign.session(sessionId).endRealtimeConnection(),
+    refusal(404, "session_not_found"),
+  );
+  assert.throws(
+    () => new UserClient({ baseUrl, apiKey: organizationApiKey }),
+    TypeError,
+  );
 
   const ended = await session.endRealtimeConnection();
   assert.equal(ended.id, opened.realtimeConnection.id);

@@ -194,6 +194,13 @@ export class HttpClient {
     return this.request(path, { ...options, method: "PUT", body });
   }
 
+  deleteResponse<T>(
+    path: string,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+  ): Promise<HttpResult<T>> {
+    return this.response(path, { ...options, method: "DELETE" });
+  }
+
   delete<T>(
     path: string,
     options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,

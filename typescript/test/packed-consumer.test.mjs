@@ -302,7 +302,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
             metadata: {}, createdAt: "2026-10-27T00:00:00.000Z", endedAt: null,
           },
           websocketUrl: "wss://voice.example/ws",
-          connectToken: "rct_" + "p".repeat(24),
+          connectToken: "rct_" + "p".repeat(43),
           connectTokenExpiresAt: "2026-10-27T00:01:00.000Z",
         }));
       } else {

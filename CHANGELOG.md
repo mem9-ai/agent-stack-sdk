@@ -10,7 +10,7 @@
   Retain the earlier contract evidence for APIs awaiting their refresh.
 
 - Rename the package to `@mem9/tidb-link` and errors/constants to TiDB Link names.
-- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases. HTTP resource paths stay unchanged.
+- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases.
 - Reject unusable one-time User Key responses without automatically repeating issuance.
 
 - Require explicit published Template selection for new Agents.

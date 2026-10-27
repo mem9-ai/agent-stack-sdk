@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck --workspace @mem9/tidb-link",
     "test": "npm run test --workspace @mem9/tidb-link",
     "test:service-contract": "npm run test:service-contract --workspace @mem9/tidb-link",
-    "pack:check": "npm run pack:check --workspace @mem9/tidb-link"
+    "pack:check": "npm run pack:check --workspace @mem9/tidb-link",
+    "test:service": "npm run test:service --workspace @mem9/tidb-link"
   },
   "devDependencies": {
     "typescript": "5.9.2"

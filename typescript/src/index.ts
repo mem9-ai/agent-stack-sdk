@@ -1,8 +1,12 @@
 /** TiDB Link OpenAPI version supported by this SDK release. */
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
-/** Exact TiDB Link revision whose public contract is supported by this SDK release. */
+/** Historical service baseline for retained APIs awaiting their refresh. */
 export const TIDB_LINK_REVISION =
   "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
+
+/** Exact service revision verified for Organization, End User and User Key provisioning. */
+export const TIDB_LINK_PROVISIONING_REVISION =
+  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
 export {
   TiDBLinkApiError,
@@ -14,8 +18,12 @@ export {
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
-export { OrganizationClient, ServiceUser } from "./organization.js";
+export { OrganizationClient } from "./organization.js";
 export type {
+  Organization,
+  EndUser,
+  CreateEndUserInput,
+  RequestOptions,
   IssuedUserApiKey,
   OrganizationClientOptions,
   UserApiKey,

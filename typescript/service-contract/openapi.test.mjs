@@ -45,7 +45,7 @@ const propertyNames = (value, names = new Set()) => {
   return names;
 };
 
-test("the SDK declaration maps to one immutable TiDB Link contract", () => {
+test("retained User APIs keep their historical immutable contract evidence", () => {
   assert.equal(metadata.tidbLinkRevision, expectedServiceRevision);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
   assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
@@ -59,11 +59,8 @@ test("the SDK declaration maps to one immutable TiDB Link contract", () => {
   );
 });
 
-test("the declared contract exposes the supported Organization and User workflows", () => {
+test("the historical contract records retained User workflows", () => {
   for (const route of [
-    "/api/admin/org/users/{userId}/api-keys",
-    "/api/admin/org/user-api-keys/{id}/rotate",
-    "/api/admin/org/user-api-keys/{id}/revoke",
     "/api/agents",
     "/api/agents/{id}/config",
     "/api/agents/{id}/memory/mem9/key",
@@ -86,15 +83,6 @@ test("the declared contract exposes the supported Organization and User workflow
     assert.equal(securitySchemes[name].scheme, "bearer");
     assert.notEqual(securitySchemes[name].bearerFormat, "JWT");
   }
-  const organizationIntent =
-    document.paths["/api/admin/org/users/{userId}/api-keys"].post.parameters
-      .filter((parameter) => parameter.in === "header");
-  assert(organizationIntent.some((parameter) => parameter.name === "x-ti-target-organization-id"));
-  assert(!organizationIntent.some((parameter) => parameter.name === "x-agent9-target-organization-id"));
-
-  const organizationSecurity =
-    document.paths["/api/admin/org/users/{userId}/api-keys"].get.security;
-  assert(organizationSecurity.some((item) => "OrganizationApiKey" in item));
   const userSecurity = document.paths["/api/agents"].post.security;
   assert(userSecurity.some((item) => "UserApiKey" in item));
 });

@@ -13,7 +13,9 @@ runtime dependencies.
 - [Security policy](SECURITY.md)
 
 The SDK is pre-1.0 while the TiDB Link HTTP API remains pre-1.0. Each SDK
-release declares the exact TiDB Link revision and API version it supports.
+release declares its service baselines and supported scope. The current refresh
+verifies Organization/End User/Key provisioning against a newer revision; see the
+TypeScript README before using retained exports.
 
 ## Development
 

@@ -2,8 +2,15 @@
 
 ## Unreleased (0.3.0)
 
+- Refresh Organization information, End User creation/listing/retrieval and User
+  API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
+- Replace the obsolete ServiceUser handle with explicit Organization operations;
+  preserve uncertain creation/issuance and one-time credential delivery.
+- Verify the packed SDK and provisioning CLI against the actual service and TiDB.
+  Retain the earlier contract evidence for APIs awaiting their refresh.
+
 - Rename the package to `@mem9/tidb-link` and errors/constants to TiDB Link names.
-- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases. HTTP resource paths stay unchanged.
+- Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases.
 - Reject unusable one-time User Key responses without automatically repeating issuance.
 
 - Require explicit published Template selection for new Agents.

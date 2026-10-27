@@ -6,6 +6,34 @@ export interface OrganizationClientOptions {
   apiKey: string;
 }
 
+export interface Organization {
+  organizationId: string;
+  slug: string;
+  name: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EndUser {
+  userId: string;
+  organizationId: string;
+  displayName: string | null;
+  externalId: string | null;
+  status: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEndUserInput {
+  displayName?: string;
+  externalId?: string;
+}
+
+export interface RequestOptions {
+  requestId?: string;
+  signal?: AbortSignal;
+}
+
 export interface UserApiKey {
   apiKeyId: string;
   organizationId: string;
@@ -27,7 +55,10 @@ export interface IssuedUserApiKey {
   token: string;
 }
 
-const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey => {
+const issuedUserApiKey = (
+  value: unknown,
+  requestId: string,
+): IssuedUserApiKey => {
   const result = value as { apiKey?: unknown; token?: unknown };
   if (
     typeof result !== "object" ||
@@ -35,85 +66,137 @@ const issuedUserApiKey = (value: unknown, requestId: string): IssuedUserApiKey =
     typeof result.apiKey !== "object" ||
     result.apiKey === null ||
     Array.isArray(result.apiKey) ||
+    typeof (result.apiKey as UserApiKey).apiKeyId !== "string" ||
+    !(result.apiKey as UserApiKey).apiKeyId ||
     !isApiKey(result.token, "user")
   ) {
     throw new OutcomeUnknownError(
-      "TiDB Link accepted the credential request but returned an unusable one-time credential",
+      "TiDB Link accepted the credential request but omitted the one-time credential",
       { requestId },
     );
   }
   return result as IssuedUserApiKey;
 };
 
-export class ServiceUser {
-  readonly #http: HttpClient;
-  readonly id: string;
+const requestOptions = (options: RequestOptions = {}): RequestOptions => {
+  requireKnownKeys(options, ["requestId", "signal"], "Request options");
+  return options;
+};
 
-  constructor(http: HttpClient, id: string) {
-    if (!id) throw new TypeError("Service User id is required");
-    this.#http = http;
-    this.id = id;
-  }
-
-  async listApiKeys(options?: { signal?: AbortSignal }): Promise<UserApiKey[]> {
-    const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
-      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
-      options,
-    );
-    return response.apiKeys;
-  }
-
-  async createApiKey(input: { name: string; signal?: AbortSignal }): Promise<IssuedUserApiKey> {
-    const result = await this.#http.postResponse<unknown>(
-      `/api/admin/org/users/${encodeURIComponent(this.id)}/api-keys`,
-      { name: input.name },
-      { ...(input.signal ? { signal: input.signal } : {}), outcomeUnknown: true },
-    );
-    return issuedUserApiKey(result.data, result.requestId);
-  }
-
-  async rotateApiKey(
-    apiKeyId: string,
-    options?: { signal?: AbortSignal },
-  ): Promise<IssuedUserApiKey> {
-    const result = await this.#http.postResponse<unknown>(
-      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
-      undefined,
-      { ...(options?.signal ? { signal: options.signal } : {}), outcomeUnknown: true },
-    );
-    return issuedUserApiKey(result.data, result.requestId);
-  }
-
-  async revokeApiKey(
-    apiKeyId: string,
-    options?: { signal?: AbortSignal },
-  ): Promise<UserApiKey> {
-    const response = await this.#http.post<{ apiKey: UserApiKey }>(
-      `/api/admin/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
-      undefined,
-      { ...(options?.signal ? { signal: options.signal } : {}), idempotent: true },
-    );
-    return response.apiKey;
-  }
-
-  async revokeAllApiKeys(options?: { signal?: AbortSignal }): Promise<UserApiKey[]> {
-    const active = (await this.listApiKeys(options)).filter((apiKey) => apiKey.status === "active");
-    return Promise.all(active.map((apiKey) => this.revokeApiKey(apiKey.apiKeyId, options)));
-  }
-}
-
+/** Customer operations authorized by an Organization API Key. */
 export class OrganizationClient {
   readonly #http: HttpClient;
 
   constructor(options: OrganizationClientOptions) {
     requireKnownKeys(options, ["baseUrl", "apiKey"], "OrganizationClient options");
     if (!isApiKey(options.apiKey, "org")) {
-      throw new TypeError("OrganizationClient requires an Organization API Key");
+      throw new TypeError(
+        "OrganizationClient requires an Organization API Key",
+      );
     }
     this.#http = new HttpClient(options);
   }
 
-  serviceUser(id: string): ServiceUser {
-    return new ServiceUser(this.#http, id);
+  async getOrganization(options?: RequestOptions): Promise<Organization> {
+    const response = await this.#http.get<{ organization: Organization }>(
+      "/api/v1/org",
+      requestOptions(options),
+    );
+    return response.organization;
+  }
+
+  async createEndUser(
+    input: CreateEndUserInput = {},
+    options?: RequestOptions,
+  ): Promise<EndUser> {
+    const result = await this.#http.postResponse<{ user?: EndUser }>(
+      "/api/v1/org/users",
+      {
+        ...(input.displayName === undefined
+          ? {}
+          : { displayName: input.displayName }),
+        ...(input.externalId === undefined
+          ? {}
+          : { externalId: input.externalId }),
+      },
+      { ...requestOptions(options), outcomeUnknown: true },
+    );
+    if (
+      !result.data?.user ||
+      typeof result.data.user.userId !== "string" ||
+      !result.data.user.userId
+    ) {
+      throw new OutcomeUnknownError(
+        "End User creation returned no usable User; reconcile by externalId",
+        {
+          requestId: result.requestId,
+        },
+      );
+    }
+    return result.data.user;
+  }
+
+  async listEndUsers(options?: RequestOptions): Promise<EndUser[]> {
+    const response = await this.#http.get<{ users: EndUser[] }>(
+      "/api/v1/org/users",
+      requestOptions(options),
+    );
+    return response.users;
+  }
+
+  async getEndUser(userId: string, options?: RequestOptions): Promise<EndUser> {
+    const response = await this.#http.get<{ user: EndUser }>(
+      `/api/v1/org/users/${encodeURIComponent(userId)}`,
+      requestOptions(options),
+    );
+    return response.user;
+  }
+
+  async createUserApiKey(
+    userId: string,
+    input: { name: string },
+    options?: RequestOptions,
+  ): Promise<IssuedUserApiKey> {
+    const result = await this.#http.postResponse<unknown>(
+      `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
+      { name: input.name },
+      { ...requestOptions(options), outcomeUnknown: true },
+    );
+    return issuedUserApiKey(result.data, result.requestId);
+  }
+
+  async listUserApiKeys(
+    userId: string,
+    options?: RequestOptions,
+  ): Promise<UserApiKey[]> {
+    const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
+      `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
+      requestOptions(options),
+    );
+    return response.apiKeys;
+  }
+
+  async rotateUserApiKey(
+    apiKeyId: string,
+    options?: RequestOptions,
+  ): Promise<IssuedUserApiKey> {
+    const result = await this.#http.postResponse<unknown>(
+      `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
+      undefined,
+      { ...requestOptions(options), outcomeUnknown: true },
+    );
+    return issuedUserApiKey(result.data, result.requestId);
+  }
+
+  async revokeUserApiKey(
+    apiKeyId: string,
+    options?: RequestOptions,
+  ): Promise<UserApiKey> {
+    const response = await this.#http.post<{ apiKey: UserApiKey }>(
+      `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
+      undefined,
+      { ...requestOptions(options), outcomeUnknown: true },
+    );
+    return response.apiKey;
   }
 }

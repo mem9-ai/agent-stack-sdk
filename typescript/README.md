@@ -1,138 +1,154 @@
 # `@mem9/tidb-link`
 
-Official TypeScript SDK for TiDB Link. The package requires Node.js 22.12 or
-newer and has no runtime dependencies.
+Official TypeScript SDK for Node.js 22.12 or newer. ESM only, with TypeScript
+declarations and no runtime dependencies.
 
-The SDK is ESM-only and ships TypeScript declarations.
+## Current refresh scope
 
-## Install
-
-```sh
-npm install @mem9/tidb-link
-```
+This slice refreshes Organization information, End User provisioning and User API
+Key management for [service revision b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
+It replaces the removed Workspace/Service User provisioning surface. The existing
+Agent, Session and Turn exports are retained for subsequent refresh
+slices; they are **not verified or supported against this baseline**. Do not use
+them as the next step in this provisioning example.
 
 ## Quick start
 
-The Organization API Key authenticates its Organization; the server authorizes each supported handler. Create the Service User
-in the Console first, then store its ID in your customer mapping. Store the
-one-time User API Key in your secret manager.
+Install the package built from this checkout. This change does not publish a new
+npm release:
 
-```ts
-import { OrganizationClient, UserClient } from "@mem9/tidb-link";
-
-export async function runCustomerTurn(input: {
-  baseUrl: string;
-  organizationApiKey: string;
-  serviceUserId: string;
-  agentTemplateId: string;
-  templateVersion: number;
-  customerName: string;
-  prompt: string;
-}) {
-  const organization = new OrganizationClient({
-    baseUrl: input.baseUrl,
-    apiKey: input.organizationApiKey,
-  });
-
-  const serviceUser = organization.serviceUser(input.serviceUserId);
-  const { token: userApiKey } = await serviceUser.createApiKey({
-    name: "saas-backend",
-  });
-
-  // Persist serviceUser.id and userApiKey securely here. The plaintext key is
-  // not available from list or revoke responses.
-  const user = new UserClient({
-    baseUrl: input.baseUrl,
-    apiKey: userApiKey,
-  });
-  const agent = await user.createAgent({
-    agentTemplateId: input.agentTemplateId,
-    templateVersion: input.templateVersion,
-    name: `${input.customerName} Agent`,
-  });
-  const session = await agent.createSession();
-  return session.turn({ text: input.prompt });
-}
+```sh
+npm run build
+npm pack --workspace @mem9/tidb-link
+# In your application directory:
+npm install /path/to/mem9-tidb-link-0.3.0.tgz
 ```
 
-`session.turn()` returns either an `answer` or a structured `clarification`.
-Use `session.streamTurn()` when progress events are needed:
+An application backend uses an Organization API Key (`ti_org_…`). The service
+derives its Organization from that key; no Organization, User or Project selector
+is accepted by this client.
 
 ```ts
-for await (const event of session.streamTurn({ text: "Continue" })) {
-  if (event.event === "progress") process.stdout.write(event.payload.text);
-}
+import { OrganizationClient } from "@mem9/tidb-link";
+
+const organization = new OrganizationClient({
+  baseUrl: process.env.AGENT_SERVICE_URL!,
+  apiKey: process.env.ORGANIZATION_API_KEY!,
+});
+const current = await organization.getOrganization();
+const user = await organization.createEndUser({
+  externalId: "your-application-user-id",
+  displayName: "Customer",
+});
+const issued = await organization.createUserApiKey(user.userId, {
+  name: "backend",
+});
+// Store user.userId in your application mapping and issued.token in your secret manager.
 ```
 
-## Clients and resources
+`externalId` is unique within the Organization. Creating it again returns
+`ConflictError` with code `resource_conflict`; it does not return the existing
+User. Use `listEndUsers()` and match `externalId` when finding an existing mapping
+or reconciling an uncertain creation, then `getEndUser(userId)` to retrieve it.
+These User and Key lists return complete arrays; this baseline has no pagination.
+A request ID identifies a request for diagnosis and does not deduplicate creation.
 
-- `OrganizationClient` accepts an Organization API Key with
-  Organization scope. It reconstructs a `ServiceUser` handle from a retained
-  User ID; Service User creation remains a Console action.
-- `ServiceUser` creates, lists, rotates, revokes, and bulk-revokes User API
-  Keys. Plaintext is returned only by successful create and rotate calls.
-- `UserClient` accepts a User API Key and manages only that User's resources.
-  It manages the current User's Agents, AgentTemplates, and Sessions.
-- `Agent` retains its latest ETag for rename, configure, and archive. A stale
-  write throws `ConflictError`; call `refresh()` before reconciling.
-- `Agent` exposes Memory enablement plus provider and credential state. Creation
-  can provision or accept a mem9 Key. `UserClient` validates a key, while
-  creator-only `Agent` methods reveal or replace it without putting plaintext in
-  Agent records.
-- `Session` retains its model ETag, reads Turn history, and offers collected or
-  streaming Turn APIs. Model changes affect future AgentRuns only. Clarification
-  replies preserve canonical ordered string values and their source Turn.
+The packaged example performs that lookup and reconciliation:
 
-The clients never accept caller-supplied Organization or User identity headers.
-Identity comes from the API Key.
+```js
+import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
+const { organization, user, apiKey, token } = await provisionUser({
+  baseUrl: process.env.AGENT_SERVICE_URL,
+  organizationApiKey: process.env.ORGANIZATION_API_KEY,
+  externalId: "your-application-user-id",
+});
+// Persist the mapping and token securely; never log token.
+```
 
-Credentials use `ti_org_<id>_<secret>` for `OrganizationClient` and
-`ti_user_<id>_<secret>` for `UserClient`. IDs contain 1–64 ASCII letters or digits;
-the secret contains exactly 43 base64url characters. Constructors reject a key
-of the other kind, malformed values and previous credential formats before making
-a request. One-time create/rotate responses must contain a valid User Key.
-The renamed package, error classes and compatibility exports have no old aliases.
+It can also run directly after setting `AGENT_SERVICE_URL`,
+`ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID`, and `USER_CREDENTIAL_FILE`:
 
-## Errors and retry behavior
+```sh
+node node_modules/@mem9/tidb-link/examples/provision-user.mjs
+```
 
-- `TiDBLinkApiError` preserves HTTP status, stable service error code,
-  request identity, and display-safe details.
-- `ConflictError` represents an explicit service conflict, including stale
-  ETags.
-- `TurnFailedError` and `TurnInterruptedError` represent known terminal Turn
-  outcomes.
-- `OutcomeUnknownError` means the operation may have happened. Do not repeat a
-  credential, Session, or Turn mutation unless the service contract makes that
-  specific request idempotent.
-- Safe reads and server-idempotent Agent creation use bounded retries with one
-  stable request identity. Credential create/rotate and Turn creation are never
-  replayed automatically.
-- `AbortSignal` stops local waiting. It does not promise remote cancellation or
-  exactly-once external effects.
+The CLI reserves a new private file before issuing a key and writes the result,
+including the token, there. It refuses to overwrite an existing file. A failed
+run can leave an empty file; inspect the failure before trying again. **Every
+successful invocation issues a new key**, even for an existing User. Reuse the
+stored credential during normal application startup.
 
-## Compatibility
+## Key management
 
-`@mem9/tidb-link` 0.3.x targets TiDB Link OpenAPI `0.0.1` at revision
-`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87`, exported as
-`TIDB_LINK_API_VERSION` and `TIDB_LINK_REVISION`.
+```ts
+const keys = await organization.listUserApiKeys(user.userId);
+const replacement = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
+// Save replacement.token; the previous token immediately stops authenticating.
+const revoked = await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
+```
 
-Credential creation and Session creation still report ambiguous transport
-outcomes explicitly and are not retried. Progress-stream resumption is outside
-the current supported surface.
+Create and rotate return `{ apiKey, token }`. List and revoke return metadata
+without the token or stored hash. Rotation preserves the key ID; revocation is
+idempotent. Only active ordinary End Users can own keys. Missing, foreign or
+disabled targets preserve the service's refusal.
 
-## Published templates and descriptive Hardware
+The returned User API Key (`ti_user_…`) authenticates that User's public APIs.
+It grants no Organization management authority; `OrganizationClient` rejects it.
+An Organization key likewise grants no User identity. Until the User client
+refresh is delivered, verify the credential with the service's public User API,
+for example `GET /api/v1/user/agents` using `Authorization: Bearer <token>`.
 
-New Agents require an explicit `agentTemplateId`. Add `templateVersion` to choose
-an exact publication; ID-only selection pins latest once on the server. Published
-content is available through `getPublishedTemplateVersion`. `Agent.data` reports
-its immutable creation origin, independent instructions and current application.
+## Errors and uncertain outcomes
 
-`config.hardware.requirements` and `overrides.hardware.requirements` contain exact
-Definition IDs and capability names. They describe metadata without assigning a
-device or granting execution. Explicit empty arrays survive upgrades. Preview an
-idle Agent upgrade with `previewTemplateApplication`, then use `applyTemplate`
-with the expected application, selected reset paths and one stable retry key.
-`hardware.requirements` is a supported reset path. Existing default-Agent ensure
-only returns an established mapping; if absent, explicitly create from a published
-Template first. This SDK exposes personal User-key APIs; Console unsaved Draft
-Preview remains a separate browser-cookie workflow.
+Every Organization method accepts a final `{ requestId?, signal? }` option.
+`TiDBLinkApiError` preserves status, service code, request identity and details;
+`ConflictError` preserves explicit 409/412 conflicts. The service's response
+request identity takes precedence over the one sent.
+
+Safe reads use bounded retries with the same request identity. User creation and
+key creation/rotation/revocation are never automatically replayed. Disconnects, unusable
+success responses, HTTP 408 and server failures during these mutations raise
+`OutcomeUnknownError`. For an HTTP failure, its `cause` retains the
+`TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous failure
+still reports an unknown outcome. `AbortSignal` stops the local request; after
+dispatch it does not establish whether a mutation happened. Redirects are refused.
+
+After uncertain User creation, list and match the original `externalId`.
+After uncertain issuance or rotation, listing keys can confirm metadata but
+**cannot recover the one-time token**. Reconcile metadata and explicitly revoke
+any unwanted key before deciding whether to issue again. The example never
+repeats an uncertain credential operation.
+
+## Compatibility and verification
+
+`TIDB_LINK_PROVISIONING_REVISION` and `tidbLinkProvisioningRevision` in the package identify the
+exact service revision above. Package metadata `tidbLinkProvisioningOpenApiSha256` pins the SHA-256 of that
+revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
+version string alone does not establish compatibility. The verified scope is the
+provisioning slice described here, not every retained export or every public API.
+
+`TIDB_LINK_REVISION` / `tidbLinkRevision` retain revision
+`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed User/Agent/Session/Turn
+APIs. The existing immutable contract checks preserve evidence for that historical
+surface; they do not certify it against the provisioning baseline. Run them with
+`TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract`, using the immutable artifact selected by this repository's CI workflow. It contains `openapi.json` and `metadata.json`.
+
+`npm test` covers the simulated HTTP failure boundary and installs the actual
+packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
+example against the real service, use the service's Node.js 26 runtime, install its
+pinned dependencies, generate Prisma, build its Hardware contract and prepare its
+current schema in a **dedicated test database**. See the selected service's
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/docs/prisma-first-tidb-validation-and-rollout.md).
+
+```sh
+AGENT_SERVICE_ROOT=/path/to/agent-stack \
+TEST_TIDB_DATABASE_URL=mysql://root@127.0.0.1:4000/tidb_link_sdk_test \
+TIDB_SSL=off npm run test:service
+```
+
+This command requires a clean service checkout at the exact revision and resets
+all rows in the selected test database before and after the run. It uses the
+service's existing AppModule test fixture, genuine credentials and real TiDB;
+fixtures prepare Organizations and controlled dependencies. No production
+supplier credentials are needed. A mismatch or unavailable service fails this
+check instead of silently skipping it.

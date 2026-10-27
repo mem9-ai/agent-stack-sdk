@@ -71,9 +71,9 @@ const errorInput = async (
     value = undefined;
   }
   const envelope = value as {
-    error?: { code?: unknown; message?: unknown; details?: unknown };
+    error?: { code?: unknown; message?: unknown; details?: unknown; requestId?: unknown };
   };
-  const error = envelope?.error;
+  const error = typeof envelope?.error === "object" && envelope.error !== null ? envelope.error : undefined;
   return {
     status: response.status,
     code: typeof error?.code === "string" ? error.code : "http_error",
@@ -81,7 +81,7 @@ const errorInput = async (
       typeof error?.message === "string"
         ? error.message
         : `TiDB Link request failed with status ${response.status}`,
-    requestId: response.headers.get("x-request-id") ?? fallbackRequestId,
+    requestId: response.headers.get("x-request-id") ?? (typeof error?.requestId === "string" ? error.requestId : fallbackRequestId),
     ...(error && "details" in error ? { details: error.details } : {}),
   };
 };
@@ -139,11 +139,11 @@ export class HttpClient {
     };
   }
 
-  get<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<T> {
+  get<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<T> {
     return this.request(path, { ...options, retry: "safe" });
   }
 
-  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal">): Promise<HttpResult<T>> {
+  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<HttpResult<T>> {
     return this.response(path, { ...options, retry: "safe" });
   }
 
@@ -212,6 +212,7 @@ export class HttpClient {
     try {
       response = await fetch(`${this.#baseUrl}${path}`, {
         method: "POST",
+        redirect: "error",
         headers: {
           ...this.#headers(requestOptions, stableRequestId),
           accept: "application/x-ndjson",
@@ -265,6 +266,7 @@ export class HttpClient {
       try {
         response = await fetch(`${this.#baseUrl}${path}`, {
           method: options.method ?? "GET",
+          redirect: "error",
           headers: this.#headers(options, stableRequestId),
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
           ...(options.signal ? { signal: options.signal } : {}),
@@ -321,9 +323,16 @@ export class HttpClient {
       }
 
       const input = await errorInput(response, stableRequestId);
-      throw input.status === 409 || input.status === 412
+      const error = input.status === 409 || input.status === 412
         ? new ConflictError(input)
         : new TiDBLinkApiError(input);
+      if (options.outcomeUnknown && (input.status >= 500 || input.status === 408)) {
+        throw new OutcomeUnknownError("TiDB Link could not confirm the mutation outcome", {
+          ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
+          cause: error,
+        });
+      }
+      throw error;
     }
     throw new Error("unreachable");
   }

@@ -69,11 +69,14 @@ assert.equal(
   manifest.tidbLinkRealtimeOpenApiSha256,
   "Agent Service OpenAPI does not match the SDK Realtime baseline",
 );
-const serviceCaseFiles = (await readdir(fileURLToPath(new URL(".", import.meta.url))))
+const serviceCaseDirectory = fileURLToPath(new URL(".", import.meta.url));
+const serviceCases = (
+  await readdir(serviceCaseDirectory, { recursive: true })
+)
   .filter((name) => name.endsWith(".cases.mjs"))
   .sort()
-  .map((name) => fileURLToPath(new URL(name, import.meta.url)));
-assert(serviceCaseFiles.length > 0, "No SDK service cases were discovered");
+  .map((name) => ({ source: path.join(serviceCaseDirectory, name), name }));
+assert(serviceCases.length > 0, "No SDK service cases were discovered");
 
 await mkdir(path.join(serviceRoot, ".agent9"), { recursive: true });
 const temporary = await mkdtemp(
@@ -107,7 +110,7 @@ try {
             "customer-http-outcomes.json",
           ),
           SDK_PACKAGE_ROOT: fileURLToPath(new URL("../..", import.meta.url)),
-          SDK_SERVICE_CASES: JSON.stringify(serviceCaseFiles),
+          SDK_SERVICE_CASES: JSON.stringify(serviceCases),
         },
       },
     );

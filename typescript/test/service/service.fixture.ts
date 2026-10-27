@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -215,17 +215,21 @@ it("the packed SDK provisions users and prepares Realtime Connections through th
     ],
     { cwd: temporary },
   );
-  const serviceCases = JSON.parse(process.env.SDK_SERVICE_CASES!) as string[];
-  const installedCaseNames = serviceCases.map((source) => path.basename(source));
+  const serviceCases = JSON.parse(process.env.SDK_SERVICE_CASES!) as Array<{
+    source: string;
+    name: string;
+  }>;
   await Promise.all(
-    serviceCases.map((source, index) =>
-      copyFile(source, path.join(temporary, installedCaseNames[index]!)),
-    ),
+    serviceCases.map(async ({ source, name }) => {
+      const destination = path.join(temporary, name);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await copyFile(source, destination);
+    }),
   );
   try {
     const result = await exec(
       process.execPath,
-      ["--test", "--test-concurrency=1", ...installedCaseNames],
+      ["--test", "--test-concurrency=1", ...serviceCases.map(({ name }) => name)],
       {
         cwd: temporary,
         env: {

@@ -128,7 +128,7 @@ const prepared = await session.openRealtimeConnection({
 ```
 
 `setRealtimeModel` requires the independent ETag returned by
-`getRealtimeModelSelection`; a stale token raises `ConflictError` with code
+`getRealtimeModelSelection`; a stale ETag raises `ConflictError` with code
 `realtime_model_conflict`. A selection change applies to the next Realtime
 Connection. A live connection keeps the model and provider identity frozen at
 its admission. Model availability, Session voice eligibility, language support,

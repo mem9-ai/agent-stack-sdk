@@ -215,23 +215,17 @@ it("the packed SDK provisions users and prepares Realtime Connections through th
     ],
     { cwd: temporary },
   );
-  await copyFile(
-    process.env.SDK_PROVISIONING_CASES!,
-    path.join(temporary, "provisioning.cases.mjs"),
-  );
-  await copyFile(
-    process.env.SDK_REALTIME_CASES!,
-    path.join(temporary, "realtime.cases.mjs"),
+  const serviceCases = JSON.parse(process.env.SDK_SERVICE_CASES!) as string[];
+  const installedCaseNames = serviceCases.map((source) => path.basename(source));
+  await Promise.all(
+    serviceCases.map((source, index) =>
+      copyFile(source, path.join(temporary, installedCaseNames[index]!)),
+    ),
   );
   try {
     const result = await exec(
       process.execPath,
-      [
-        "--test",
-        "--test-concurrency=1",
-        "provisioning.cases.mjs",
-        "realtime.cases.mjs",
-      ],
+      ["--test", "--test-concurrency=1", ...installedCaseNames],
       {
         cwd: temporary,
         env: {

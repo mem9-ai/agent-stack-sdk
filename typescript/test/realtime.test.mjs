@@ -426,6 +426,7 @@ for (const [name, invoke] of [
 ]) {
   test(`an unusable successful ${name} response is outcome unknown`, async () => {
     const calls = [];
+    const returnedToken = "rct_" + "s".repeat(43);
     const baseUrl = await serve(async (request, response) => {
       for await (const _chunk of request) {
         // Consume the mutation before returning an unusable success receipt.
@@ -435,6 +436,14 @@ for (const [name, invoke] of [
       response.setHeader("x-request-id", "service-receipt-id");
       if (name === "Realtime Model selection") {
         response.writeHead(204).end();
+      } else if (name === "Realtime connect-token issuance") {
+        response.writeHead(201).end(
+          JSON.stringify({
+            websocketUrl: "not-a-websocket-url",
+            connectToken: returnedToken,
+            connectTokenExpiresAt: "2026-10-27T12:01:00.000Z",
+          }),
+        );
       } else {
         response.writeHead(request.method === "POST" ? 201 : 200).end("{}");
       }
@@ -446,6 +455,7 @@ for (const [name, invoke] of [
         assert.equal(error.name, "OutcomeUnknownError");
         assert.equal(error.requestId, "service-receipt-id");
         assert.doesNotMatch(String(error), /rct_/u);
+        assert.equal(JSON.stringify(error).includes(returnedToken), false);
         return true;
       },
     );

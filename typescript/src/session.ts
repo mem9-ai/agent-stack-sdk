@@ -217,9 +217,7 @@ export class Session {
       throw new TypeError("Realtime Model ID must contain 1-128 characters");
     if (!options.ifMatch)
       throw new TypeError("Realtime Model selection requires ifMatch");
-    const result = await this.#http.patchResponse<{
-      session: RealtimeSessionSelectionFields;
-    }>(
+    const result = await this.#http.patchResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime-model`,
       { realtimeModel: model },
       {
@@ -228,8 +226,9 @@ export class Session {
         ...(options.signal ? { signal: options.signal } : {}),
       },
     );
+    const receipt = result.data as { session?: unknown } | null | undefined;
     return requireRealtimeModelSelectionReceipt(
-      (result.data as { session?: unknown }).session,
+      receipt?.session,
       result.requestId,
     );
   }

@@ -433,7 +433,11 @@ for (const [name, invoke] of [
       calls.push([request.method, request.url]);
       response.setHeader("content-type", "application/json");
       response.setHeader("x-request-id", "service-receipt-id");
-      response.writeHead(request.method === "POST" ? 201 : 200).end("{}");
+      if (name === "Realtime Model selection") {
+        response.writeHead(204).end();
+      } else {
+        response.writeHead(request.method === "POST" ? 201 : 200).end("{}");
+      }
     });
 
     await assert.rejects(

@@ -20,7 +20,8 @@
     "./examples/send-message.mjs": "./examples/send-message.mjs",
     "./examples/control-turn.mjs": "./examples/control-turn.mjs",
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
-    "./examples/observe-message.mjs": "./examples/observe-message.mjs"
+    "./examples/observe-message.mjs": "./examples/observe-message.mjs",
+    "./examples/schedule-task.mjs": "./examples/schedule-task.mjs"
   },
   "files": [
     "dist",
@@ -31,7 +32,8 @@
     "examples/send-message.mjs",
     "examples/control-turn.mjs",
     "examples/upload-file.mjs",
-    "examples/observe-message.mjs"
+    "examples/observe-message.mjs",
+    "examples/schedule-task.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

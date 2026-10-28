@@ -144,6 +144,9 @@ const errorInput = async (
         ? error.requestId
         : fallbackRequestId),
     ...(error && "details" in error ? { details: error.details } : {}),
+    ...(response.headers.has("retry-after")
+      ? { retryAfter: response.headers.get("retry-after")! }
+      : {}),
   };
 };
 

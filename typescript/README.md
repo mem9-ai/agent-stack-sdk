@@ -8,13 +8,13 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, conversation history, file attachments, and
+continuous progress, conversation history, file attachments, Schedulers, and
 Realtime Model/Connection preparation for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Client Tools, Schedulers and
+default Agents and general Agent overrides are removed. Client Tools and
 usage remain subsequent slices. Browser, MSP, management and device APIs are
 outside this refresh.
 
@@ -307,7 +307,9 @@ const accepted = await session.submitMessage({
 });
 let cursor: string | undefined;
 let draft = "";
-for await (const update of session.observe(accepted.inputId, { timeoutMs: 60_000 })) {
+for await (const update of session.observe(accepted.inputId, {
+  timeoutMs: 60_000,
+})) {
   if (update.type === "result") {
     console.log(update.result.text);
   } else {
@@ -561,6 +563,74 @@ The example returns the final conversation result; its exported
 `uploadFileWorkflow()` accepts bytes directly. It does not manage general Drive
 directories, write Session text files, or grant Organization access to User files.
 
+## Scheduled work
+
+`user.schedulers` uses the full customer Scheduler API. A new-Session schedule
+requires an owned Agent; a bound-Session schedule supplies only its Session.
+The service resolves the Agent from that Session.
+
+```ts
+const created = await customer.schedulers.create({
+  agentId: agent.id,
+  title: "Morning report",
+  prompt: "Summarize the latest activity.",
+  schedule: { kind: "cron", cronExpr: "0 9 * * *", timezone: "Asia/Shanghai" },
+  idempotencyKey: savedSchedulerKey,
+});
+const current = await customer.schedulers.get(created.scheduler.schedulerId);
+const updated = await customer.schedulers.update(
+  current.scheduler.schedulerId,
+  { enabled: false },
+  { ifMatch: current.etag },
+);
+const history = await customer.schedulers.fires(current.scheduler.schedulerId, {
+  limit: 20,
+});
+```
+
+For one-time work use exactly one of `{ kind: "once", runAt: isoTimestamp }` or
+`{ kind: "once", after: "1h30m" }`. `runAt` includes a timezone offset; cron
+requires an IANA timezone. The service owns timing and validation. Optional
+`validFrom` and `validUntil` restrict the execution window. A bound-Session create
+uses `delivery: { target: "bound_session", sessionId }` and omits `agentId`.
+
+Creation returns `{ scheduler, etag }`. Persist the key and exact input before
+calling. A same-key replay returns the **original creation response and ETag**,
+even if the Scheduler has since changed; use `get()` for current state before an
+edit. A changed input with that key is refused. Uncertain responses raise
+`OutcomeUnknownError` rather than repeating the command automatically.
+`idempotency_in_progress` retains the service's raw `retryAfter` header on the
+error so the application can decide when to replay the original request.
+
+`update(id, changes, { ifMatch })` and `delete(id, { ifMatch })` require a
+previously read ETag. Stale writes retain the service's 412 conflict; the SDK
+never refreshes and overwrites another writer's changes. Updates support title,
+prompt, Agent/delivery target, schedule, enabled state, validity window and
+`snoozeUntil`. Enabling an elapsed one-time schedule requires a future time.
+Disabling or deleting a Scheduler does not roll back completed effects. Deleted
+Schedulers are no longer available through detail or fire-history reads.
+
+`list({ status, limit, cursor })` and `fires(id, { limit, cursor })` return
+`nextCursor` rather than `hasMore`. Cursors retain their original owner/filter
+scope. Each fire preserves its execution prompt and delivery snapshot; later
+Scheduler edits cannot rewrite it. `pending` is not success. A `completed` fire
+or a `failed` fire retains nullable result identities and a nullable failure code.
+When `result.sessionId` and `result.turnId` are present, read the saved Turn with
+`customer.session(sessionId).getTurn(turnId)`; do not invent a message identity
+when `messageId` is null.
+
+The installed `schedule-task.mjs` example creates one scheduled task, waits
+locally for a settled fire and reads its associated Turn. Set `AGENT_SERVICE_URL`,
+`USER_API_KEY`, `AGENT_ID`, `SCHEDULER_IDEMPOTENCY_KEY`, `SCHEDULE_RUN_AT` and
+`SCHEDULE_PROMPT`, then run:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/schedule-task.mjs
+```
+
+A local example timeout leaves the schedule active and prints its identity for
+later fire-history reads. The separate Scheduler plans API is outside this SDK.
+
 ## Errors and uncertain outcomes
 
 Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
@@ -606,7 +676,7 @@ fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks frozen text/progress/history and file-transfer OpenAPI subsets from
+`npm run test:service-contract` checks frozen text/progress/history, file-transfer and Scheduler OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -644,6 +714,9 @@ They verify inline, multipart and empty uploads, cancellation and invalid conten
 large-file download-ticket redemption, and a real Runtime file read whose answer
 contains the uploaded content. The installed upload example exercises the same
 public workflow. Real supplier deployment certification is outside this evidence.
+Scheduler cases enable the real background runner and use SDK-created schedules
+to verify successful and failed execution, delivery changes, retained fire
+snapshots and the installed example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

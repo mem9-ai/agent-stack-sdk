@@ -105,3 +105,5 @@ export type {
   SessionTimelineEntry,
   SessionTimelinePage,
 } from "./history.js";
+
+export type { TurnCommandInput, RetryReceipt } from "./control.js";

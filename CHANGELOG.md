@@ -2,6 +2,12 @@
 
 ## Unreleased (0.3.0)
 
+- Add explicit exact-Turn cancellation and checkpoint retry with recoverable
+  command identities; wait for retry results without replacing earlier outcomes.
+- Verify active-Turn steering through message admission, eventual cancellation,
+  enabled and disabled checkpoint retry using the installed SDK and real service.
+
+
 - Refresh Organization information, End User creation/listing/retrieval and User
   API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
 - Replace the obsolete ServiceUser handle with explicit Organization operations;

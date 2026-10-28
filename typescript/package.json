@@ -17,7 +17,8 @@
     "./examples/provision-user.mjs": "./examples/provision-user.mjs",
     "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
     "./examples/create-session.mjs": "./examples/create-session.mjs",
-    "./examples/send-message.mjs": "./examples/send-message.mjs"
+    "./examples/send-message.mjs": "./examples/send-message.mjs",
+    "./examples/control-turn.mjs": "./examples/control-turn.mjs"
   },
   "files": [
     "dist",
@@ -25,7 +26,8 @@
     "examples/provision-user.mjs",
     "examples/prepare-realtime-connection.mjs",
     "examples/create-session.mjs",
-    "examples/send-message.mjs"
+    "examples/send-message.mjs",
+    "examples/control-turn.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

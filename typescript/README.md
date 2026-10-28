@@ -175,7 +175,7 @@ It never silently retries a stale update. Model changes apply to the next Turn;
 active execution, steering and retry retain the model admitted for that Turn.
 Realtime Model selection has its own independent revision token. Availability,
 Organization policy, read-only Sessions and current ownership remain service
-decisions. `session.delete()` returns the deleted tombstone; later ordinary reads
+decisions. `session.delete()` updates and returns the Session handle; `.data` contains the deleted tombstone; later ordinary reads
 and lists hide the Session. Active execution or a read-only Session can refuse
 deletion. Name and Billing Tag changes do not change the frozen recipe.
 
@@ -206,10 +206,11 @@ const { agent, session } = await createSessionWorkflow({
 ```
 
 For direct execution, set `AGENT_SERVICE_URL`, `USER_API_KEY`,
-`AGENT_CREATION_KEY` and `SESSION_CREATION_KEY`; `TEMPLATE_ID` and `MODEL_ID` are
-optional. Without a Template ID it selects an available Template from the paged
-directory. Persist the selected Template ID and model with the keys for recovery;
-discovery can change between invocations.
+`TEMPLATE_ID`, `AGENT_CREATION_KEY` and `SESSION_CREATION_KEY`; `MODEL_ID` is optional.
+Select and persist the Template ID, optional model and both keys before calling.
+The example also returns the current Template page and model catalog. If no model
+was requested, it preserves omission so the service can recover the original
+creation even after the deployment default changes.
 
 ## Realtime connection preparation
 
@@ -338,13 +339,13 @@ TIDB_SSL=off npm run test:service
 
 This command requires a clean service checkout at the exact revision and resets
 all rows in the selected test database before and after the run. It uses the
-service's existing AppModule test fixture, genuine credentials, real TiDB and a
-controlled dependencies. Fixtures prepare identities, Templates and eligible
+service's existing AppModule test fixture, genuine credentials, real TiDB and
+controlled model dependencies. Fixtures prepare identities, Templates and eligible
 Realtime Sessions; public SDK methods perform Template-to-Agent-to-Session
 creation, ownership checks, lifecycle updates and Realtime operations.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's existing persistence evidence; SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 No production supplier credentials or WebSocket redemption are needed. A
 mismatch or unavailable service fails this check instead of silently skipping it.

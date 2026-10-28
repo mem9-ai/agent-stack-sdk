@@ -217,3 +217,94 @@ test("aborting creation after dispatch reports an unknown outcome and keeps the 
   );
   assert.equal(calls, 1);
 });
+
+test("a truncated retryable response still recovers creation with the original identity", async () => {
+  const identities = [];
+  const baseUrl = await serve((req, res) => {
+    identities.push(req.headers["idempotency-key"]);
+    if (identities.length === 1) {
+      res.writeHead(503, {
+        "content-type": "application/json",
+        "content-length": 1000,
+      });
+      res.write('{"error":');
+      setTimeout(() => res.destroy(), 10);
+      return;
+    }
+    res
+      .writeHead(201, { "content-type": "application/json" })
+      .end(JSON.stringify({ agent: record }));
+  });
+  const user = new UserClient({ baseUrl, apiKey: key });
+  assert.equal(
+    (
+      await user.createAgent({
+        agentTemplateId: "template_1",
+        idempotencyKey: "recover-truncated",
+      })
+    ).id,
+    "agent_1",
+  );
+  assert.deepEqual(identities, ["recover-truncated", "recover-truncated"]);
+});
+
+test("the packaged workflow keeps original creation inputs when catalog defaults change", async () => {
+  const bodies = [];
+  let catalogReads = 0;
+  const baseUrl = await serve(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    res.setHeader("content-type", "application/json");
+    if (req.url.startsWith("/api/v1/user/agent-templates")) {
+      res.end(
+        JSON.stringify({
+          templates: [{ agentTemplateId: "changed-template" }],
+          hasMore: false,
+          nextCursor: null,
+        }),
+      );
+    } else if (req.url.startsWith("/api/v1/agent-models")) {
+      res.end(
+        JSON.stringify({
+          effectiveDefaultModel:
+            ++catalogReads === 1 ? "first-default" : "new-default",
+        }),
+      );
+    } else if (req.url === "/api/v1/user/agents") {
+      bodies.push(JSON.parse(body));
+      res.writeHead(201).end(JSON.stringify({ agent: record }));
+    } else {
+      bodies.push(JSON.parse(body));
+      res.setHeader("etag", '"model-1"');
+      res
+        .writeHead(201)
+        .end(
+          JSON.stringify({
+            session: {
+              sessionId: "session_1",
+              createdWithAgentId: "agent_1",
+              model: "first-default",
+            },
+          }),
+        );
+    }
+  });
+  const { createSessionWorkflow } =
+    await import("../examples/create-session.mjs");
+  const input = {
+    baseUrl,
+    userApiKey: key,
+    agentTemplateId: "template_1",
+    agentCreationKey: "example-agent",
+    sessionCreationKey: "example-session",
+  };
+  const first = await createSessionWorkflow(input);
+  const second = await createSessionWorkflow(input);
+  assert.equal(second.session.id, first.session.id);
+  assert.deepEqual(bodies, [
+    { agentTemplateId: "template_1" },
+    { agentId: "agent_1" },
+    { agentTemplateId: "template_1" },
+    { agentId: "agent_1" },
+  ]);
+});

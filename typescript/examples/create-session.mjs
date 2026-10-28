@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { UserClient } from "@mem9/tidb-link";
 
-/** Keep both creation keys with the application's workflow record before calling. */
+/** Save the selected Template, optional model and both keys before calling. */
 export async function createSessionWorkflow({
   baseUrl,
   userApiKey,
@@ -10,29 +10,23 @@ export async function createSessionWorkflow({
   sessionCreationKey,
   model,
 }) {
-  const user = new UserClient({ baseUrl, apiKey: userApiKey });
-  if (!agentTemplateId) {
-    let cursor;
-    do {
-      const page = await user.listAgentTemplates(cursor ? { cursor } : {});
-      agentTemplateId = page.templates[0]?.agentTemplateId;
-      cursor = page.nextCursor;
-      if (agentTemplateId || !page.hasMore) break;
-      if (!cursor) throw new Error("Template continuation omitted a cursor");
-    } while (cursor);
-  }
   if (!agentTemplateId)
-    throw new Error("No available Template; provide an available TEMPLATE_ID");
+    throw new TypeError(
+      "Select and retain an agentTemplateId before creating an Agent",
+    );
+  const user = new UserClient({ baseUrl, apiKey: userApiKey });
+  const templates = await user.listAgentTemplates();
   const models = await user.listModels();
   const agent = await user.createAgent({
     agentTemplateId,
     idempotencyKey: agentCreationKey,
   });
+  // Omission is part of the creation identity; resolving today's default would change a replay.
   const session = await agent.createSession({
     idempotencyKey: sessionCreationKey,
-    model: model ?? models.effectiveDefaultModel,
+    ...(model === undefined ? {} : { model }),
   });
-  return { agent, session, models };
+  return { agent, session, templates, models };
 }
 
 if (
@@ -42,19 +36,20 @@ if (
   const {
     AGENT_SERVICE_URL,
     USER_API_KEY,
+    TEMPLATE_ID,
     AGENT_CREATION_KEY,
     SESSION_CREATION_KEY,
-    TEMPLATE_ID,
     MODEL_ID,
   } = process.env;
   if (
     !AGENT_SERVICE_URL ||
     !USER_API_KEY ||
+    !TEMPLATE_ID ||
     !AGENT_CREATION_KEY ||
     !SESSION_CREATION_KEY
   )
     throw new Error(
-      "Set AGENT_SERVICE_URL, USER_API_KEY, AGENT_CREATION_KEY and SESSION_CREATION_KEY; TEMPLATE_ID and MODEL_ID are optional",
+      "Set AGENT_SERVICE_URL, USER_API_KEY, TEMPLATE_ID, AGENT_CREATION_KEY and SESSION_CREATION_KEY; MODEL_ID is optional",
     );
   const result = await createSessionWorkflow({
     baseUrl: AGENT_SERVICE_URL,

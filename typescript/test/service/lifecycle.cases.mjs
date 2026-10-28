@@ -231,6 +231,7 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
   const options = {
     baseUrl,
     userApiKey: process.env.SDK_USER_KEY,
+    agentTemplateId: templateId,
     agentCreationKey: randomUUID(),
     sessionCreationKey: randomUUID(),
   };
@@ -253,6 +254,7 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
         ...process.env,
         AGENT_SERVICE_URL: baseUrl,
         USER_API_KEY: options.userApiKey,
+        TEMPLATE_ID: options.agentTemplateId,
         AGENT_CREATION_KEY: options.agentCreationKey,
         SESSION_CREATION_KEY: options.sessionCreationKey,
       },

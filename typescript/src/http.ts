@@ -436,7 +436,7 @@ export class HttpClient {
       }
 
       if (attempt < attempts && RETRYABLE_STATUS.has(response.status)) {
-        await response.arrayBuffer();
+        await response.arrayBuffer().catch(() => undefined);
         await pauseBeforeRetry(
           100 * 2 ** (attempt - 1),
           options,

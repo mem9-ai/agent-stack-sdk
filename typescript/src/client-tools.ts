@@ -75,6 +75,12 @@ export async function getClientTools(
   sessionId: string,
   options?: RequestOptions,
 ): Promise<ClientToolSet> {
+  if (options)
+    requireKnownKeys(
+      options,
+      ["signal", "requestId"],
+      "Client Tool read options",
+    );
   return toolSet(await http.getResponse(toolsPath(sessionId), options));
 }
 
@@ -130,6 +136,12 @@ export async function listPendingClientToolCalls(
   sessionId: string,
   options?: RequestOptions,
 ): Promise<PendingClientToolCall[]> {
+  if (options)
+    requireKnownKeys(
+      options,
+      ["signal", "requestId"],
+      "Pending Client Tool call options",
+    );
   const result = await http.get<{ calls: PendingClientToolCall[] }>(
     `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/client-tool-calls`,
     options,

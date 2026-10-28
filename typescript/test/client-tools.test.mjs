@@ -198,15 +198,13 @@ for (const failure of ["disconnect", "malformed", "wrong-target"])
       );
     });
     await assert.rejects(
-      userFor(baseUrl)
-        .session("session_1")
-        .submitClientToolOutput({
-          clientEventId: "output_1",
-          turnId: "turn_1",
-          callId: "call_1",
-          output: "app-result",
-          requestId: "result-request",
-        }),
+      userFor(baseUrl).session("session_1").submitClientToolOutput({
+        clientEventId: "output_1",
+        turnId: "turn_1",
+        callId: "call_1",
+        output: "app-result",
+        requestId: "result-request",
+      }),
       (error) =>
         error instanceof OutcomeUnknownError &&
         error.sessionId === "session_1" &&
@@ -302,4 +300,28 @@ test("invalid outputs fail before dispatch without dropping unsupported executio
   ])
     await assert.rejects(session.submitClientToolOutput(input), TypeError);
   assert.deepEqual(writes, []);
+});
+
+test("Client Tool read options cannot turn a read into an unsafe replacement", async () => {
+  const requests = [];
+  const baseUrl = await serve((req, res) => {
+    requests.push(req.method);
+    json(res, { revision: 2, tools: [], calls: [] }, 200, {
+      etag: '"tools.session_1.2"',
+    });
+  });
+  const session = userFor(baseUrl).session("session_1");
+  await assert.rejects(
+    session.getClientTools({
+      method: "PUT",
+      body: { tools: [] },
+      ifMatch: '"tools.session_1.1"',
+    }),
+    TypeError,
+  );
+  await assert.rejects(
+    session.listPendingClientToolCalls({ method: "POST" }),
+    TypeError,
+  );
+  assert.deepEqual(requests, []);
 });

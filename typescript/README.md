@@ -7,15 +7,14 @@ declarations and no runtime dependencies.
 
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
-text submission, steering, cancellation, checkpoint retry, original-result waiting
-and conversation history, and
+text submission, steering, cancellation, checkpoint retry, original-result waiting,
+continuous progress and conversation history, and
 Realtime Model/Connection preparation for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Continuous progress,
-Client Tools, files, Schedulers and
+default Agents and general Agent overrides are removed. Client Tools, files, Schedulers and
 usage remain subsequent slices. Browser, MSP, management and device APIs are
 outside this refresh.
 
@@ -295,7 +294,61 @@ Set those five environment variables to run the installed example directly:
 `node node_modules/@mem9/tidb-link/examples/send-message.mjs`. It prints only the
 final answer. Preserve the input across invocations; each new command identity
 can start new work. This slice replaces the obsolete response-owned NDJSON
-`streamTurn` API. Continuous progress observation belongs to a subsequent slice.
+`streamTurn` API. Use the independent progress subscription below.
+
+## Continuous progress and reconnection
+
+Submit once with a persisted `clientEventId`, then observe that original receipt:
+
+```ts
+const accepted = await session.submitMessage({
+  clientEventId: crypto.randomUUID(),
+  text: "Summarize the findings",
+});
+let cursor: string | undefined;
+let draft = "";
+for await (const update of session.observe(accepted.inputId, { timeoutMs: 60_000 })) {
+  if (update.type === "result") {
+    console.log(update.result.text);
+  } else {
+    cursor = update.event.cursor; // Persist with session.id and accepted.inputId.
+    if (update.type === "draft") draft = update.text; // Replace, including an empty reset.
+    if (update.type === "progress") console.log(update.text);
+  }
+}
+```
+
+`draft` is provisional, and a progress update or saved-message event is not a
+successful result. Only `type: "result"` establishes the original command's
+successful outcome using its durable receipt and matching saved Turn. Failures,
+interruption and unincorporated inputs use the same errors as `waitForResult()`.
+A later explicit retry cannot replace the earlier command's result.
+
+`ObservationStoppedError` retains `sessionId`, `inputId`, `turnId` when known,
+the last `cursor`, and `timedOut`. On disconnect, local abort or timeout, preserve
+those values. Reconnect with `session.observe(inputId, { cursor })`, or query
+`getInteraction(inputId)` / `waitForResult(inputId)`; do not submit another message.
+Breaking the loop stops only observation. EOF, a revoked observer credential,
+Session idleness and the absence of subscribers do not establish success or cancel
+execution. With revoked credentials, use another currently authorized User Key
+for recovery. The SDK does not automatically reconnect or resubmit.
+
+`session.events({ cursor, signal })` exposes the independent Session-wide stream
+as raw envelopes with `cursor`, `type`, `sessionId`, `turnId`, `createdAt` and
+`data`, including Realtime and unfamiliar event types. It ends when its connection
+ends; it has no execution-result promise. `observe()` selects the original Turn,
+exposes typed draft/progress text and raw other events, and confirms its original
+receipt before reporting a result. A missing/expired cursor is the service's
+`validation_error` refusal; it does not silently start replay from the beginning.
+A resumed draft is a complete snapshot, usable without earlier frames.
+
+The packaged `observe-message.mjs` example observes an existing input and never
+submits it again. Run it with `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` and
+`INPUT_ID`; supply `EVENT_CURSOR` to resume:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/observe-message.mjs
+```
 
 ## Saved conversation history
 
@@ -438,7 +491,7 @@ directly. `REALTIME_MODEL_ID` is optional.
 
 ## Errors and uncertain outcomes
 
-Organization, text/history and refreshed Agent/Session lifecycle methods accept
+Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
 `{ requestId?, signal? }` options; creation and list options include these fields.
 `TiDBLinkApiError` preserves status, service code, request identity and details;
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
@@ -476,12 +529,12 @@ new token after reconciling the connection state.
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
 revision. The provisioning, lifecycle, Realtime and text constants and package
 fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
-`tidbLinkTextRevision` covers text and control commands, original results and history;
+`tidbLinkTextRevision` covers text and control commands, progress, original results and history;
 `tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks a frozen text/history OpenAPI subset from
+`npm run test:service-contract` checks a frozen text/progress/history OpenAPI subset from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -507,9 +560,11 @@ Realtime Sessions; public SDK methods perform Template-to-Agent-to-Session
 creation, ownership checks, lifecycle updates and Realtime operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
-history through public SDK methods. A forwarding proxy drops only an actual
-service response to prove uncertain-submission recovery. Control cases verify
-active-Turn steering, eventual cancellation, disabled retry and an explicitly
+history through public SDK methods. Progress cases verify draft replacement, cursor
+reconnection/refusal, original-result confirmation, local observation timeout and
+live credential revocation without remote cancellation. A forwarding proxy drops only
+an actual service response to prove uncertain-submission recovery. Control cases
+verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture
 uses the existing controlled Drive9 and model suppliers; real supplier deployment
 certification is outside this evidence.

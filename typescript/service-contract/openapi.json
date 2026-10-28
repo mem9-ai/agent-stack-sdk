@@ -138,6 +138,121 @@
         ],
         "tags": ["Sessions"],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "get": {
+        "operationId": "SessionsController_events",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["text/event-stream"]
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor returned in the SSE id field for continuation.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stream",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "enum": [true]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A persisted Server-Sent Events stream under current User Key, ordinary User, and Organization authority. Revocation, rotation, or disabling the User or Organization closes the subscription. The cursor in each id field can be supplied on a later request. Disconnecting the subscription does not cancel the active Turn. Each data frame is a JSON envelope with type, sessionId, turnId, createdAt and data. Turn events (agent.session.turn.*) carry the durable Turn event in data. Realtime facts of the Session timeline arrive in the same order: agent.session.realtime.input_transcript.completed for each final user transcript and agent.session.realtime.response.completed for each completed Realtime model response, with data {id, type, realtimeConnectionId, text, turnId, createdAt} and, for a response, kind (chat, task_ack, task_progress, task_result, clarify; historical device_ack remains readable), responseId and interrupted. Their envelope turnId is the linked Turn or null. Partial Realtime transcripts are delivered only on the realtime connection. agent.session.turn.output_text.snapshot carries the complete provisional draft in data.payload.text: replace the draft for that turnId, including revisions or an empty reset, rather than appending. A resumed snapshot is independently usable without earlier draft frames. agent.session.turn.progress carries a separate progress message in data.payload.text. agent.session.turn.item.added with data.event = assistant_message carries the final saved message in data.payload.text and data.payload.messageId; the terminal Turn event establishes its outcome. agent.session.turn.item.added with data.event = operation_step carries data.payload.operationId, status and label; a tool Operation also carries data.payload.category (skill_read for a read inside a frozen Skill package, with data.payload.skill {skillId, name}; otherwise tool_call), matching the Operation in Turn reads. Client Tool progress also carries safe data.payload.source: {type: session_client} or {type: hardware, hardwareRequirementId, method}; Hardware labels identify the requirement and original method. Hardware arguments, outputs and private target identities are omitted from progress and Turn Operations. The hardware_read_state platform tool creates a hardware.state.read Operation; public input contains only its tool name and requirement identifier, and output omits sensor data. Metadata-only Operations omit source. Events saved before these fields existed omit them. agent.session.turn.requires_action with data.event = client_tool_calls carries data.payload.calls, the Client Tool calls of one model step, each with callId, name, arguments and deadlineAt; answer each with agent.session.input.client_tool_output before its deadline. Receiving this event counts as delivery of its calls. No output_text.delta alias is emitted.",
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": ["no-cache, no-transform"]
+                }
+              },
+              "X-Accel-Buffering": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": ["no"]
+                }
+              }
+            },
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The stream selector, Accept header, or continuation cursor is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
     "/api/v1/user/sessions/{id}/interactions": {

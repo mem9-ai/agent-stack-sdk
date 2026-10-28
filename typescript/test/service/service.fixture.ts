@@ -142,6 +142,25 @@ beforeAll(async () => {
     } as AssistantMessage;
     return {
       async *[Symbol.asyncIterator]() {
+        if (prompt.includes("SDK_FIXTURE_PROGRESS")) {
+          yield {
+            type: "start",
+            partial: { ...message, content: [] },
+          } as const;
+          for (const text of ["SDK draft.", "SDK revised draft."]) {
+            const partial = {
+              ...message,
+              content: [{ type: "text" as const, text }],
+            };
+            yield {
+              type: "text_delta",
+              contentIndex: 0,
+              delta: text,
+              partial,
+            } as const;
+            await new Promise<void>((resolve) => setTimeout(resolve, 100));
+          }
+        }
         if (pause) {
           await new Promise<void>((resolve) => {
             const finish = () => {
@@ -149,7 +168,10 @@ beforeAll(async () => {
               options?.signal?.removeEventListener("abort", finish);
               resolve();
             };
-            const timer = setTimeout(finish, 2000);
+            const timer = setTimeout(
+              finish,
+              prompt.includes("SDK_FIXTURE_OBSERVE_LONG") ? 7000 : 2000,
+            );
             options?.signal?.addEventListener("abort", finish, { once: true });
             if (options?.signal?.aborted) finish();
           });

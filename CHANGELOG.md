@@ -7,6 +7,9 @@
 - Verify active-Turn steering through message admission, eventual cancellation,
   enabled and disabled checkpoint retry using the installed SDK and real service.
 
+- Observe Session progress with resumable event cursors and complete draft snapshots;
+  confirm final results through the original receipt and preserve recovery identities
+  when observation stops. Include a runnable installed-package observation example.
 
 - Refresh Organization information, End User creation/listing/retrieval and User
   API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
@@ -37,7 +40,7 @@
 - Wait for original-generation outcomes with recoverable local timeout/abort;
   read paginated interactions, Full Agent/Realtime Turns and Session Timeline.
 - Replace obsolete NDJSON Turn streaming with the current receipt-based text
-  interface. Continuous progress remains a subsequent slice.
+  interface. Continuous progress uses independent resumable event subscriptions.
 - Verify the text/history slice against exact service revision `b59a0a58`, with
   actual-service outcomes and response loss, a packaged runnable example and an
   independent packed TypeScript consumer; refresh the frozen contract evidence.

@@ -28,6 +28,7 @@ export {
   TurnWaitTimeoutError,
   InputNotAppliedError,
   OutcomeUnknownError,
+  ObservationStoppedError,
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
@@ -107,3 +108,9 @@ export type {
 } from "./history.js";
 
 export type { TurnCommandInput, RetryReceipt } from "./control.js";
+export type {
+  SessionEvent,
+  SessionEventsOptions,
+  ObserveTurnOptions,
+  TurnObservation,
+} from "./progress.js";

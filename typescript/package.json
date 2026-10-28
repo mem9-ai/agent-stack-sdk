@@ -22,7 +22,8 @@
     "./examples/observe-message.mjs": "./examples/observe-message.mjs",
     "./examples/read-usage.mjs": "./examples/read-usage.mjs",
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
-    "./examples/schedule-task.mjs": "./examples/schedule-task.mjs"
+    "./examples/schedule-task.mjs": "./examples/schedule-task.mjs",
+    "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs"
   },
   "files": [
     "dist",
@@ -35,7 +36,8 @@
     "examples/observe-message.mjs",
     "examples/read-usage.mjs",
     "examples/upload-file.mjs",
-    "examples/schedule-task.mjs"
+    "examples/schedule-task.mjs",
+    "examples/answer-client-tool.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

@@ -151,8 +151,43 @@ beforeAll(async () => {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
     } as AssistantMessage;
+    if (prompt.includes("SDK_FIXTURE_CLIENT_TOOL")) {
+      const output = context.messages.findLast(
+        (item) =>
+          item.role === "toolResult" && item.toolName === "lookup_order",
+      );
+      if (output?.role === "toolResult") {
+        message.content = [
+          {
+            type: "text",
+            text: `Application tool result: ${JSON.stringify(output.content)}`,
+          },
+        ];
+      } else if (
+        context.messages.some(
+          (item) =>
+            item.role === "system" &&
+            item.toolsAdded?.some((tool) => tool.name === "lookup_order"),
+        )
+      ) {
+        message.content = [
+          {
+            type: "toolCall",
+            id: `sdk_lookup_${randomUUID().replaceAll("-", "")}`,
+            name: "lookup_order",
+            arguments: { orderId: "order_1" },
+          },
+        ];
+        message.stopReason = "toolUse";
+      }
+    }
     return {
       async *[Symbol.asyncIterator]() {
+        if (message.stopReason === "toolUse")
+          yield {
+            type: "start",
+            partial: { ...message, content: [] },
+          } as const;
         if (prompt.includes("SDK_FIXTURE_PROGRESS")) {
           yield {
             type: "start",
@@ -189,7 +224,12 @@ beforeAll(async () => {
         }
         if (fail)
           yield { type: "error", reason: "error", error: message } as const;
-        else yield { type: "done", reason: "stop", message } as const;
+        else
+          yield {
+            type: "done",
+            reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+            message,
+          } as const;
       },
       result: async () => message,
     } as unknown as Awaited<ReturnType<StreamFn>>;

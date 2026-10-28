@@ -8,14 +8,13 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, conversation history, file attachments, Schedulers,
+continuous progress, Client Tools, conversation history, file attachments, Schedulers,
 Realtime Model/Connection preparation and User usage reads for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Client Tools remain
-a subsequent slice. Browser, MSP, management and device APIs are
+default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
 outside this refresh.
 
 ## Quick start
@@ -350,6 +349,87 @@ submits it again. Run it with `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` 
 
 ```sh
 node node_modules/@mem9/tidb-link/examples/observe-message.mjs
+```
+
+## Session Client Tools
+
+Declare the application functions that an ordinary text Turn may request. The
+application executes them itself; the SDK only declares tools and exchanges calls
+and results. Parameters are JSON Schema objects. The service validates reserved
+names, schema size/depth and combined tool limits; the `async` argument is reserved
+for the platform and is not part of application arguments.
+
+```ts
+import type { ClientToolDeclaration } from "@mem9/tidb-link";
+const tools: ClientToolDeclaration[] = [{
+  type: "function",
+  name: "lookup_order",
+  description: "Read an order status",
+  parameters: {
+    type: "object",
+    properties: { orderId: { type: "string" } },
+    required: ["orderId"],
+    additionalProperties: false,
+  },
+}];
+const session = await agent.createSession({
+  idempotencyKey: savedSessionCreationKey,
+  tools,
+});
+const current = await session.getClientTools();
+await session.replaceClientTools(tools, { ifMatch: current.etag });
+```
+
+Replacement is the complete set, with `[]` clearing it. Its ETag is independent of
+the Session's model ETag. Stale replacement returns `precondition_failed`; read the
+set and decide again. A Turn retains the declarations admitted when it started.
+An identical replacement keeps its revision. Scheduler and audio inputs do not
+use the Session-client declarations under this service baseline.
+
+After submitting a message, retrieve pending calls independently of any progress
+subscription:
+
+```ts
+const calls = await session.listPendingClientToolCalls();
+const call = calls.find((call) => call.callId === savedCallId);
+if (!call || Date.parse(call.deadlineAt) <= Date.now()) {
+  throw new Error("The call is unavailable or expired; do not execute it again");
+}
+// The application obtains this value from its own business function.
+const output = JSON.stringify({ status: "shipped" });
+const receipt = await session.submitClientToolOutput({
+  clientEventId: savedOutputCommandId,
+  turnId: call.turnId,
+  callId: call.callId,
+  output,
+});
+// To report a business failure, supply error: { message: "Warehouse unavailable" }
+// instead of output.
+```
+
+The result command has its own stable `clientEventId`; it is distinct from the
+call's `callId` and the message's input identity. Its receipt confirms admission,
+not successful completion of the message. Continue with the original message's
+`waitForResult(inputId)` or `observe(inputId)`. An application-reported tool error
+may still produce a successful answer explaining that failure.
+
+Pending reads count as delivery and preserve `publishedAt`/`deadlineAt`. Calls
+have a 60-second deadline from publication. Retain the call identity and the
+application's result before submission; a disconnect does not authorize executing
+the business function again. After uncertain submission, reconcile its original
+command with `getInteraction(clientEventId)` or `reconcileInteraction(clientEventId)`.
+The SDK never retries output submission automatically. Repeating the exact command
+recovers its original receipt; a new command for a settled call is refused with
+`client_tool_call_settled`. Foreign, unknown and Hardware calls are unavailable
+through this endpoint. Hardware results belong to the device connection and are
+not an SDK Client Tool capability.
+
+The packaged `answer-client-tool.mjs` example submits one already produced result.
+Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
+`CLIENT_EVENT_ID` and exactly one of `TOOL_OUTPUT` or `TOOL_ERROR`:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/answer-client-tool.mjs
 ```
 
 ## Saved conversation history
@@ -752,7 +832,9 @@ exercise actual acceptance, final success/failure/interruption, local timeout an
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor
 reconnection/refusal, original-result confirmation, local observation timeout and
-live credential revocation without remote cancellation. A forwarding proxy drops only
+live credential revocation without remote cancellation. Client Tool cases declare and replace tools, resume pending reads, explicitly return
+application output or errors, and observe those values in real Runtime answers, with
+ownership, stale revision, settled-call and unavailable-call refusals. A forwarding proxy drops only
 an actual service response to prove uncertain-submission recovery. Control cases
 verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture

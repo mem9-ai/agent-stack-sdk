@@ -136,7 +136,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       },
       "get": {
@@ -156,7 +158,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["text/event-stream"]
+              "enum": [
+                "text/event-stream"
+              ]
             }
           },
           {
@@ -174,7 +178,9 @@
             "in": "query",
             "schema": {
               "type": "boolean",
-              "enum": [true]
+              "enum": [
+                true
+              ]
             }
           }
         ],
@@ -186,14 +192,18 @@
                 "required": true,
                 "schema": {
                   "type": "string",
-                  "enum": ["no-cache, no-transform"]
+                  "enum": [
+                    "no-cache, no-transform"
+                  ]
                 }
               },
               "X-Accel-Buffering": {
                 "required": true,
                 "schema": {
                   "type": "string",
-                  "enum": ["no"]
+                  "enum": [
+                    "no"
+                  ]
                 }
               }
             },
@@ -251,7 +261,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -334,7 +346,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -396,7 +410,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -466,7 +482,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -511,7 +529,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -586,7 +606,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Sessions"],
+        "tags": [
+          "Sessions"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -646,7 +668,10 @@
             "in": "query",
             "description": "Default range selector. `day` defaults to today; `week` defaults to the last 7 days.",
             "schema": {
-              "enum": ["day", "week"],
+              "enum": [
+                "day",
+                "week"
+              ],
               "type": "string"
             }
           },
@@ -656,7 +681,10 @@
             "in": "query",
             "description": "Personal billing aggregate scope. Organization scope is not supported.",
             "schema": {
-              "enum": ["organization", "user"],
+              "enum": [
+                "organization",
+                "user"
+              ],
               "type": "string"
             }
           }
@@ -681,7 +709,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Console"],
+        "tags": [
+          "Console"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -753,7 +783,10 @@
             "in": "query",
             "description": "Default range selector. `day` defaults to today; `week` defaults to the last 7 days.",
             "schema": {
-              "enum": ["day", "week"],
+              "enum": [
+                "day",
+                "week"
+              ],
               "type": "string"
             }
           },
@@ -763,7 +796,9 @@
             "in": "query",
             "description": "Detail rows are available only for the acting user.",
             "schema": {
-              "enum": ["user"],
+              "enum": [
+                "user"
+              ],
               "type": "string"
             }
           }
@@ -788,7 +823,9 @@
             "UserApiKey": []
           }
         ],
-        "tags": ["Console"],
+        "tags": [
+          "Console"
+        ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -831,7 +868,12 @@
             "description": "UTC time bucket. Weeks start Monday at 00:00 UTC; months start on day 1 at 00:00 UTC. The first and last buckets may be partial for an unaligned half-open range.",
             "schema": {
               "type": "string",
-              "enum": ["hour", "day", "week", "month"],
+              "enum": [
+                "hour",
+                "day",
+                "week",
+                "month"
+              ],
               "default": "day"
             }
           },
@@ -884,7 +926,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["invalid_billing_usage_query"]
+                              "enum": [
+                                "invalid_billing_usage_query"
+                              ]
                             }
                           }
                         }
@@ -912,7 +956,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["authentication_required"]
+                              "enum": [
+                                "authentication_required"
+                              ]
                             }
                           }
                         }
@@ -940,7 +986,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["auth_kind_forbidden"]
+                              "enum": [
+                                "auth_kind_forbidden"
+                              ]
                             }
                           }
                         }
@@ -968,7 +1016,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["billing_target_not_found"]
+                              "enum": [
+                                "billing_target_not_found"
+                              ]
                             }
                           }
                         }
@@ -996,7 +1046,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["billing_audit_unavailable"]
+                              "enum": [
+                                "billing_audit_unavailable"
+                              ]
                             }
                           }
                         }
@@ -1014,7 +1066,9 @@
           }
         ],
         "summary": "Aggregate one organization user billing range",
-        "tags": ["Organization Billing"],
+        "tags": [
+          "Organization Billing"
+        ],
         "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
       }
     },
@@ -1074,7 +1128,11 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": ["llm", "sandbox", "web_search"],
+              "enum": [
+                "llm",
+                "sandbox",
+                "web_search"
+              ],
               "type": "string"
             }
           },
@@ -1107,7 +1165,11 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["items", "nextCursor", "factCompleteness"],
+                  "required": [
+                    "items",
+                    "nextCursor",
+                    "factCompleteness"
+                  ],
                   "properties": {
                     "items": {
                       "type": "array",
@@ -1160,7 +1222,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["llm"]
+                                "enum": [
+                                  "llm"
+                                ]
                               },
                               "id": {
                                 "type": "string"
@@ -1211,7 +1275,10 @@
                               },
                               "valuationStatus": {
                                 "type": "string",
-                                "enum": ["priced", "unpriced"],
+                                "enum": [
+                                  "priced",
+                                  "unpriced"
+                                ],
                                 "description": "Whether this usage fact contributes to priced totals. A stored cost does not override an unpriced status."
                               },
                               "valuationReason": {
@@ -1311,11 +1378,17 @@
                               },
                               "pricingStatus": {
                                 "type": "string",
-                                "enum": ["estimated", "unknown"]
+                                "enum": [
+                                  "estimated",
+                                  "unknown"
+                                ]
                               },
                               "estimateBasis": {
                                 "type": "string",
-                                "enum": ["public_list_placeholder", "contract"],
+                                "enum": [
+                                  "public_list_placeholder",
+                                  "contract"
+                                ],
                                 "nullable": true
                               },
                               "contextTier": {
@@ -1360,7 +1433,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["sandbox"]
+                                "enum": [
+                                  "sandbox"
+                                ]
                               },
                               "id": {
                                 "type": "string"
@@ -1409,7 +1484,10 @@
                               },
                               "valuationStatus": {
                                 "type": "string",
-                                "enum": ["priced", "unpriced"],
+                                "enum": [
+                                  "priced",
+                                  "unpriced"
+                                ],
                                 "description": "Whether this usage fact contributes to priced totals. A stored cost does not override an unpriced status."
                               },
                               "valuationReason": {
@@ -1431,7 +1509,11 @@
                               },
                               "provider": {
                                 "type": "string",
-                                "enum": ["e2b", "tencent_ags", "run9"]
+                                "enum": [
+                                  "e2b",
+                                  "tencent_ags",
+                                  "run9"
+                                ]
                               },
                               "profileId": {
                                 "type": "string"
@@ -1496,7 +1578,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["web_search"]
+                                "enum": [
+                                  "web_search"
+                                ]
                               },
                               "id": {
                                 "type": "string"
@@ -1545,7 +1629,10 @@
                               },
                               "valuationStatus": {
                                 "type": "string",
-                                "enum": ["priced", "unpriced"],
+                                "enum": [
+                                  "priced",
+                                  "unpriced"
+                                ],
                                 "description": "Whether this usage fact contributes to priced totals. A stored cost does not override an unpriced status."
                               },
                               "valuationReason": {
@@ -1570,15 +1657,21 @@
                               },
                               "provider": {
                                 "type": "string",
-                                "enum": ["exa"]
+                                "enum": [
+                                  "exa"
+                                ]
                               },
                               "searchType": {
                                 "type": "string",
-                                "enum": ["auto"]
+                                "enum": [
+                                  "auto"
+                                ]
                               },
                               "requestCount": {
                                 "type": "integer",
-                                "enum": [1]
+                                "enum": [
+                                  1
+                                ]
                               },
                               "requestedResultCount": {
                                 "type": "integer"
@@ -1589,11 +1682,17 @@
                               },
                               "contentTextRequested": {
                                 "type": "boolean",
-                                "enum": [true]
+                                "enum": [
+                                  true
+                                ]
                               },
                               "requestOutcome": {
                                 "type": "string",
-                                "enum": ["succeeded", "failed", "aborted"]
+                                "enum": [
+                                  "succeeded",
+                                  "failed",
+                                  "aborted"
+                                ]
                               },
                               "usageEvidenceStatus": {
                                 "type": "string",
@@ -1627,7 +1726,10 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "projectedFactCount": {
                           "type": "integer"
@@ -1655,7 +1757,10 @@
                             "properties": {
                               "status": {
                                 "type": "string",
-                                "enum": ["complete", "incomplete"]
+                                "enum": [
+                                  "complete",
+                                  "incomplete"
+                                ]
                               },
                               "projectedFactCount": {
                                 "type": "integer"
@@ -1728,7 +1833,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["authentication_required"]
+                              "enum": [
+                                "authentication_required"
+                              ]
                             }
                           }
                         }
@@ -1756,7 +1863,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["auth_kind_forbidden"]
+                              "enum": [
+                                "auth_kind_forbidden"
+                              ]
                             }
                           }
                         }
@@ -1784,7 +1893,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["billing_target_not_found"]
+                              "enum": [
+                                "billing_target_not_found"
+                              ]
                             }
                           }
                         }
@@ -1812,7 +1923,9 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["billing_audit_unavailable"]
+                              "enum": [
+                                "billing_audit_unavailable"
+                              ]
                             }
                           }
                         }
@@ -1830,8 +1943,412 @@
           }
         ],
         "summary": "List one organization user billing stream using an organization API key",
-        "tags": ["Organization Billing"],
+        "tags": [
+          "Organization Billing"
+        ],
         "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions": {
+      "post": {
+        "operationId": "SessionsController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created Session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Opaque Session model revision token. Model changes apply to the next Turn. It does not version live `realtime` presence.",
+                "required": true,
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Session input or required Idempotency-Key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The selected Agent or published Template is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Idempotency-Key conflicts, the selected model provider is unconfigured, the Realtime Model is unavailable (realtime_model_unavailable), Realtime is disabled (realtime_not_enabled), or combined Agent instructions exceed 16 KiB (agent_instructions_too_large).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/tools": {
+      "get": {
+        "operationId": "SessionsController_getTools",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Session client-declared Client Tool set and its revision.",
+            "headers": {
+              "ETag": {
+                "description": "Strong ETag of the Session Client Tool set revision.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionClientToolsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "put": {
+        "operationId": "SessionsController_replaceTools",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Exact Client Tool set ETag from the latest tools response.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceSessionToolsOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The replaced Client Tool set. An identical set keeps its revision.",
+            "headers": {
+              "ETag": {
+                "description": "Strong ETag of the Session Client Tool set revision.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionClientToolsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Client Tool declarations are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Session is read-only (session_read_only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The supplied Client Tool set ETag is stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/client-tool-calls": {
+      "get": {
+        "operationId": "SessionsController_listPendingClientToolCalls",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending Session-client Tool calls, oldest first. Hardware calls are delivered only over their device connection and never appear here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingClientToolCallsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The status filter is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
     }
   },
@@ -1887,14 +2404,19 @@
                               "properties": {
                                 "type": {
                                   "type": "string",
-                                  "enum": ["text"]
+                                  "enum": [
+                                    "text"
+                                  ]
                                 },
                                 "text": {
                                   "type": "string",
                                   "minLength": 1
                                 }
                               },
-                              "required": ["type", "text"],
+                              "required": [
+                                "type",
+                                "text"
+                              ],
                               "additionalProperties": false
                             }
                           }
@@ -1942,7 +2464,9 @@
                         ]
                       }
                     },
-                    "required": ["content"],
+                    "required": [
+                      "content"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -1962,14 +2486,19 @@
                               "properties": {
                                 "type": {
                                   "type": "string",
-                                  "enum": ["text"]
+                                  "enum": [
+                                    "text"
+                                  ]
                                 },
                                 "text": {
                                   "type": "string",
                                   "minLength": 1
                                 }
                               },
-                              "required": ["type", "text"],
+                              "required": [
+                                "type",
+                                "text"
+                              ],
                               "additionalProperties": false
                             }
                           }
@@ -2017,13 +2546,19 @@
                         ]
                       }
                     },
-                    "required": ["text"],
+                    "required": [
+                      "text"
+                    ],
                     "additionalProperties": false
                   }
                 ]
               }
             },
-            "required": ["type", "clientEventId", "data"],
+            "required": [
+              "type",
+              "clientEventId",
+              "data"
+            ],
             "additionalProperties": false
           },
           {
@@ -2053,7 +2588,11 @@
                 "additionalProperties": false
               }
             },
-            "required": ["type", "clientEventId", "data"],
+            "required": [
+              "type",
+              "clientEventId",
+              "data"
+            ],
             "additionalProperties": false
           },
           {
@@ -2080,11 +2619,17 @@
                     "maxLength": 64
                   }
                 },
-                "required": ["turnId"],
+                "required": [
+                  "turnId"
+                ],
                 "additionalProperties": false
               }
             },
-            "required": ["type", "clientEventId", "data"],
+            "required": [
+              "type",
+              "clientEventId",
+              "data"
+            ],
             "additionalProperties": false
           },
           {
@@ -2092,7 +2637,9 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["agent.session.input.client_tool_output"]
+                "enum": [
+                  "agent.session.input.client_tool_output"
+                ]
               },
               "clientEventId": {
                 "type": "string",
@@ -2118,7 +2665,11 @@
                         "maxLength": 65536
                       }
                     },
-                    "required": ["turnId", "callId", "output"],
+                    "required": [
+                      "turnId",
+                      "callId",
+                      "output"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -2143,17 +2694,27 @@
                             "maxLength": 4096
                           }
                         },
-                        "required": ["message"],
+                        "required": [
+                          "message"
+                        ],
                         "additionalProperties": false
                       }
                     },
-                    "required": ["turnId", "callId", "error"],
+                    "required": [
+                      "turnId",
+                      "callId",
+                      "error"
+                    ],
                     "additionalProperties": false
                   }
                 ]
               }
             },
-            "required": ["type", "clientEventId", "data"],
+            "required": [
+              "type",
+              "clientEventId",
+              "data"
+            ],
             "additionalProperties": false
           }
         ]
@@ -2161,7 +2722,10 @@
       "BillingTag": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["key", "value"],
+        "required": [
+          "key",
+          "value"
+        ],
         "description": "A non-secret attribution label. The pair is matched exactly and is not an authorization boundary.",
         "properties": {
           "key": {
@@ -2193,7 +2757,12 @@
               },
               "kind": {
                 "type": "string",
-                "enum": ["message", "cancel", "retry", "client_tool_output"]
+                "enum": [
+                  "message",
+                  "cancel",
+                  "retry",
+                  "client_tool_output"
+                ]
               },
               "mode": {
                 "type": "string",
@@ -2216,7 +2785,9 @@
                   },
                   "role": {
                     "type": "string",
-                    "enum": ["user"]
+                    "enum": [
+                      "user"
+                    ]
                   },
                   "content": {
                     "type": "string"
@@ -2225,7 +2796,12 @@
                     "type": "string"
                   }
                 },
-                "required": ["id", "role", "content", "createdAt"],
+                "required": [
+                  "id",
+                  "role",
+                  "content",
+                  "createdAt"
+                ],
                 "nullable": true
               },
               "createdAt": {
@@ -2248,7 +2824,9 @@
                     ]
                   }
                 },
-                "required": ["code"],
+                "required": [
+                  "code"
+                ],
                 "nullable": true
               },
               "result": {
@@ -2257,14 +2835,22 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "enum": ["running", "succeeded", "failed", "interrupted"]
+                    "enum": [
+                      "running",
+                      "succeeded",
+                      "failed",
+                      "interrupted"
+                    ]
                   },
                   "completedAt": {
                     "type": "string",
                     "nullable": true
                   }
                 },
-                "required": ["status", "completedAt"]
+                "required": [
+                  "status",
+                  "completedAt"
+                ]
               }
             },
             "required": [
@@ -2281,7 +2867,9 @@
             ]
           }
         },
-        "required": ["interaction"]
+        "required": [
+          "interaction"
+        ]
       },
       "SessionEventRetryResponseOpenApiDto": {
         "type": "object",
@@ -2300,21 +2888,35 @@
               },
               "disposition": {
                 "type": "string",
-                "enum": ["retrying"]
+                "enum": [
+                  "retrying"
+                ]
               }
             },
-            "required": ["clientEventId", "sessionId", "turnId", "disposition"]
+            "required": [
+              "clientEventId",
+              "sessionId",
+              "turnId",
+              "disposition"
+            ]
           }
         },
-        "required": ["event"]
+        "required": [
+          "event"
+        ]
       },
       "ErrorEnvelope": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "object",
-            "required": ["code", "message"],
+            "required": [
+              "code",
+              "message"
+            ],
             "properties": {
               "code": {
                 "type": "string",
@@ -2558,7 +3160,12 @@
                 },
                 "kind": {
                   "type": "string",
-                  "enum": ["message", "cancel", "retry", "client_tool_output"]
+                  "enum": [
+                    "message",
+                    "cancel",
+                    "retry",
+                    "client_tool_output"
+                  ]
                 },
                 "mode": {
                   "type": "string",
@@ -2581,7 +3188,9 @@
                     },
                     "role": {
                       "type": "string",
-                      "enum": ["user"]
+                      "enum": [
+                        "user"
+                      ]
                     },
                     "content": {
                       "type": "string"
@@ -2590,7 +3199,12 @@
                       "type": "string"
                     }
                   },
-                  "required": ["id", "role", "content", "createdAt"],
+                  "required": [
+                    "id",
+                    "role",
+                    "content",
+                    "createdAt"
+                  ],
                   "nullable": true
                 },
                 "createdAt": {
@@ -2613,7 +3227,9 @@
                       ]
                     }
                   },
-                  "required": ["code"],
+                  "required": [
+                    "code"
+                  ],
                   "nullable": true
                 },
                 "result": {
@@ -2622,14 +3238,22 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["running", "succeeded", "failed", "interrupted"]
+                      "enum": [
+                        "running",
+                        "succeeded",
+                        "failed",
+                        "interrupted"
+                      ]
                     },
                     "completedAt": {
                       "type": "string",
                       "nullable": true
                     }
                   },
-                  "required": ["status", "completedAt"]
+                  "required": [
+                    "status",
+                    "completedAt"
+                  ]
                 }
               },
               "required": [
@@ -2654,7 +3278,11 @@
             "nullable": true
           }
         },
-        "required": ["interactions", "hasMore", "nextCursor"]
+        "required": [
+          "interactions",
+          "hasMore",
+          "nextCursor"
+        ]
       },
       "TurnsResponseOpenApiDto": {
         "type": "object",
@@ -2666,7 +3294,10 @@
               "properties": {
                 "executor": {
                   "type": "string",
-                  "enum": ["full_agent", "realtime_model"]
+                  "enum": [
+                    "full_agent",
+                    "realtime_model"
+                  ]
                 },
                 "realtime": {
                   "type": "object",
@@ -2681,7 +3312,10 @@
                       }
                     }
                   },
-                  "required": ["connectionId", "linkedTurnIds"]
+                  "required": [
+                    "connectionId",
+                    "linkedTurnIds"
+                  ]
                 },
                 "realtimeResponses": {
                   "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
@@ -2700,7 +3334,10 @@
                       },
                       "role": {
                         "type": "string",
-                        "enum": ["user", "assistant"]
+                        "enum": [
+                          "user",
+                          "assistant"
+                        ]
                       },
                       "content": {
                         "type": "string"
@@ -2716,17 +3353,23 @@
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["text"]
+                                "enum": [
+                                  "text"
+                                ]
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           },
                           {
                             "type": "object",
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["audio"]
+                                "enum": [
+                                  "audio"
+                                ]
                               },
                               "utterance": {
                                 "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -2752,10 +3395,16 @@
                                   },
                                   "source": {
                                     "type": "string",
-                                    "enum": ["realtime_model"]
+                                    "enum": [
+                                      "realtime_model"
+                                    ]
                                   }
                                 },
-                                "required": ["label", "confidence", "source"]
+                                "required": [
+                                  "label",
+                                  "confidence",
+                                  "source"
+                                ]
                               },
                               "realtimeSummary": {
                                 "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
@@ -2764,7 +3413,9 @@
                                 "maxLength": 8000
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           },
                           {
                             "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -2772,10 +3423,14 @@
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["standing_task"]
+                                "enum": [
+                                  "standing_task"
+                                ]
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           }
                         ]
                       },
@@ -2792,7 +3447,10 @@
                                 "nullable": true
                               }
                             },
-                            "required": ["startsTurn", "linkedTurnId"]
+                            "required": [
+                              "startsTurn",
+                              "linkedTurnId"
+                            ]
                           },
                           {
                             "type": "object",
@@ -2849,7 +3507,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["running", "succeeded", "failed", "interrupted"]
+                  "enum": [
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "interrupted"
+                  ]
                 },
                 "billingTag": {
                   "nullable": true,
@@ -2874,7 +3537,10 @@
                     },
                     "role": {
                       "type": "string",
-                      "enum": ["user", "assistant"]
+                      "enum": [
+                        "user",
+                        "assistant"
+                      ]
                     },
                     "content": {
                       "type": "string"
@@ -2890,17 +3556,23 @@
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["text"]
+                              "enum": [
+                                "text"
+                              ]
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         },
                         {
                           "type": "object",
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["audio"]
+                              "enum": [
+                                "audio"
+                              ]
                             },
                             "utterance": {
                               "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -2926,10 +3598,16 @@
                                 },
                                 "source": {
                                   "type": "string",
-                                  "enum": ["realtime_model"]
+                                  "enum": [
+                                    "realtime_model"
+                                  ]
                                 }
                               },
-                              "required": ["label", "confidence", "source"]
+                              "required": [
+                                "label",
+                                "confidence",
+                                "source"
+                              ]
                             },
                             "realtimeSummary": {
                               "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
@@ -2938,7 +3616,9 @@
                               "maxLength": 8000
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         },
                         {
                           "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -2946,10 +3626,14 @@
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["standing_task"]
+                              "enum": [
+                                "standing_task"
+                              ]
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         }
                       ]
                     },
@@ -2966,7 +3650,10 @@
                               "nullable": true
                             }
                           },
-                          "required": ["startsTurn", "linkedTurnId"]
+                          "required": [
+                            "startsTurn",
+                            "linkedTurnId"
+                          ]
                         },
                         {
                           "type": "object",
@@ -3031,7 +3718,10 @@
                       },
                       "role": {
                         "type": "string",
-                        "enum": ["user", "assistant"]
+                        "enum": [
+                          "user",
+                          "assistant"
+                        ]
                       },
                       "content": {
                         "type": "string"
@@ -3047,17 +3737,23 @@
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["text"]
+                                "enum": [
+                                  "text"
+                                ]
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           },
                           {
                             "type": "object",
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["audio"]
+                                "enum": [
+                                  "audio"
+                                ]
                               },
                               "utterance": {
                                 "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -3083,10 +3779,16 @@
                                   },
                                   "source": {
                                     "type": "string",
-                                    "enum": ["realtime_model"]
+                                    "enum": [
+                                      "realtime_model"
+                                    ]
                                   }
                                 },
-                                "required": ["label", "confidence", "source"]
+                                "required": [
+                                  "label",
+                                  "confidence",
+                                  "source"
+                                ]
                               },
                               "realtimeSummary": {
                                 "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
@@ -3095,7 +3797,9 @@
                                 "maxLength": 8000
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           },
                           {
                             "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -3103,10 +3807,14 @@
                             "properties": {
                               "channel": {
                                 "type": "string",
-                                "enum": ["standing_task"]
+                                "enum": [
+                                  "standing_task"
+                                ]
                               }
                             },
-                            "required": ["channel"]
+                            "required": [
+                              "channel"
+                            ]
                           }
                         ]
                       },
@@ -3123,7 +3831,10 @@
                                 "nullable": true
                               }
                             },
-                            "required": ["startsTurn", "linkedTurnId"]
+                            "required": [
+                              "startsTurn",
+                              "linkedTurnId"
+                            ]
                           },
                           {
                             "type": "object",
@@ -3210,7 +3921,10 @@
                       "checksumVerification": {
                         "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part.",
                         "type": "string",
-                        "enum": ["whole", "part_only"],
+                        "enum": [
+                          "whole",
+                          "part_only"
+                        ],
                         "nullable": true
                       },
                       "contentType": {
@@ -3268,7 +3982,9 @@
                       },
                       "mediator": {
                         "type": "string",
-                        "enum": ["aos"]
+                        "enum": [
+                          "aos"
+                        ]
                       },
                       "status": {
                         "type": "string",
@@ -3283,7 +3999,10 @@
                       "category": {
                         "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations.",
                         "type": "string",
-                        "enum": ["tool_call", "skill_read"]
+                        "enum": [
+                          "tool_call",
+                          "skill_read"
+                        ]
                       },
                       "skill": {
                         "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
@@ -3296,7 +4015,10 @@
                             "type": "string"
                           }
                         },
-                        "required": ["skillId", "name"]
+                        "required": [
+                          "skillId",
+                          "name"
+                        ]
                       },
                       "source": {
                         "description": "Client Tool source. Hardware exposes only requirement and original method; private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
@@ -3306,17 +4028,23 @@
                             "properties": {
                               "type": {
                                 "type": "string",
-                                "enum": ["session_client"]
+                                "enum": [
+                                  "session_client"
+                                ]
                               }
                             },
-                            "required": ["type"]
+                            "required": [
+                              "type"
+                            ]
                           },
                           {
                             "type": "object",
                             "properties": {
                               "type": {
                                 "type": "string",
-                                "enum": ["hardware"]
+                                "enum": [
+                                  "hardware"
+                                ]
                               },
                               "hardwareRequirementId": {
                                 "type": "string",
@@ -3387,7 +4115,10 @@
                     },
                     "role": {
                       "type": "string",
-                      "enum": ["user", "assistant"]
+                      "enum": [
+                        "user",
+                        "assistant"
+                      ]
                     },
                     "content": {
                       "type": "string"
@@ -3403,17 +4134,23 @@
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["text"]
+                              "enum": [
+                                "text"
+                              ]
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         },
                         {
                           "type": "object",
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["audio"]
+                              "enum": [
+                                "audio"
+                              ]
                             },
                             "utterance": {
                               "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -3439,10 +4176,16 @@
                                 },
                                 "source": {
                                   "type": "string",
-                                  "enum": ["realtime_model"]
+                                  "enum": [
+                                    "realtime_model"
+                                  ]
                                 }
                               },
-                              "required": ["label", "confidence", "source"]
+                              "required": [
+                                "label",
+                                "confidence",
+                                "source"
+                              ]
                             },
                             "realtimeSummary": {
                               "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
@@ -3451,7 +4194,9 @@
                               "maxLength": 8000
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         },
                         {
                           "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -3459,10 +4204,14 @@
                           "properties": {
                             "channel": {
                               "type": "string",
-                              "enum": ["standing_task"]
+                              "enum": [
+                                "standing_task"
+                              ]
                             }
                           },
-                          "required": ["channel"]
+                          "required": [
+                            "channel"
+                          ]
                         }
                       ]
                     },
@@ -3479,7 +4228,10 @@
                               "nullable": true
                             }
                           },
-                          "required": ["startsTurn", "linkedTurnId"]
+                          "required": [
+                            "startsTurn",
+                            "linkedTurnId"
+                          ]
                         },
                         {
                           "type": "object",
@@ -3540,7 +4292,9 @@
                         "selectionMode": {
                           "description": "Requires exactly one answer and two or three mutually exclusive candidates.",
                           "type": "string",
-                          "enum": ["single"]
+                          "enum": [
+                            "single"
+                          ]
                         },
                         "answerChoices": {
                           "description": "Candidate display order is also the canonical structured-answer order.",
@@ -3567,10 +4321,17 @@
                               }
                             }
                           },
-                          "required": ["responseTurnId", "answers"]
+                          "required": [
+                            "responseTurnId",
+                            "answers"
+                          ]
                         }
                       },
-                      "required": ["prompt", "selectionMode", "answerChoices"]
+                      "required": [
+                        "prompt",
+                        "selectionMode",
+                        "answerChoices"
+                      ]
                     },
                     {
                       "type": "object",
@@ -3581,7 +4342,9 @@
                         "selectionMode": {
                           "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates.",
                           "type": "string",
-                          "enum": ["multiple"]
+                          "enum": [
+                            "multiple"
+                          ]
                         },
                         "answerChoices": {
                           "description": "Candidate display order is also the canonical structured-answer order.",
@@ -3610,10 +4373,17 @@
                               }
                             }
                           },
-                          "required": ["responseTurnId", "answers"]
+                          "required": [
+                            "responseTurnId",
+                            "answers"
+                          ]
                         }
                       },
-                      "required": ["prompt", "selectionMode", "answerChoices"]
+                      "required": [
+                        "prompt",
+                        "selectionMode",
+                        "answerChoices"
+                      ]
                     }
                   ]
                 },
@@ -3689,7 +4459,10 @@
                       }
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               },
               "required": [
@@ -3714,11 +4487,17 @@
             "nullable": true
           }
         },
-        "required": ["turns", "hasMore", "nextCursor"]
+        "required": [
+          "turns",
+          "hasMore",
+          "nextCursor"
+        ]
       },
       "TurnResponse": {
         "type": "object",
-        "required": ["turn"],
+        "required": [
+          "turn"
+        ],
         "properties": {
           "turn": {
             "$ref": "#/components/schemas/Turn"
@@ -3747,7 +4526,12 @@
           },
           "status": {
             "type": "string",
-            "enum": ["running", "succeeded", "failed", "interrupted"]
+            "enum": [
+              "running",
+              "succeeded",
+              "failed",
+              "interrupted"
+            ]
           },
           "userMessage": {
             "$ref": "#/components/schemas/Message"
@@ -3814,7 +4598,10 @@
           },
           "executor": {
             "type": "string",
-            "enum": ["full_agent", "realtime_model"]
+            "enum": [
+              "full_agent",
+              "realtime_model"
+            ]
           },
           "realtime": {
             "type": "object",
@@ -3829,7 +4616,10 @@
                 }
               }
             },
-            "required": ["connectionId", "linkedTurnIds"]
+            "required": [
+              "connectionId",
+              "linkedTurnIds"
+            ]
           },
           "realtimeResponses": {
             "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
@@ -3848,7 +4638,10 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": ["user", "assistant"]
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
                 },
                 "content": {
                   "type": "string"
@@ -3864,17 +4657,23 @@
                       "properties": {
                         "channel": {
                           "type": "string",
-                          "enum": ["text"]
+                          "enum": [
+                            "text"
+                          ]
                         }
                       },
-                      "required": ["channel"]
+                      "required": [
+                        "channel"
+                      ]
                     },
                     {
                       "type": "object",
                       "properties": {
                         "channel": {
                           "type": "string",
-                          "enum": ["audio"]
+                          "enum": [
+                            "audio"
+                          ]
                         },
                         "utterance": {
                           "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -3900,10 +4699,16 @@
                             },
                             "source": {
                               "type": "string",
-                              "enum": ["realtime_model"]
+                              "enum": [
+                                "realtime_model"
+                              ]
                             }
                           },
-                          "required": ["label", "confidence", "source"]
+                          "required": [
+                            "label",
+                            "confidence",
+                            "source"
+                          ]
                         },
                         "realtimeSummary": {
                           "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
@@ -3912,7 +4717,9 @@
                           "maxLength": 8000
                         }
                       },
-                      "required": ["channel"]
+                      "required": [
+                        "channel"
+                      ]
                     },
                     {
                       "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -3920,10 +4727,14 @@
                       "properties": {
                         "channel": {
                           "type": "string",
-                          "enum": ["standing_task"]
+                          "enum": [
+                            "standing_task"
+                          ]
                         }
                       },
-                      "required": ["channel"]
+                      "required": [
+                        "channel"
+                      ]
                     }
                   ]
                 },
@@ -3940,7 +4751,10 @@
                           "nullable": true
                         }
                       },
-                      "required": ["startsTurn", "linkedTurnId"]
+                      "required": [
+                        "startsTurn",
+                        "linkedTurnId"
+                      ]
                     },
                     {
                       "type": "object",
@@ -4013,7 +4827,10 @@
           },
           "role": {
             "type": "string",
-            "enum": ["user", "assistant"]
+            "enum": [
+              "user",
+              "assistant"
+            ]
           },
           "content": {
             "type": "string"
@@ -4038,7 +4855,10 @@
                     "nullable": true
                   }
                 },
-                "required": ["startsTurn", "linkedTurnId"]
+                "required": [
+                  "startsTurn",
+                  "linkedTurnId"
+                ]
               },
               {
                 "type": "object",
@@ -4083,21 +4903,29 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["channel"],
+            "required": [
+              "channel"
+            ],
             "properties": {
               "channel": {
                 "type": "string",
-                "enum": ["text"]
+                "enum": [
+                  "text"
+                ]
               }
             }
           },
           {
             "type": "object",
-            "required": ["channel"],
+            "required": [
+              "channel"
+            ],
             "properties": {
               "channel": {
                 "type": "string",
-                "enum": ["audio"]
+                "enum": [
+                  "audio"
+                ]
               },
               "utterance": {
                 "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -4108,7 +4936,11 @@
               "emotion": {
                 "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
                 "type": "object",
-                "required": ["label", "confidence", "source"],
+                "required": [
+                  "label",
+                  "confidence",
+                  "source"
+                ],
                 "properties": {
                   "label": {
                     "type": "string",
@@ -4122,7 +4954,9 @@
                   },
                   "source": {
                     "type": "string",
-                    "enum": ["realtime_model"]
+                    "enum": [
+                      "realtime_model"
+                    ]
                   }
                 }
               },
@@ -4137,11 +4971,15 @@
           {
             "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
             "type": "object",
-            "required": ["channel"],
+            "required": [
+              "channel"
+            ],
             "properties": {
               "channel": {
                 "type": "string",
-                "enum": ["standing_task"]
+                "enum": [
+                  "standing_task"
+                ]
               }
             }
           }
@@ -4182,7 +5020,10 @@
           },
           "checksumVerification": {
             "type": "string",
-            "enum": ["whole", "part_only"],
+            "enum": [
+              "whole",
+              "part_only"
+            ],
             "nullable": true
           },
           "contentType": {
@@ -4254,7 +5095,9 @@
           },
           "mediator": {
             "type": "string",
-            "enum": ["aos"]
+            "enum": [
+              "aos"
+            ]
           },
           "status": {
             "type": "string",
@@ -4268,7 +5111,10 @@
           },
           "category": {
             "type": "string",
-            "enum": ["tool_call", "skill_read"],
+            "enum": [
+              "tool_call",
+              "skill_read"
+            ],
             "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations."
           },
           "skill": {
@@ -4305,7 +5151,10 @@
       "OperationSkill": {
         "type": "object",
         "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
-        "required": ["skillId", "name"],
+        "required": [
+          "skillId",
+          "name"
+        ],
         "properties": {
           "skillId": {
             "type": "string"
@@ -4320,22 +5169,32 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["type"],
+            "required": [
+              "type"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["session_client"]
+                "enum": [
+                  "session_client"
+                ]
               }
             }
           },
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["type", "hardwareRequirementId", "method"],
+            "required": [
+              "type",
+              "hardwareRequirementId",
+              "method"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["hardware"]
+                "enum": [
+                  "hardware"
+                ]
               },
               "hardwareRequirementId": {
                 "type": "string",
@@ -4362,14 +5221,20 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["prompt", "selectionMode", "answerChoices"],
+            "required": [
+              "prompt",
+              "selectionMode",
+              "answerChoices"
+            ],
             "properties": {
               "prompt": {
                 "type": "string"
               },
               "selectionMode": {
                 "type": "string",
-                "enum": ["single"],
+                "enum": [
+                  "single"
+                ],
                 "description": "Requires exactly one answer and two or three mutually exclusive candidates."
               },
               "answerChoices": {
@@ -4384,7 +5249,10 @@
               },
               "response": {
                 "type": "object",
-                "required": ["answers", "responseTurnId"],
+                "required": [
+                  "answers",
+                  "responseTurnId"
+                ],
                 "properties": {
                   "answers": {
                     "type": "array",
@@ -4405,14 +5273,20 @@
           },
           {
             "type": "object",
-            "required": ["prompt", "selectionMode", "answerChoices"],
+            "required": [
+              "prompt",
+              "selectionMode",
+              "answerChoices"
+            ],
             "properties": {
               "prompt": {
                 "type": "string"
               },
               "selectionMode": {
                 "type": "string",
-                "enum": ["multiple"],
+                "enum": [
+                  "multiple"
+                ],
                 "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates."
               },
               "answerChoices": {
@@ -4427,7 +5301,10 @@
               },
               "response": {
                 "type": "object",
-                "required": ["answers", "responseTurnId"],
+                "required": [
+                  "answers",
+                  "responseTurnId"
+                ],
                 "properties": {
                   "answers": {
                     "type": "array",
@@ -4451,7 +5328,10 @@
       "TurnFailure": {
         "type": "object",
         "description": "A failed Turn's public error, as carried by its turn_error event and Turn.failure. The message is fixed text for the code and never contains supplier or internal error text.",
-        "required": ["code", "message"],
+        "required": [
+          "code",
+          "message"
+        ],
         "properties": {
           "code": {
             "type": "string",
@@ -4523,7 +5403,9 @@
                   "properties": {
                     "type": {
                       "type": "string",
-                      "enum": ["turn"]
+                      "enum": [
+                        "turn"
+                      ]
                     },
                     "turn": {
                       "type": "object",
@@ -4531,7 +5413,10 @@
                         "executor": {
                           "description": "Always returned by /turns list and detail; older Turn surfaces may omit it.",
                           "type": "string",
-                          "enum": ["full_agent", "realtime_model"]
+                          "enum": [
+                            "full_agent",
+                            "realtime_model"
+                          ]
                         },
                         "realtime": {
                           "type": "object",
@@ -4546,7 +5431,10 @@
                               }
                             }
                           },
-                          "required": ["connectionId", "linkedTurnIds"]
+                          "required": [
+                            "connectionId",
+                            "linkedTurnIds"
+                          ]
                         },
                         "realtimeResponses": {
                           "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
@@ -4565,7 +5453,10 @@
                               },
                               "role": {
                                 "type": "string",
-                                "enum": ["user", "assistant"]
+                                "enum": [
+                                  "user",
+                                  "assistant"
+                                ]
                               },
                               "content": {
                                 "type": "string"
@@ -4581,17 +5472,23 @@
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["text"]
+                                        "enum": [
+                                          "text"
+                                        ]
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   },
                                   {
                                     "type": "object",
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["audio"]
+                                        "enum": [
+                                          "audio"
+                                        ]
                                       },
                                       "utterance": {
                                         "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -4617,7 +5514,9 @@
                                           },
                                           "source": {
                                             "type": "string",
-                                            "enum": ["realtime_model"]
+                                            "enum": [
+                                              "realtime_model"
+                                            ]
                                           }
                                         },
                                         "required": [
@@ -4633,7 +5532,9 @@
                                         "maxLength": 8000
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   },
                                   {
                                     "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -4641,10 +5542,14 @@
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["standing_task"]
+                                        "enum": [
+                                          "standing_task"
+                                        ]
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   }
                                 ]
                               },
@@ -4661,7 +5566,10 @@
                                         "nullable": true
                                       }
                                     },
-                                    "required": ["startsTurn", "linkedTurnId"]
+                                    "required": [
+                                      "startsTurn",
+                                      "linkedTurnId"
+                                    ]
                                   },
                                   {
                                     "type": "object",
@@ -4748,7 +5656,10 @@
                             },
                             "role": {
                               "type": "string",
-                              "enum": ["user", "assistant"]
+                              "enum": [
+                                "user",
+                                "assistant"
+                              ]
                             },
                             "content": {
                               "type": "string"
@@ -4764,17 +5675,23 @@
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["text"]
+                                      "enum": [
+                                        "text"
+                                      ]
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 },
                                 {
                                   "type": "object",
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["audio"]
+                                      "enum": [
+                                        "audio"
+                                      ]
                                     },
                                     "utterance": {
                                       "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -4800,7 +5717,9 @@
                                         },
                                         "source": {
                                           "type": "string",
-                                          "enum": ["realtime_model"]
+                                          "enum": [
+                                            "realtime_model"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -4816,7 +5735,9 @@
                                       "maxLength": 8000
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 },
                                 {
                                   "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -4824,10 +5745,14 @@
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["standing_task"]
+                                      "enum": [
+                                        "standing_task"
+                                      ]
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 }
                               ]
                             },
@@ -4844,7 +5769,10 @@
                                       "nullable": true
                                     }
                                   },
-                                  "required": ["startsTurn", "linkedTurnId"]
+                                  "required": [
+                                    "startsTurn",
+                                    "linkedTurnId"
+                                  ]
                                 },
                                 {
                                   "type": "object",
@@ -4909,7 +5837,10 @@
                               },
                               "role": {
                                 "type": "string",
-                                "enum": ["user", "assistant"]
+                                "enum": [
+                                  "user",
+                                  "assistant"
+                                ]
                               },
                               "content": {
                                 "type": "string"
@@ -4925,17 +5856,23 @@
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["text"]
+                                        "enum": [
+                                          "text"
+                                        ]
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   },
                                   {
                                     "type": "object",
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["audio"]
+                                        "enum": [
+                                          "audio"
+                                        ]
                                       },
                                       "utterance": {
                                         "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -4961,7 +5898,9 @@
                                           },
                                           "source": {
                                             "type": "string",
-                                            "enum": ["realtime_model"]
+                                            "enum": [
+                                              "realtime_model"
+                                            ]
                                           }
                                         },
                                         "required": [
@@ -4977,7 +5916,9 @@
                                         "maxLength": 8000
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   },
                                   {
                                     "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -4985,10 +5926,14 @@
                                     "properties": {
                                       "channel": {
                                         "type": "string",
-                                        "enum": ["standing_task"]
+                                        "enum": [
+                                          "standing_task"
+                                        ]
                                       }
                                     },
-                                    "required": ["channel"]
+                                    "required": [
+                                      "channel"
+                                    ]
                                   }
                                 ]
                               },
@@ -5005,7 +5950,10 @@
                                         "nullable": true
                                       }
                                     },
-                                    "required": ["startsTurn", "linkedTurnId"]
+                                    "required": [
+                                      "startsTurn",
+                                      "linkedTurnId"
+                                    ]
                                   },
                                   {
                                     "type": "object",
@@ -5092,7 +6040,10 @@
                               "checksumVerification": {
                                 "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part.",
                                 "type": "string",
-                                "enum": ["whole", "part_only"],
+                                "enum": [
+                                  "whole",
+                                  "part_only"
+                                ],
                                 "nullable": true
                               },
                               "contentType": {
@@ -5150,7 +6101,9 @@
                               },
                               "mediator": {
                                 "type": "string",
-                                "enum": ["aos"]
+                                "enum": [
+                                  "aos"
+                                ]
                               },
                               "status": {
                                 "type": "string",
@@ -5165,7 +6118,10 @@
                               "category": {
                                 "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations.",
                                 "type": "string",
-                                "enum": ["tool_call", "skill_read"]
+                                "enum": [
+                                  "tool_call",
+                                  "skill_read"
+                                ]
                               },
                               "skill": {
                                 "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
@@ -5178,7 +6134,10 @@
                                     "type": "string"
                                   }
                                 },
-                                "required": ["skillId", "name"]
+                                "required": [
+                                  "skillId",
+                                  "name"
+                                ]
                               },
                               "source": {
                                 "description": "Client Tool source. Hardware exposes only requirement and original method; private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
@@ -5188,17 +6147,23 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": ["session_client"]
+                                        "enum": [
+                                          "session_client"
+                                        ]
                                       }
                                     },
-                                    "required": ["type"]
+                                    "required": [
+                                      "type"
+                                    ]
                                   },
                                   {
                                     "type": "object",
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": ["hardware"]
+                                        "enum": [
+                                          "hardware"
+                                        ]
                                       },
                                       "hardwareRequirementId": {
                                         "type": "string",
@@ -5269,7 +6234,10 @@
                             },
                             "role": {
                               "type": "string",
-                              "enum": ["user", "assistant"]
+                              "enum": [
+                                "user",
+                                "assistant"
+                              ]
                             },
                             "content": {
                               "type": "string"
@@ -5285,17 +6253,23 @@
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["text"]
+                                      "enum": [
+                                        "text"
+                                      ]
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 },
                                 {
                                   "type": "object",
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["audio"]
+                                      "enum": [
+                                        "audio"
+                                      ]
                                     },
                                     "utterance": {
                                       "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
@@ -5321,7 +6295,9 @@
                                         },
                                         "source": {
                                           "type": "string",
-                                          "enum": ["realtime_model"]
+                                          "enum": [
+                                            "realtime_model"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -5337,7 +6313,9 @@
                                       "maxLength": 8000
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 },
                                 {
                                   "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
@@ -5345,10 +6323,14 @@
                                   "properties": {
                                     "channel": {
                                       "type": "string",
-                                      "enum": ["standing_task"]
+                                      "enum": [
+                                        "standing_task"
+                                      ]
                                     }
                                   },
-                                  "required": ["channel"]
+                                  "required": [
+                                    "channel"
+                                  ]
                                 }
                               ]
                             },
@@ -5365,7 +6347,10 @@
                                       "nullable": true
                                     }
                                   },
-                                  "required": ["startsTurn", "linkedTurnId"]
+                                  "required": [
+                                    "startsTurn",
+                                    "linkedTurnId"
+                                  ]
                                 },
                                 {
                                   "type": "object",
@@ -5426,7 +6411,9 @@
                                 "selectionMode": {
                                   "description": "Requires exactly one answer and two or three mutually exclusive candidates.",
                                   "type": "string",
-                                  "enum": ["single"]
+                                  "enum": [
+                                    "single"
+                                  ]
                                 },
                                 "answerChoices": {
                                   "description": "Candidate display order is also the canonical structured-answer order.",
@@ -5453,7 +6440,10 @@
                                       }
                                     }
                                   },
-                                  "required": ["responseTurnId", "answers"]
+                                  "required": [
+                                    "responseTurnId",
+                                    "answers"
+                                  ]
                                 }
                               },
                               "required": [
@@ -5471,7 +6461,9 @@
                                 "selectionMode": {
                                   "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates.",
                                   "type": "string",
-                                  "enum": ["multiple"]
+                                  "enum": [
+                                    "multiple"
+                                  ]
                                 },
                                 "answerChoices": {
                                   "description": "Candidate display order is also the canonical structured-answer order.",
@@ -5500,7 +6492,10 @@
                                       }
                                     }
                                   },
-                                  "required": ["responseTurnId", "answers"]
+                                  "required": [
+                                    "responseTurnId",
+                                    "answers"
+                                  ]
                                 }
                               },
                               "required": [
@@ -5583,7 +6578,10 @@
                               }
                             }
                           },
-                          "required": ["code", "message"]
+                          "required": [
+                            "code",
+                            "message"
+                          ]
                         }
                       },
                       "required": [
@@ -5599,14 +6597,19 @@
                       ]
                     }
                   },
-                  "required": ["type", "turn"]
+                  "required": [
+                    "type",
+                    "turn"
+                  ]
                 },
                 {
                   "type": "object",
                   "properties": {
                     "type": {
                       "type": "string",
-                      "enum": ["realtime"]
+                      "enum": [
+                        "realtime"
+                      ]
                     },
                     "realtime": {
                       "description": "A durable Realtime fact of the Session timeline. It is never a Turn, Message or task result.",
@@ -5620,7 +6623,9 @@
                             },
                             "type": {
                               "type": "string",
-                              "enum": ["input_transcript"]
+                              "enum": [
+                                "input_transcript"
+                              ]
                             },
                             "realtimeConnectionId": {
                               "type": "string"
@@ -5655,7 +6660,9 @@
                             },
                             "type": {
                               "type": "string",
-                              "enum": ["response"]
+                              "enum": [
+                                "response"
+                              ]
                             },
                             "realtimeConnectionId": {
                               "type": "string"
@@ -5708,7 +6715,10 @@
                       ]
                     }
                   },
-                  "required": ["type", "realtime"]
+                  "required": [
+                    "type",
+                    "realtime"
+                  ]
                 }
               ]
             }
@@ -5721,7 +6731,11 @@
             "nullable": true
           }
         },
-        "required": ["entries", "hasMore", "nextCursor"]
+        "required": [
+          "entries",
+          "hasMore",
+          "nextCursor"
+        ]
       },
       "ConsoleBillingUsageResponseOpenApiDto": {
         "type": "object",
@@ -5731,7 +6745,10 @@
             "properties": {
               "level": {
                 "type": "string",
-                "enum": ["organization", "user"]
+                "enum": [
+                  "organization",
+                  "user"
+                ]
               },
               "organizationId": {
                 "type": "string"
@@ -5741,14 +6758,21 @@
                 "nullable": true
               }
             },
-            "required": ["level", "organizationId", "userId"]
+            "required": [
+              "level",
+              "organizationId",
+              "userId"
+            ]
           },
           "range": {
             "type": "object",
             "properties": {
               "period": {
                 "type": "string",
-                "enum": ["day", "week"]
+                "enum": [
+                  "day",
+                  "week"
+                ]
               },
               "from": {
                 "type": "string"
@@ -5757,7 +6781,11 @@
                 "type": "string"
               }
             },
-            "required": ["period", "from", "to"]
+            "required": [
+              "period",
+              "from",
+              "to"
+            ]
           },
           "factCompleteness": {
             "type": "object",
@@ -5765,7 +6793,10 @@
               "status": {
                 "description": "Completeness of durable LLM and sandbox usage facts. Valuation completeness is reported separately.",
                 "type": "string",
-                "enum": ["complete", "incomplete"]
+                "enum": [
+                  "complete",
+                  "incomplete"
+                ]
               },
               "projectedFactCount": {
                 "type": "integer"
@@ -5787,7 +6818,10 @@
                     "status": {
                       "description": "Completeness of durable LLM and sandbox usage facts. Valuation completeness is reported separately.",
                       "type": "string",
-                      "enum": ["complete", "incomplete"]
+                      "enum": [
+                        "complete",
+                        "incomplete"
+                      ]
                     },
                     "projectedFactCount": {
                       "type": "integer"
@@ -5826,7 +6860,9 @@
             "properties": {
               "currency": {
                 "type": "string",
-                "enum": ["USD"]
+                "enum": [
+                  "USD"
+                ]
               },
               "totalCostMicros": {
                 "description": "Platform-borne priced cost only.",
@@ -5918,7 +6954,11 @@
                     ]
                   }
                 },
-                "required": ["platform", "customer", "unknown"]
+                "required": [
+                  "platform",
+                  "customer",
+                  "unknown"
+                ]
               },
               "organizationMachineCostMicros": {
                 "description": "Platform-borne priced cost attributed to Organization-machine activity only.",
@@ -5962,7 +7002,11 @@
                     "type": "integer"
                   }
                 },
-                "required": ["inputTokens", "cachedInputTokens", "outputTokens"]
+                "required": [
+                  "inputTokens",
+                  "cachedInputTokens",
+                  "outputTokens"
+                ]
               },
               "sandboxDurationSeconds": {
                 "type": "integer"
@@ -5973,7 +7017,10 @@
                   "status": {
                     "description": "Complete only when every usage fact in this aggregate is priced.",
                     "type": "string",
-                    "enum": ["complete", "incomplete"]
+                    "enum": [
+                      "complete",
+                      "incomplete"
+                    ]
                   },
                   "pricedUsageCount": {
                     "type": "integer"
@@ -5993,7 +7040,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -6028,7 +7078,10 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "enum": ["complete", "incomplete"]
+                    "enum": [
+                      "complete",
+                      "incomplete"
+                    ]
                   },
                   "classifiedUsageCount": {
                     "type": "integer"
@@ -6052,7 +7105,10 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "classifiedUsageCount": {
                           "type": "integer"
@@ -6125,7 +7181,11 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "userId": {
                       "type": "string"
@@ -6136,7 +7196,9 @@
                     },
                     "currency": {
                       "type": "string",
-                      "enum": ["USD"]
+                      "enum": [
+                        "USD"
+                      ]
                     },
                     "totalCostMicros": {
                       "type": "integer"
@@ -6183,7 +7245,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -6227,7 +7292,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "llm": {
             "type": "object",
@@ -6240,7 +7307,11 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string"
@@ -6261,7 +7332,11 @@
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "requestCount": {
                       "type": "integer"
@@ -6287,7 +7362,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -6325,7 +7403,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "sandbox": {
             "type": "object",
@@ -6338,11 +7418,19 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string",
-                      "enum": ["e2b", "tencent_ags", "run9"]
+                      "enum": [
+                        "e2b",
+                        "tencent_ags",
+                        "run9"
+                      ]
                     },
                     "profileId": {
                       "type": "string"
@@ -6352,7 +7440,11 @@
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "usageCount": {
                       "type": "integer"
@@ -6375,7 +7467,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -6412,7 +7507,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "webSearch": {
             "type": "object",
@@ -6425,19 +7522,31 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string",
-                      "enum": ["exa"]
+                      "enum": [
+                        "exa"
+                      ]
                     },
                     "searchType": {
                       "type": "string",
-                      "enum": ["auto"]
+                      "enum": [
+                        "auto"
+                      ]
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "requestCount": {
                       "type": "integer"
@@ -6457,7 +7566,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -6492,7 +7604,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "series": {
             "type": "array",
@@ -6530,7 +7644,10 @@
                     "status": {
                       "description": "Complete only when every usage fact in this aggregate is priced.",
                       "type": "string",
-                      "enum": ["complete", "incomplete"]
+                      "enum": [
+                        "complete",
+                        "incomplete"
+                      ]
                     },
                     "pricedUsageCount": {
                       "type": "integer"
@@ -6584,7 +7701,10 @@
             "properties": {
               "level": {
                 "type": "string",
-                "enum": ["organization", "user"]
+                "enum": [
+                  "organization",
+                  "user"
+                ]
               },
               "organizationId": {
                 "type": "string"
@@ -6594,14 +7714,21 @@
                 "nullable": true
               }
             },
-            "required": ["level", "organizationId", "userId"]
+            "required": [
+              "level",
+              "organizationId",
+              "userId"
+            ]
           },
           "range": {
             "type": "object",
             "properties": {
               "period": {
                 "type": "string",
-                "enum": ["day", "week"]
+                "enum": [
+                  "day",
+                  "week"
+                ]
               },
               "from": {
                 "type": "string"
@@ -6610,7 +7737,11 @@
                 "type": "string"
               }
             },
-            "required": ["period", "from", "to"]
+            "required": [
+              "period",
+              "from",
+              "to"
+            ]
           },
           "llm": {
             "type": "array",
@@ -6619,7 +7750,9 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["llm"]
+                  "enum": [
+                    "llm"
+                  ]
                 },
                 "id": {
                   "type": "string"
@@ -6653,7 +7786,12 @@
                 },
                 "attributionKind": {
                   "type": "string",
-                  "enum": ["agent", "user_level", "system", "unattributed"]
+                  "enum": [
+                    "agent",
+                    "user_level",
+                    "system",
+                    "unattributed"
+                  ]
                 },
                 "ownerUserId": {
                   "type": "string",
@@ -6670,7 +7808,11 @@
                 },
                 "principalBucket": {
                   "type": "string",
-                  "enum": ["human", "user_api_key", "organization_machine"]
+                  "enum": [
+                    "human",
+                    "user_api_key",
+                    "organization_machine"
+                  ]
                 },
                 "billingTag": {
                   "nullable": true,
@@ -6772,14 +7914,19 @@
                 },
                 "currency": {
                   "type": "string",
-                  "enum": ["USD"]
+                  "enum": [
+                    "USD"
+                  ]
                 },
                 "ratedAt": {
                   "type": "string"
                 },
                 "pricingStatus": {
                   "type": "string",
-                  "enum": ["estimated", "unknown"]
+                  "enum": [
+                    "estimated",
+                    "unknown"
+                  ]
                 },
                 "unknownReason": {
                   "type": "string",
@@ -6787,7 +7934,10 @@
                 },
                 "estimateBasis": {
                   "type": "string",
-                  "enum": ["public_list_placeholder", "contract"],
+                  "enum": [
+                    "public_list_placeholder",
+                    "contract"
+                  ],
                   "nullable": true
                 },
                 "estimateLabel": {
@@ -6796,7 +7946,12 @@
                 },
                 "contextTier": {
                   "type": "string",
-                  "enum": ["short", "long", "all_context", "unknown"]
+                  "enum": [
+                    "short",
+                    "long",
+                    "all_context",
+                    "unknown"
+                  ]
                 },
                 "pricingVersion": {
                   "type": "string"
@@ -6829,7 +7984,10 @@
                 "valuationStatus": {
                   "description": "Whether this usage fact contributes to priced totals. A stored cost does not override an unpriced status.",
                   "type": "string",
-                  "enum": ["priced", "unpriced"]
+                  "enum": [
+                    "priced",
+                    "unpriced"
+                  ]
                 }
               },
               "required": [
@@ -6896,7 +8054,9 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["sandbox"]
+                  "enum": [
+                    "sandbox"
+                  ]
                 },
                 "id": {
                   "type": "string"
@@ -6923,7 +8083,12 @@
                 },
                 "attributionKind": {
                   "type": "string",
-                  "enum": ["agent", "user_level", "system", "unattributed"]
+                  "enum": [
+                    "agent",
+                    "user_level",
+                    "system",
+                    "unattributed"
+                  ]
                 },
                 "ownerUserId": {
                   "type": "string",
@@ -6940,7 +8105,11 @@
                 },
                 "principalBucket": {
                   "type": "string",
-                  "enum": ["human", "user_api_key", "organization_machine"]
+                  "enum": [
+                    "human",
+                    "user_api_key",
+                    "organization_machine"
+                  ]
                 },
                 "billingTag": {
                   "nullable": true,
@@ -6953,7 +8122,11 @@
                 },
                 "provider": {
                   "type": "string",
-                  "enum": ["e2b", "tencent_ags", "run9"]
+                  "enum": [
+                    "e2b",
+                    "tencent_ags",
+                    "run9"
+                  ]
                 },
                 "profileId": {
                   "type": "string"
@@ -6977,7 +8150,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["running", "closed", "close_failed", "abandoned"]
+                  "enum": [
+                    "running",
+                    "closed",
+                    "close_failed",
+                    "abandoned"
+                  ]
                 },
                 "closeReason": {
                   "type": "string",
@@ -6993,7 +8171,9 @@
                 },
                 "currency": {
                   "type": "string",
-                  "enum": ["USD"]
+                  "enum": [
+                    "USD"
+                  ]
                 },
                 "pricingVersion": {
                   "type": "string"
@@ -7004,7 +8184,10 @@
                 "valuationStatus": {
                   "description": "Whether this usage fact contributes to priced totals. A stored cost does not override an unpriced status.",
                   "type": "string",
-                  "enum": ["priced", "unpriced"]
+                  "enum": [
+                    "priced",
+                    "unpriced"
+                  ]
                 }
               },
               "required": [
@@ -7046,7 +8229,9 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["web_search"]
+                  "enum": [
+                    "web_search"
+                  ]
                 },
                 "id": {
                   "type": "string"
@@ -7077,7 +8262,12 @@
                 },
                 "attributionKind": {
                   "type": "string",
-                  "enum": ["agent", "user_level", "system", "unattributed"]
+                  "enum": [
+                    "agent",
+                    "user_level",
+                    "system",
+                    "unattributed"
+                  ]
                 },
                 "authKind": {
                   "type": "string",
@@ -7090,7 +8280,11 @@
                 },
                 "principalBucket": {
                   "type": "string",
-                  "enum": ["human", "user_api_key", "organization_machine"]
+                  "enum": [
+                    "human",
+                    "user_api_key",
+                    "organization_machine"
+                  ]
                 },
                 "billingTag": {
                   "nullable": true,
@@ -7106,7 +8300,9 @@
                 },
                 "searchType": {
                   "type": "string",
-                  "enum": ["auto"]
+                  "enum": [
+                    "auto"
+                  ]
                 },
                 "requestCount": {
                   "type": "number",
@@ -7122,15 +8318,21 @@
                 },
                 "pricingStatus": {
                   "type": "string",
-                  "enum": ["unpriced"]
+                  "enum": [
+                    "unpriced"
+                  ]
                 },
                 "unknownReason": {
                   "type": "string",
-                  "enum": ["no_rate_authority"]
+                  "enum": [
+                    "no_rate_authority"
+                  ]
                 },
                 "valuationStatus": {
                   "type": "string",
-                  "enum": ["unpriced"]
+                  "enum": [
+                    "unpriced"
+                  ]
                 }
               },
               "required": [
@@ -7159,7 +8361,13 @@
             }
           }
         },
-        "required": ["scope", "range", "llm", "sandbox", "webSearch"]
+        "required": [
+          "scope",
+          "range",
+          "llm",
+          "sandbox",
+          "webSearch"
+        ]
       },
       "OrganizationBillingUsageAggregateResponseOpenApiDto": {
         "type": "object",
@@ -7175,10 +8383,19 @@
               },
               "interval": {
                 "type": "string",
-                "enum": ["hour", "day", "week", "month"]
+                "enum": [
+                  "hour",
+                  "day",
+                  "week",
+                  "month"
+                ]
               }
             },
-            "required": ["from", "to", "interval"]
+            "required": [
+              "from",
+              "to",
+              "interval"
+            ]
           },
           "factCompleteness": {
             "type": "object",
@@ -7186,7 +8403,10 @@
               "status": {
                 "description": "Completeness of durable LLM and sandbox usage facts. Valuation completeness is reported separately.",
                 "type": "string",
-                "enum": ["complete", "incomplete"]
+                "enum": [
+                  "complete",
+                  "incomplete"
+                ]
               },
               "projectedFactCount": {
                 "type": "integer"
@@ -7208,7 +8428,10 @@
                     "status": {
                       "description": "Completeness of durable LLM and sandbox usage facts. Valuation completeness is reported separately.",
                       "type": "string",
-                      "enum": ["complete", "incomplete"]
+                      "enum": [
+                        "complete",
+                        "incomplete"
+                      ]
                     },
                     "projectedFactCount": {
                       "type": "integer"
@@ -7247,7 +8470,9 @@
             "properties": {
               "currency": {
                 "type": "string",
-                "enum": ["USD"]
+                "enum": [
+                  "USD"
+                ]
               },
               "totalCostMicros": {
                 "description": "Platform-borne priced cost only.",
@@ -7339,7 +8564,11 @@
                     ]
                   }
                 },
-                "required": ["platform", "customer", "unknown"]
+                "required": [
+                  "platform",
+                  "customer",
+                  "unknown"
+                ]
               },
               "organizationMachineCostMicros": {
                 "description": "Platform-borne priced cost attributed to Organization-machine activity only.",
@@ -7383,7 +8612,11 @@
                     "type": "integer"
                   }
                 },
-                "required": ["inputTokens", "cachedInputTokens", "outputTokens"]
+                "required": [
+                  "inputTokens",
+                  "cachedInputTokens",
+                  "outputTokens"
+                ]
               },
               "sandboxDurationSeconds": {
                 "type": "integer"
@@ -7394,7 +8627,10 @@
                   "status": {
                     "description": "Complete only when every usage fact in this aggregate is priced.",
                     "type": "string",
-                    "enum": ["complete", "incomplete"]
+                    "enum": [
+                      "complete",
+                      "incomplete"
+                    ]
                   },
                   "pricedUsageCount": {
                     "type": "integer"
@@ -7414,7 +8650,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -7449,7 +8688,10 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "enum": ["complete", "incomplete"]
+                    "enum": [
+                      "complete",
+                      "incomplete"
+                    ]
                   },
                   "classifiedUsageCount": {
                     "type": "integer"
@@ -7473,7 +8715,10 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "classifiedUsageCount": {
                           "type": "integer"
@@ -7546,7 +8791,11 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string"
@@ -7567,7 +8816,11 @@
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "requestCount": {
                       "type": "integer"
@@ -7593,7 +8846,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -7631,7 +8887,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "sandbox": {
             "type": "object",
@@ -7644,11 +8902,19 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string",
-                      "enum": ["e2b", "tencent_ags", "run9"]
+                      "enum": [
+                        "e2b",
+                        "tencent_ags",
+                        "run9"
+                      ]
                     },
                     "profileId": {
                       "type": "string"
@@ -7658,7 +8924,11 @@
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "usageCount": {
                       "type": "integer"
@@ -7681,7 +8951,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -7718,7 +8991,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "webSearch": {
             "type": "object",
@@ -7731,19 +9006,31 @@
                     "costBearer": {
                       "description": "The single cost bearer represented by this aggregate row.",
                       "type": "string",
-                      "enum": ["platform", "customer", "unknown"]
+                      "enum": [
+                        "platform",
+                        "customer",
+                        "unknown"
+                      ]
                     },
                     "provider": {
                       "type": "string",
-                      "enum": ["exa"]
+                      "enum": [
+                        "exa"
+                      ]
                     },
                     "searchType": {
                       "type": "string",
-                      "enum": ["auto"]
+                      "enum": [
+                        "auto"
+                      ]
                     },
                     "principalBucket": {
                       "type": "string",
-                      "enum": ["human", "user_api_key", "organization_machine"]
+                      "enum": [
+                        "human",
+                        "user_api_key",
+                        "organization_machine"
+                      ]
                     },
                     "requestCount": {
                       "type": "integer"
@@ -7763,7 +9050,10 @@
                         "status": {
                           "description": "Complete only when every usage fact in this aggregate is priced.",
                           "type": "string",
-                          "enum": ["complete", "incomplete"]
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
                         },
                         "pricedUsageCount": {
                           "type": "integer"
@@ -7798,7 +9088,9 @@
                 }
               }
             },
-            "required": ["aggregates"]
+            "required": [
+              "aggregates"
+            ]
           },
           "series": {
             "type": "array",
@@ -7845,7 +9137,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["llm"]
+                                "enum": [
+                                  "llm"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -7893,7 +9187,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["sandbox"]
+                                "enum": [
+                                  "sandbox"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -7916,7 +9212,10 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["durationSeconds", "usageCount"]
+                                "required": [
+                                  "durationSeconds",
+                                  "usageCount"
+                                ]
                               }
                             },
                             "required": [
@@ -7931,7 +9230,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["web_search"]
+                                "enum": [
+                                  "web_search"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -7951,7 +9252,9 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["requestCount"]
+                                "required": [
+                                  "requestCount"
+                                ]
                               }
                             },
                             "required": [
@@ -7974,7 +9277,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["llm"]
+                                "enum": [
+                                  "llm"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8022,7 +9327,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["sandbox"]
+                                "enum": [
+                                  "sandbox"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8045,7 +9352,10 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["durationSeconds", "usageCount"]
+                                "required": [
+                                  "durationSeconds",
+                                  "usageCount"
+                                ]
                               }
                             },
                             "required": [
@@ -8060,7 +9370,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["web_search"]
+                                "enum": [
+                                  "web_search"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8080,7 +9392,9 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["requestCount"]
+                                "required": [
+                                  "requestCount"
+                                ]
                               }
                             },
                             "required": [
@@ -8103,7 +9417,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["llm"]
+                                "enum": [
+                                  "llm"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8151,7 +9467,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["sandbox"]
+                                "enum": [
+                                  "sandbox"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8174,7 +9492,10 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["durationSeconds", "usageCount"]
+                                "required": [
+                                  "durationSeconds",
+                                  "usageCount"
+                                ]
                               }
                             },
                             "required": [
@@ -8189,7 +9510,9 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["web_search"]
+                                "enum": [
+                                  "web_search"
+                                ]
                               },
                               "provider": {
                                 "type": "string"
@@ -8209,7 +9532,9 @@
                                     "type": "integer"
                                   }
                                 },
-                                "required": ["requestCount"]
+                                "required": [
+                                  "requestCount"
+                                ]
                               }
                             },
                             "required": [
@@ -8223,7 +9548,11 @@
                       }
                     }
                   },
-                  "required": ["platform", "customer", "unknown"]
+                  "required": [
+                    "platform",
+                    "customer",
+                    "unknown"
+                  ]
                 },
                 "valuation": {
                   "type": "object",
@@ -8231,7 +9560,10 @@
                     "status": {
                       "description": "Complete only when every usage fact in this aggregate is priced.",
                       "type": "string",
-                      "enum": ["complete", "incomplete"]
+                      "enum": [
+                        "complete",
+                        "incomplete"
+                      ]
                     },
                     "pricedUsageCount": {
                       "type": "integer"
@@ -8274,6 +9606,604 @@
           "sandbox",
           "webSearch",
           "series"
+        ]
+      },
+      "CreateSessionOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+          },
+          "realtimeModel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "billingTag": {
+            "nullable": true,
+            "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BillingTag"
+              }
+            ]
+          },
+          "tools": {
+            "description": "Client Tools this Session client declares and executes; each client-started Turn uses the set current at its admission.",
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "function"
+                  ]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "description",
+                "parameters"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "agentId"
+        ],
+        "additionalProperties": false
+      },
+      "SessionResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
+              },
+              "autoTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "ownerUserId": {
+                "type": "string"
+              },
+              "startedByUserId": {
+                "type": "string"
+              },
+              "createdByType": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "scheduler"
+                ]
+              },
+              "readOnly": {
+                "type": "boolean"
+              },
+              "sourceSchedulerId": {
+                "type": "string",
+                "nullable": true
+              },
+              "sourceSchedulerFireId": {
+                "type": "string",
+                "nullable": true
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+              },
+              "modelRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "realtimeModel": {
+                "description": "Selection for the next Realtime Connection; null uses the active release default.",
+                "type": "string",
+                "nullable": true
+              },
+              "realtimeModelRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "realtimeModelEtag": {
+                "description": "Opaque If-Match token for PATCH /api/v1/user/sessions/{id}/realtime-model; independent of the text model ETag.",
+                "type": "string"
+              },
+              "createdWithAgentId": {
+                "type": "string"
+              },
+              "template": {
+                "type": "object",
+                "properties": {
+                  "templateId": {
+                    "type": "string"
+                  },
+                  "contentDigest": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "templateId",
+                  "contentDigest"
+                ],
+                "nullable": true
+              },
+              "modelPolicyStatus": {
+                "type": "string",
+                "enum": [
+                  "allowed",
+                  "organization_disallowed"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "deleted"
+                ]
+              },
+              "billingTag": {
+                "nullable": true,
+                "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/BillingTag"
+                  }
+                ]
+              },
+              "activeTurnId": {
+                "type": "string",
+                "nullable": true
+              },
+              "realtimeVoice": {
+                "description": "Fixed Session voice setting; null disables voice. This does not guarantee current provider availability.",
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "zh-CN",
+                      "en-US"
+                    ]
+                  }
+                },
+                "required": [
+                  "language"
+                ],
+                "nullable": true
+              },
+              "realtime": {
+                "description": "The live Realtime connection of this Session, read when the response is produced; null when none is live or the Session is deleted.",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Realtime connection ID.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "connecting: admitted, but the realtime audio stream is not open yet. active: the stream is open and the user can speak, including while a task runs. paused: the stream is still open, but the current task is waiting for the user to answer a clarification question; answering resumes it.",
+                    "type": "string",
+                    "enum": [
+                      "connecting",
+                      "active",
+                      "paused"
+                    ]
+                  },
+                  "audio": {
+                    "type": "object",
+                    "properties": {
+                      "input": {
+                        "description": "One direction of the Realtime connection audio format.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "Little-endian mono samples.",
+                                "type": "string",
+                                "enum": [
+                                  "pcm16"
+                                ]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "One Opus packet per audio frame, decoded at sampleRate.",
+                                "type": "string",
+                                "enum": [
+                                  "opus"
+                                ]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              },
+                              "packetDurationMs": {
+                                "description": "Duration of each Opus packet.",
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "bitrate": {
+                                "description": "Output CBR in bps; absent on input and historical connections.",
+                                "oneOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 16000,
+                                    "maximum": 16000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 24000,
+                                    "maximum": 24000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 32000,
+                                    "maximum": 32000
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels",
+                              "packetDurationMs"
+                            ]
+                          }
+                        ]
+                      },
+                      "output": {
+                        "description": "One direction of the Realtime connection audio format.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "Little-endian mono samples.",
+                                "type": "string",
+                                "enum": [
+                                  "pcm16"
+                                ]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "One Opus packet per audio frame, decoded at sampleRate.",
+                                "type": "string",
+                                "enum": [
+                                  "opus"
+                                ]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              },
+                              "packetDurationMs": {
+                                "description": "Duration of each Opus packet.",
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "bitrate": {
+                                "description": "Output CBR in bps; absent on input and historical connections.",
+                                "oneOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 16000,
+                                    "maximum": 16000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 24000,
+                                    "maximum": 24000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 32000,
+                                    "maximum": 32000
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels",
+                              "packetDurationMs"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "input",
+                      "output"
+                    ]
+                  },
+                  "startedAt": {
+                    "description": "When the Realtime connection was admitted.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "status",
+                  "audio",
+                  "startedAt"
+                ],
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "deletedAt": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "organizationId",
+              "sessionId",
+              "name",
+              "autoTitle",
+              "ownerUserId",
+              "startedByUserId",
+              "createdByType",
+              "readOnly",
+              "sourceSchedulerId",
+              "sourceSchedulerFireId",
+              "model",
+              "modelRevision",
+              "realtimeModel",
+              "realtimeModelRevision",
+              "realtimeModelEtag",
+              "createdWithAgentId",
+              "template",
+              "modelPolicyStatus",
+              "status",
+              "billingTag",
+              "activeTurnId",
+              "realtimeVoice",
+              "realtime",
+              "createdAt",
+              "updatedAt",
+              "deletedAt"
+            ]
+          }
+        },
+        "required": [
+          "session"
+        ]
+      },
+      "SessionClientToolsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "description": "Increments on each replacement that changes the set; 0 before any declaration.",
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "function"
+                  ]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "description",
+                "parameters"
+              ]
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "tools"
+        ]
+      },
+      "ReplaceSessionToolsOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "function"
+                  ]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "description",
+                "parameters"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tools"
+        ],
+        "additionalProperties": false
+      },
+      "PendingClientToolCallsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "description": "Arguments for the declared parameters; the platform async choice is removed.",
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "publishedAt": {
+                  "type": "string"
+                },
+                "deadlineAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "callId",
+                "turnId",
+                "name",
+                "arguments",
+                "publishedAt",
+                "deadlineAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "calls"
         ]
       }
     },

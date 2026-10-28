@@ -183,6 +183,13 @@ export type {
   OrganizationUserUsageOptions,
   OrganizationUserUsageDetailsOptions,
 } from "./usage.js";
+export type {
+  ClientToolDeclaration,
+  ClientToolSet,
+  ReplaceClientToolsOptions,
+  PendingClientToolCall,
+  ClientToolOutputInput,
+} from "./client-tools.js";
 export { UserSchedulers } from "./schedulers.js";
 export type {
   SchedulerSchedule,

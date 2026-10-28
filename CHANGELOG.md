@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Add User self-usage and Organization target-User usage summaries and details,
+  preserving separate date/paging contracts and unknown, unpriced or incomplete
+  facts. Include the installed usage example and actual-service verification.
+
+
 - Add explicit exact-Turn cancellation and checkpoint retry with recoverable
   command identities; wait for retry results without replacing earlier outcomes.
 - Verify active-Turn steering through message admission, eventual cancellation,

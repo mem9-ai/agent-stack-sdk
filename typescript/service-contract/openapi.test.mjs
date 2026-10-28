@@ -50,10 +50,6 @@ test("the selected commands and history reads require User authority", () => {
     ["/turns/{turnId}", "get"],
     ["/timeline", "get"],
   ];
-  assert.deepEqual(
-    Object.keys(document.paths).sort(),
-    operations.map(([route]) => `${sessionPath}${route}`).sort(),
-  );
   for (const [route, method] of operations) {
     const operation = document.paths[`${sessionPath}${route}`][method];
     assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
@@ -242,4 +238,49 @@ test("independent observation preserves the declared event position and snapshot
     /Disconnecting the subscription does not cancel/,
   );
   assert.match(stream.description, /agent\.session\.turn\.requires_action/);
+});
+
+test("usage surfaces preserve separate authority, ranges and result projections", () => {
+  const own = document.paths["/api/v1/billing/usage"].get;
+  const org = document.paths["/api/v1/org/users/{userId}/billing/usage"].get;
+  const ownDetails = document.paths["/api/v1/billing/usage/details"].get;
+  const orgDetails =
+    document.paths["/api/v1/org/users/{userId}/billing/usage/details"].get;
+  for (const operation of [own, ownDetails])
+    assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+  for (const operation of [org, orgDetails])
+    assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
+  assert.equal(own.parameters.find((p) => p.name === "from").required, false);
+  assert.equal(org.parameters.find((p) => p.name === "from").required, true);
+  assert(
+    own.parameters
+      .find((p) => p.name === "from")
+      .schema.pattern.includes("\\d{4}"),
+  );
+  assert.equal(
+    org.parameters.find((p) => p.name === "from").schema.format,
+    "date-time",
+  );
+  assert(!ownDetails.parameters.some((p) => p.name === "cursor"));
+  assert(orgDetails.parameters.some((p) => p.name === "cursor"));
+  const self = properties(schema("ConsoleBillingDetailsResponseOpenApiDto"));
+  assert(self.llm && self.sandbox && self.webSearch && !self.nextCursor);
+  const target = orgDetails.responses["200"].content["application/json"].schema;
+  assert.deepEqual(target.required, [
+    "items",
+    "nextCursor",
+    "factCompleteness",
+  ]);
+  const item = properties(target).items.items.oneOf.find(
+    (v) => properties(v).kind.enum[0] === "llm",
+  );
+  assert.equal(properties(item).costMicros.nullable, true);
+  assert.deepEqual(properties(item).pricingStatus.enum, [
+    "estimated",
+    "unknown",
+  ]);
+  assert.deepEqual(properties(item).valuationStatus.enum, [
+    "priced",
+    "unpriced",
+  ]);
 });

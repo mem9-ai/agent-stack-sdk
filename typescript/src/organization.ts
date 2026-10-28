@@ -1,3 +1,11 @@
+import {
+  usageQuery,
+  userUsagePath,
+  type OrganizationUserUsageOptions,
+  type OrganizationUserUsageDetailsOptions,
+  type OrganizationUserUsageSummary,
+  type OrganizationUserUsageDetails,
+} from "./usage.js";
 import type { AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
 import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
@@ -120,6 +128,28 @@ export class OrganizationClient {
         { requestId: result.requestId },
       );
     return result.data.agent;
+  }
+
+  getUserUsage(
+    userId: string,
+    options: OrganizationUserUsageOptions,
+  ): Promise<OrganizationUserUsageSummary> {
+    const path = userUsagePath(userId, options);
+    return this.#http.get(
+      `${path}${usageQuery(options, ["from", "to", "interval", "tagKey", "tagValue"])}`,
+      options,
+    );
+  }
+
+  getUserUsageDetails(
+    userId: string,
+    options: OrganizationUserUsageDetailsOptions,
+  ): Promise<OrganizationUserUsageDetails> {
+    const path = userUsagePath(userId, options);
+    return this.#http.get(
+      `${path}/details${usageQuery(options, ["from", "to", "kind", "limit", "cursor", "tagKey", "tagValue"])}`,
+      options,
+    );
   }
 
   async getOrganization(options?: RequestOptions): Promise<Organization> {

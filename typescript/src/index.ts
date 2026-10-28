@@ -105,3 +105,19 @@ export type {
   SessionTimelineEntry,
   SessionTimelinePage,
 } from "./history.js";
+
+export { UserFiles, FileUploadOutcomeUnknownError } from "./files.js";
+export type {
+  UserFile,
+  FileUploadCapabilities,
+  CreateFileUploadInput,
+  UploadFileInput,
+  FileUpload,
+  FileUploadStatus,
+  FileUploadPart,
+  UploadedFilePart,
+  FileListOptions,
+  FilePage,
+  FileDownloadGrant,
+  FileContent,
+} from "./files.js";

@@ -2,6 +2,13 @@
 
 ## Unreleased (0.3.0)
 
+- Upload and verify owned file attachments using service-selected inline or
+  multipart transfer, with explicit recovery, cancellation and fixed expiry.
+- List and inspect files, download complete verified content, and redeem
+  short-lived transfer credentials without forwarding API Keys.
+- Include a runnable upload-and-attach example and actual-service evidence that
+  uploaded bytes participate in a conversation.
+
 - Refresh Organization information, End User creation/listing/retrieval and User
   API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
 - Replace the obsolete ServiceUser handle with explicit Organization operations;

@@ -16,7 +16,7 @@ The SDK is pre-1.0 while the TiDB Link HTTP API remains pre-1.0. Each SDK
 release declares its service baselines and supported scope. The current refresh
 covers Organization/End User/Key provisioning, Template discovery, personal Agent
 and Session management, text commands with recoverable final results, conversation
-history, and Realtime Model/Connection preparation against one
+history, verified file attachments and downloads, and Realtime Model/Connection preparation against one
 exact service revision. See the TypeScript README for the supported boundaries
 and the remaining capabilities reserved for later slices.
 

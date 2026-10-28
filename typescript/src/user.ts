@@ -1,3 +1,4 @@
+import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
@@ -143,12 +144,18 @@ export interface SessionPage {
 
 export class UserClient {
   readonly #http: HttpClient;
+  readonly #files: UserFiles;
+
+  get files(): UserFiles {
+    return this.#files;
+  }
 
   constructor(options: UserClientOptions) {
     requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
     if (!isApiKey(options.apiKey, "user"))
       throw new TypeError("UserClient requires a User API Key");
     this.#http = new HttpClient(options);
+    this.#files = new UserFiles(this.#http);
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {

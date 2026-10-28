@@ -31,6 +31,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
+  assert(files.includes("examples/upload-file.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -42,6 +43,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
+        file === "examples/upload-file.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -63,6 +65,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   await writeFile(
     path.join(temporary, "consumer.ts"),
     `import type {
+      UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
+      FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
       Agent,
       AgentRecord,
       AgentTemplatePage,
@@ -127,6 +131,21 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const revoked: UserApiKey = await organization.revokeUserApiKey(rotated.apiKey.apiKeyId);
       void current; void users; void keys; void revoked;
       return found;
+    }
+    async function fileWorkflow(user: UserClient): Promise<UserFile> {
+      const capabilities: FileUploadCapabilities = await user.files.capabilities();
+      const intent: FileUpload = await user.files.createUpload({originalName:"empty", byteSize:0, sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", contentType:null,idempotencyKey:"empty-file"});
+      const status: FileUploadStatus = await user.files.getUpload(intent.uploadId);
+      const part: FileUploadPart = await user.files.presignPart(intent.uploadId,1,"a".repeat(64));
+      const uploaded: UploadedFilePart = await user.files.uploadPart(part,new Uint8Array());
+      await user.files.completeUpload(intent.uploadId,[uploaded]);
+      const page: FilePage = await user.files.list({history:true,limit:1});
+      const content: FileContent = await user.files.getContent(intent.file.fileId);
+      if(content.type === "download") { const grant: FileDownloadGrant = content.grant; await user.files.downloadFromGrant(grant); }
+      await user.files.download(intent.file.fileId);
+      await user.files.cancelUpload(intent.uploadId);
+      void capabilities; void status; void page;
+      return user.files.upload({originalName:"empty",bytes:new Uint8Array(),idempotencyKey:"another-file"});
     }
     async function lifecycleWorkflow(): Promise<Session> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
@@ -318,6 +337,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
+    const { uploadFileWorkflow } = await import("@mem9/tidb-link/examples/upload-file.mjs");
+    assert.equal(typeof uploadFileWorkflow,"function");
     assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");

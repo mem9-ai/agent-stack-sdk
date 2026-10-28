@@ -16,7 +16,6 @@ export interface RawRequestOptions extends Omit<RequestOptions, "body"> {
   headers?: Record<string, string>;
 }
 
-
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
@@ -195,6 +194,9 @@ export class HttpClient {
     this.#apiKey = input.apiKey;
   }
 
+  resolveUrl(value: string): URL {
+    return new URL(value, `${this.#baseUrl}/`);
+  }
 
   get<T>(
     path: string,
@@ -288,25 +290,38 @@ export class HttpClient {
     const { body, ...requestOptions } = options;
     const { response, requestId } = await this.rawResponse(path, {
       ...requestOptions,
-      ...(body === undefined ? {} : {
-        body: JSON.stringify(body),
-        headers: { "content-type": "application/json" },
-      }),
+      ...(body === undefined
+        ? {}
+        : {
+            body: JSON.stringify(body),
+            headers: { "content-type": "application/json" },
+          }),
     });
     let data: T;
     try {
-      data = response.status === 204 ? undefined as T : await response.json() as T;
+      data =
+        response.status === 204
+          ? (undefined as T)
+          : ((await response.json()) as T);
     } catch (cause) {
-      const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : TiDBLinkError;
-      throw new ErrorClass(options.outcomeUnknown
-        ? "TiDB Link accepted the request but returned an unusable response"
-        : "TiDB Link returned invalid JSON", { requestId, cause });
+      const ErrorClass = options.outcomeUnknown
+        ? OutcomeUnknownError
+        : TiDBLinkError;
+      throw new ErrorClass(
+        options.outcomeUnknown
+          ? "TiDB Link accepted the request but returned an unusable response"
+          : "TiDB Link returned invalid JSON",
+        { requestId, cause },
+      );
     }
     return { data, etag: response.headers.get("etag") ?? undefined, requestId };
   }
 
   /** Raw bytes and event streams retain the same credential, redirect and error boundary. */
-  async rawResponse(path: string, options: RawRequestOptions = {}): Promise<{ response: Response; requestId: string }> {
+  async rawResponse(
+    path: string,
+    options: RawRequestOptions = {},
+  ): Promise<{ response: Response; requestId: string }> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
@@ -333,12 +348,12 @@ export class HttpClient {
             ...options.headers,
             authorization: `Bearer ${this.#apiKey}`,
             "x-request-id": stableRequestId,
-            ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+            ...(options.idempotencyKey
+              ? { "idempotency-key": options.idempotencyKey }
+              : {}),
             ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
           },
-          ...(options.body === undefined
-            ? {}
-            : { body: options.body }),
+          ...(options.body === undefined ? {} : { body: options.body }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
@@ -365,10 +380,11 @@ export class HttpClient {
         );
       }
 
-      if (response.ok) return {
-        response,
-        requestId: response.headers.get("x-request-id") ?? stableRequestId,
-      };
+      if (response.ok)
+        return {
+          response,
+          requestId: response.headers.get("x-request-id") ?? stableRequestId,
+        };
 
       if (attempt < attempts && RETRYABLE_STATUS.has(response.status)) {
         await response.arrayBuffer().catch(() => undefined);

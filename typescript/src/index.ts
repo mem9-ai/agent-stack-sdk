@@ -137,3 +137,17 @@ export type {
   PendingClientToolCall,
   ClientToolOutputInput,
 } from "./client-tools.js";
+export { UserSchedulers } from "./schedulers.js";
+export type {
+  SchedulerSchedule,
+  SchedulerDelivery,
+  CreateSchedulerInput,
+  UpdateSchedulerInput,
+  Scheduler,
+  SchedulerResponse,
+  SchedulerPage,
+  SchedulerListOptions,
+  SchedulerMutationOptions,
+  SchedulerFire,
+  SchedulerFirePage,
+} from "./schedulers.js";

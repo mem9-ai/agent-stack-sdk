@@ -18,6 +18,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
   readonly status: number;
   readonly code: string;
   readonly details?: unknown;
+  readonly retryAfter: string | undefined;
 
   constructor(input: {
     status: number;
@@ -25,6 +26,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
     message: string;
     requestId?: string;
     details?: unknown;
+    retryAfter?: string;
   }) {
     super(
       input.message,
@@ -35,6 +37,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
     this.status = input.status;
     this.code = input.code;
     this.details = input.details;
+    this.retryAfter = input.retryAfter;
   }
 }
 

@@ -21,6 +21,7 @@
     "./examples/control-turn.mjs": "./examples/control-turn.mjs",
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/observe-message.mjs": "./examples/observe-message.mjs",
+    "./examples/schedule-task.mjs": "./examples/schedule-task.mjs",
     "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs"
   },
   "files": [
@@ -33,6 +34,7 @@
     "examples/control-turn.mjs",
     "examples/upload-file.mjs",
     "examples/observe-message.mjs",
+    "examples/schedule-task.mjs",
     "examples/answer-client-tool.mjs"
   ],
   "scripts": {

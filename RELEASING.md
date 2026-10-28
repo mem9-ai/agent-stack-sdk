@@ -9,7 +9,7 @@ is pre-1.0.
    each baseline's scope.
 2. Update the package version and release notes.
 3. Run the local checks in `CONTRIBUTING.md`; CI also verifies the pinned TiDB
-   Link contract on Node.js 22.12. Verify the current provisioning, lifecycle, Realtime, text/progress/history and file-transfer
+   Link contract on Node.js 22.12. Verify the current provisioning, lifecycle, Realtime, text/progress/history, file-transfer and Scheduler
    slices with `npm run test:service` on the service's Node.js 26 runtime and a
    dedicated test database as documented in the package README. CI's frozen
    contract check alone does not replace actual-service evidence.

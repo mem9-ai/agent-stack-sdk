@@ -584,11 +584,58 @@ for (const failure of ["disconnect", "conflict"]) {
 }
 
 
-test("request options cannot enable automatic mutation replay", async () => {
-  const client = new OrganizationClient({ baseUrl: "http://127.0.0.1:1", apiKey: organizationApiKey });
+test("public request options cannot change operations or enable unsafe replay", async () => {
+  const requests = [];
+  let inFlightOptions;
+  const baseUrl = await serve((request, response) => {
+    requests.push(request.method);
+    if (inFlightOptions) {
+      if (request.method === "GET") inFlightOptions.retry = "safe";
+      else
+        return response
+          .writeHead(503, { "content-type": "application/json" })
+          .end(
+            JSON.stringify({
+              error: {
+                code: "service_unavailable",
+                message: "Outcome uncertain",
+              },
+            }),
+          );
+    }
+    response
+      .writeHead(200, { "content-type": "application/json", etag: "model-v1" })
+      .end(JSON.stringify({ session: { sessionId: "session_1" } }));
+  });
+  const client = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  });
+  const user = new UserClient({
+    baseUrl,
+    apiKey: "ti_user_key_" + "x".repeat(43),
+  });
+  const session = user.session("session_1");
   for (const operation of [
     () => client.createEndUser({}, { idempotent: true }),
-    () => client.createUserApiKey("user_1", { name: "backend" }, { idempotent: true }),
+    () =>
+      client.createUserApiKey(
+        "user_1",
+        { name: "backend" },
+        { idempotent: true },
+      ),
     () => client.rotateUserApiKey("key_1", { idempotent: true }),
-  ]) await assert.rejects(operation(), TypeError);
+    () => session.refresh({ method: "DELETE", body: { unexpected: true } }),
+    () => session.getRealtimeConnection({ method: "DELETE" }),
+    () => session.suggestName({ userText: "Name this" }, { idempotent: true }),
+    () => session.rename("Name", { retry: "safe" }),
+  ])
+    await assert.rejects(operation(), TypeError);
+  assert.deepEqual(requests, []);
+  inFlightOptions = {};
+  await assert.rejects(
+    session.setModel("next-model", inFlightOptions),
+    OutcomeUnknownError,
+  );
+  assert.deepEqual(requests, ["GET", "PATCH"]);
 });

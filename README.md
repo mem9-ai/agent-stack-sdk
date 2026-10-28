@@ -13,7 +13,7 @@ runtime dependencies.
 - [Security policy](SECURITY.md)
 
 The SDK is pre-1.0 while the TiDB Link HTTP API remains pre-1.0. Each SDK
-release declares its service baselines and supported scope. The current refresh
+release declares its exact service baseline and supported scope. This package
 covers Organization/End User/Key provisioning, Template discovery, personal Agent
 and Session management, text commands with recoverable final results and continuous
 progress, Client Tools, explicit cancellation and checkpoint retry, conversation

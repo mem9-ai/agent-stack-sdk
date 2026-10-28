@@ -176,6 +176,13 @@ export function requireKnownKeys(
   if (unknown) throw new TypeError(`${label}.${unknown} is not supported`);
 }
 
+export const requestOptions = (
+  options: Pick<RequestOptions, "requestId" | "signal"> = {},
+): Pick<RequestOptions, "requestId" | "signal"> => {
+  requireKnownKeys(options, ["requestId", "signal"], "Request options");
+  return { ...options };
+};
+
 /** Check the frozen wire grammar without retaining or exposing the credential. */
 export const isApiKey = (
   value: unknown,

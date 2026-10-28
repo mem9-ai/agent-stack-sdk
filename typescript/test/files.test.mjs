@@ -300,24 +300,30 @@ test("file listing preserves its own cursor/history semantics and verified downl
   );
 });
 
-test("uncertain file creation retains its key and never repeats the effect", async () => {
+test("uncertain file creation retains its dispatched key after caller mutation and never repeats the effect", async () => {
   let attempts = 0;
-  const baseUrl = await serve((req, res) => {
+  let sentKey;
+  const input = {
+    originalName: "x",
+    bytes: new Uint8Array(),
+    idempotencyKey: "recover-original",
+  };
+  const baseUrl = await serve((req) => {
     attempts++;
+    sentKey = req.headers["idempotency-key"];
+    input.idempotencyKey = "changed-after-dispatch";
     req.socket.destroy();
   });
   const user = new UserClient({ baseUrl, apiKey });
   await assert.rejects(
-    user.files.upload({
-      originalName: "x",
-      bytes: new Uint8Array(),
-      idempotencyKey: "recover-original",
-    }),
+    user.files.upload(input),
     (error) =>
       error.name === "FileUploadOutcomeUnknownError" &&
       error.idempotencyKey === "recover-original" &&
+      error.idempotencyKey === sentKey &&
       error.uploadId === undefined,
   );
+  assert.equal(sentKey, "recover-original");
   assert.equal(attempts, 1);
 });
 

@@ -9,6 +9,7 @@ import { UserSchedulers } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
+  requestOptions,
   HttpClient,
   isApiKey,
   paginationQuery,
@@ -112,6 +113,7 @@ export class Agent {
   }
 
   async refresh(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
       `/api/v1/user/agents/${encodeURIComponent(this.id)}`,
       options,
@@ -124,6 +126,7 @@ export class Agent {
     input: UpdateAgentInput,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     requireKnownKeys(input, ["additionalInstructions"], "Agent preferences");
     if (
       input.additionalInstructions !== null &&
@@ -173,6 +176,7 @@ export class UserClient {
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agents: AgentRecord[] }>(
       "/api/v1/user/agents",
       options,
@@ -223,6 +227,7 @@ export class UserClient {
   }
 
   async getAgent(id: string, options?: RequestOptions): Promise<Agent> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
       `/api/v1/user/agents/${encodeURIComponent(id)}`,
       options,
@@ -240,6 +245,12 @@ export class UserClient {
   listModels(
     options?: RequestOptions & { agentId?: string },
   ): Promise<AgentModelCatalog> {
+    if (options)
+      requireKnownKeys(
+        options,
+        ["agentId", "signal", "requestId"],
+        "Model list options",
+      );
     const query =
       options?.agentId === undefined
         ? ""
@@ -248,7 +259,7 @@ export class UserClient {
   }
 
   listRealtimeModels(options?: RequestOptions): Promise<RealtimeModelCatalog> {
-    return this.#http.get("/api/v1/realtime-models", options);
+    return this.#http.get("/api/v1/realtime-models", requestOptions(options));
   }
 
   async listSessions(options?: ListOptions): Promise<SessionPage> {

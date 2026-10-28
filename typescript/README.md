@@ -8,14 +8,13 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, conversation history, file attachments, Schedulers, prerecorded audio, and
-Realtime Model/Connection preparation for [service revision
+continuous progress, Client Tools, conversation history, file attachments, Schedulers,
+Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Client Tools and
-usage remain subsequent slices. Browser, MSP, management and device APIs are
+default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
 outside this refresh.
 
 ## Quick start
@@ -350,6 +349,87 @@ submits it again. Run it with `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` 
 
 ```sh
 node node_modules/@mem9/tidb-link/examples/observe-message.mjs
+```
+
+## Session Client Tools
+
+Declare the application functions that an ordinary text Turn may request. The
+application executes them itself; the SDK only declares tools and exchanges calls
+and results. Parameters are JSON Schema objects. The service validates reserved
+names, schema size/depth and combined tool limits; the `async` argument is reserved
+for the platform and is not part of application arguments.
+
+```ts
+import type { ClientToolDeclaration } from "@mem9/tidb-link";
+const tools: ClientToolDeclaration[] = [{
+  type: "function",
+  name: "lookup_order",
+  description: "Read an order status",
+  parameters: {
+    type: "object",
+    properties: { orderId: { type: "string" } },
+    required: ["orderId"],
+    additionalProperties: false,
+  },
+}];
+const session = await agent.createSession({
+  idempotencyKey: savedSessionCreationKey,
+  tools,
+});
+const current = await session.getClientTools();
+await session.replaceClientTools(tools, { ifMatch: current.etag });
+```
+
+Replacement is the complete set, with `[]` clearing it. Its ETag is independent of
+the Session's model ETag. Stale replacement returns `precondition_failed`; read the
+set and decide again. A Turn retains the declarations admitted when it started.
+An identical replacement keeps its revision. Scheduler and audio inputs do not
+use the Session-client declarations under this service baseline.
+
+After submitting a message, retrieve pending calls independently of any progress
+subscription:
+
+```ts
+const calls = await session.listPendingClientToolCalls();
+const call = calls.find((call) => call.callId === savedCallId);
+if (!call || Date.parse(call.deadlineAt) <= Date.now()) {
+  throw new Error("The call is unavailable or expired; do not execute it again");
+}
+// The application obtains this value from its own business function.
+const output = JSON.stringify({ status: "shipped" });
+const receipt = await session.submitClientToolOutput({
+  clientEventId: savedOutputCommandId,
+  turnId: call.turnId,
+  callId: call.callId,
+  output,
+});
+// To report a business failure, supply error: { message: "Warehouse unavailable" }
+// instead of output.
+```
+
+The result command has its own stable `clientEventId`; it is distinct from the
+call's `callId` and the message's input identity. Its receipt confirms admission,
+not successful completion of the message. Continue with the original message's
+`waitForResult(inputId)` or `observe(inputId)`. An application-reported tool error
+may still produce a successful answer explaining that failure.
+
+Pending reads count as delivery and preserve `publishedAt`/`deadlineAt`. Calls
+have a 60-second deadline from publication. Retain the call identity and the
+application's result before submission; a disconnect does not authorize executing
+the business function again. After uncertain submission, reconcile its original
+command with `getInteraction(clientEventId)` or `reconcileInteraction(clientEventId)`.
+The SDK never retries output submission automatically. Repeating the exact command
+recovers its original receipt; a new command for a settled call is refused with
+`client_tool_call_settled`. Foreign, unknown and Hardware calls are unavailable
+through this endpoint. Hardware results belong to the device connection and are
+not an SDK Client Tool capability.
+
+The packaged `answer-client-tool.mjs` example submits one already produced result.
+Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
+`CLIENT_EVENT_ID` and exactly one of `TOOL_OUTPUT` or `TOOL_ERROR`:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/answer-client-tool.mjs
 ```
 
 ## Saved conversation history
@@ -717,6 +797,54 @@ uncertain connection open or end, inspect the newest connection. An uncertain
 connect-token response cannot recover that plaintext token; deliberately mint a
 new token after reconciling the connection state.
 
+## User usage
+
+A User client reads its own usage. An Organization client must name a target User
+in that Organization. These are distinct response projections and date contracts:
+
+| Read | User client | Organization client |
+| --- | --- | --- |
+| Summary | `getUsage(options)` | `getUserUsage(userId, options)` |
+| Details | `getUsageDetails(options)` | `getUserUsageDetails(userId, options)` |
+| Range | Optional inclusive UTC dates, `YYYY-MM-DD`; at most 370 days | Required exact UTC timestamps with milliseconds, inclusive `from` and exclusive `to`; at most 31 days |
+| Buckets | `period: "day"` or `"week"` chooses the default range; series remains daily | `interval: "hour"`, `"day"`, `"week"` or `"month"` |
+| Detail limits | Separate `llm`, `sandbox` and `webSearch` arrays; `limit` applies per kind, with no cursor | Globally ordered `items`; optional `kind`, `limit` and opaque `cursor`; `nextCursor: null` ends the stream |
+
+Both support an exact `tagKey`/`tagValue` pair. Send both or neither. Values retain
+case sensitivity and the service's normalization rules. Preserve the original
+range, kind and tag filters when following an Organization cursor. Details accept
+limits from 1 to 500. The User detail endpoint cannot retrieve older rows beyond
+its limit through a fabricated continuation; Organization details support paging.
+
+```ts
+const own = await user.getUsage({
+  from: "2030-01-02", to: "2030-01-02", period: "day",
+});
+const page = await organization.getUserUsageDetails(targetUserId, {
+  from: "2030-01-02T00:00:00.000Z",
+  to: "2030-01-03T00:00:00.000Z",
+  limit: 100,
+});
+```
+
+The SDK returns the service's values unchanged. `costMicros: null`,
+`pricingStatus: "unknown"`, `valuationStatus: "unpriced"`, and incomplete fact or
+valuation counts retain different meanings. A stored numeric cost does not make
+an unpriced fact billable. Priced totals exclude unpriced facts. Scalar cost totals describe platform-borne
+costs; `costByBearer` preserves the separate platform, customer and unknown
+categories. Public-list estimates are not supplier invoices or known final charges. Fact completeness and
+valuation completeness are independent. Do not display missing costs as zero or
+infer a balance from these reads. Organization projections intentionally omit
+some details available in the User's own projection.
+
+The installed example `@mem9/tidb-link/examples/read-usage.mjs` exports
+`readOwnUsage` and `readUserUsage`, each returning a summary and the first detail
+page. The CLI requires `AGENT_SERVICE_URL` and `USAGE_AUTHORITY=user` with
+`USER_API_KEY`, or `USAGE_AUTHORITY=organization` with `ORGANIZATION_API_KEY` and
+`END_USER_ID`. Supply `USAGE_FROM`/`USAGE_TO` in the corresponding date format;
+`TAG_KEY`/`TAG_VALUE` are optional. It performs reads only and does not claim that
+a first detail page is complete history.
+
 ## Compatibility and verification
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
@@ -727,7 +855,7 @@ fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks frozen text/progress/history, file-transfer, Scheduler and audio OpenAPI subsets from
+`npm run test:service-contract` checks frozen selected SDK OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -755,7 +883,9 @@ exercise actual acceptance, final success/failure/interruption, local timeout an
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor
 reconnection/refusal, original-result confirmation, local observation timeout and
-live credential revocation without remote cancellation. A forwarding proxy drops only
+live credential revocation without remote cancellation. Client Tool cases declare and replace tools, resume pending reads, explicitly return
+application output or errors, and observe those values in real Runtime answers, with
+ownership, stale revision, settled-call and unavailable-call refusals. A forwarding proxy drops only
 an actual service response to prove uncertain-submission recovery. Control cases
 verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture
@@ -776,5 +906,7 @@ The public Session projection exposes the frozen Template digest but hides store
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
+Usage cases seed controlled facts and verify both public projections, exact filters,
+paging and authority without executing messages to manufacture billing data.
 No production supplier credentials or WebSocket redemption are needed. A
 mismatch or unavailable service fails this check instead of silently skipping it.

@@ -7,6 +7,13 @@
 - Preserve audio response interruption and unknown outcomes without text replay
   promises; verify actual transcription, budget refusal and saved Turn outcomes.
 
+- Add User self-usage and Organization target-User usage summaries and details,
+  preserving separate date/paging contracts and unknown, unpriced or incomplete
+  facts. Include the installed usage example and actual-service verification.
+
+- Declare and replace Session Client Tools, recover pending calls, and explicitly
+  submit application results with stable command identities. Include an installed
+  result-submission example and real Runtime success/failure verification.
 - Create and manage one-time and recurring Schedulers with stable creation keys,
   explicit conditional writes, paginated reads and immutable fire results.
 - Preserve service retry hints and verify SDK-created schedules through the real

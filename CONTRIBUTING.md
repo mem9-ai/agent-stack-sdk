@@ -14,13 +14,13 @@ npm test
 npm run pack:check
 ```
 
-The frozen text/progress/history, file-transfer, Scheduler and audio contract check uses the committed exact-service snapshot:
+The frozen selected SDK contract checks use committed exact-service snapshots:
 
 ```sh
 npm run test:service-contract
 ```
 
-For current provisioning, Template/Agent/Session management, text/results/progress/history, cancellation/checkpoint retry, file attachments, Schedulers, prerecorded audio and Realtime preparation,
+For current provisioning, Template/Agent/Session management, text/results/progress/history, cancellation/checkpoint retry, file attachments, Schedulers, Realtime preparation, prerecorded audio and User usage,
 run `npm run test:service` with the exact service checkout and a dedicated TiDB
 test database; setup is in [the package README](typescript/README.md#compatibility-and-verification).
 This verifies the installed packed SDK and its examples against the actual service.

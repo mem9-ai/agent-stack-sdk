@@ -31,11 +31,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
+  assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/schedule-task.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
+  assert(files.includes("examples/answer-client-tool.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -47,11 +49,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
+        file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/schedule-task.mjs" ||
         file === "examples/submit-audio.mjs" ||
         file === "examples/observe-message.mjs" ||
+        file === "examples/answer-client-tool.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -101,9 +105,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionTimelinePage,
       TurnPage,
       WaitForResultOptions,
+      UserUsageSummary, UserUsageDetails, UserUsageOptions,
+      OrganizationUserUsageSummary, OrganizationUserUsageDetails,
+      OrganizationUserUsageOptions, OrganizationUserUsageDetailsOptions,
       TurnCommandInput,
       RetryReceipt,
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
+      ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
     } from "@mem9/tidb-link";
     import {
       TIDB_LINK_API_VERSION,
@@ -145,6 +153,20 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const revoked: UserApiKey = await organization.revokeUserApiKey(rotated.apiKey.apiKeyId);
       void current; void users; void keys; void revoked;
       return found;
+    }
+    async function clientToolsWorkflow(session: Session, agent: Agent) {
+      const tool: ClientToolDeclaration = {type:"function",name:"lookup_order",description:"Read an order",parameters:{type:"object",properties:{orderId:{type:"string"}}}};
+      const created: Session = await agent.createSession({idempotencyKey:"tools-session",tools:[tool]});
+      const set: ClientToolSet = await session.getClientTools();
+      const options: ReplaceClientToolsOptions = {ifMatch:set.etag};
+      const replaced: ClientToolSet = await session.replaceClientTools([],options);
+      const calls: PendingClientToolCall[] = await session.listPendingClientToolCalls();
+      const input: ClientToolOutputInput = {clientEventId:"output-1",turnId:calls[0]!.turnId,callId:calls[0]!.callId,output:"shipped"};
+      const receipt: SessionInteraction = await session.submitClientToolOutput(input);
+      await session.submitClientToolOutput({clientEventId:"failure-1",turnId:input.turnId,callId:input.callId,error:{message:"Unavailable"}});
+      // @ts-expect-error A result is either output or error.
+      const invalid: ClientToolOutputInput = {clientEventId:"bad",turnId:"turn",callId:"call",output:"ok",error:{message:"failed"}};
+      void created; void replaced; void receipt; void invalid;
     }
     async function controlWorkflow(session: Session): Promise<TurnResult> {
       const input: TurnCommandInput = { clientEventId: "cancel-command", turnId: "turn" };
@@ -208,6 +230,23 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const stopped = new ObservationStoppedError("Stopped", {sessionId: session.id, inputId: "original-input", cursor: "saved-position"});
       const cursor: string | undefined = stopped.cursor;
       void cursor;
+    }
+    async function usageWorkflow() {
+      const user = new UserClient({baseUrl, apiKey: userApiKey});
+      const options: UserUsageOptions = {from:"2030-01-02",to:"2030-01-02"};
+      const own: UserUsageSummary = await user.getUsage(options);
+      const details: UserUsageDetails = await user.getUsageDetails({...options,limit:1});
+      const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour"};
+      const target: OrganizationUserUsageSummary = await organization.getUserUsage("user_1",range);
+      const pageOptions: OrganizationUserUsageDetailsOptions = {from:range.from,to:range.to,kind:"llm",limit:1};
+      const page: OrganizationUserUsageDetails = await organization.getUserUsageDetails("user_1",pageOptions);
+      const cost: number | null | undefined = page.items[0]?.costMicros;
+      const cursor: string | null = page.nextCursor;
+      // @ts-expect-error User usage has no other User selector or cursor.
+      await user.getUsageDetails({userId:"other",cursor:"unsupported"});
+      // @ts-expect-error Organization aggregate requires an explicit target User.
+      await organization.getUserUsage(range);
+      void own;void details;void target;void cost;void cursor;
     }
     async function lifecycleWorkflow(): Promise<Session> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
@@ -397,6 +436,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
+    const { readOwnUsage, readUserUsage } = await import("@mem9/tidb-link/examples/read-usage.mjs");
+    assert.equal(typeof readOwnUsage,"function");
+    assert.equal(typeof readUserUsage,"function");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
     const { uploadFileWorkflow } = await import("@mem9/tidb-link/examples/upload-file.mjs");
@@ -407,6 +449,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof submitAudioWorkflow,"function");
     const { observeMessageWorkflow } = await import("@mem9/tidb-link/examples/observe-message.mjs");
     assert.equal(typeof observeMessageWorkflow,"function");
+    const { answerClientToolWorkflow } = await import("@mem9/tidb-link/examples/answer-client-tool.mjs");
+    assert.equal(typeof answerClientToolWorkflow,"function");
     assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");

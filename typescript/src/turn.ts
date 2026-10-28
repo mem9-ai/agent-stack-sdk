@@ -54,6 +54,42 @@ export type TurnResult = ResultIdentity &
     | { type: "clarification"; clarification: ClarificationItem }
   );
 
+const validClarification = (value: unknown): value is ClarificationItem => {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
+  const item = value as Record<string, unknown>;
+  const strings = (
+    items: unknown,
+    min: number,
+    max: number,
+  ): items is string[] =>
+    Array.isArray(items) &&
+    items.length >= min &&
+    items.length <= max &&
+    items.every((text) => typeof text === "string" && text.length > 0);
+  if (
+    typeof item.prompt !== "string" ||
+    !item.prompt ||
+    (item.selectionMode !== "single" && item.selectionMode !== "multiple") ||
+    !strings(item.answerChoices, 2, item.selectionMode === "single" ? 3 : 8)
+  )
+    return false;
+  if (item.response === undefined) return true;
+  if (
+    typeof item.response !== "object" ||
+    item.response === null ||
+    Array.isArray(item.response)
+  )
+    return false;
+  const response = item.response as Record<string, unknown>;
+  return (
+    Object.keys(response).sort().join(",") === "answers,responseTurnId" &&
+    typeof response.responseTurnId === "string" &&
+    response.responseTurnId.length > 0 &&
+    strings(response.answers, 1, item.selectionMode === "single" ? 1 : 9)
+  );
+};
+
 export const submitMessage = async (
   http: HttpClient,
   sessionId: string,
@@ -236,10 +272,13 @@ export const waitForResult = async (
           turn.completedAt !== interaction.result.completedAt ||
           !message ||
           message.role !== "assistant" ||
+          typeof message.id !== "string" ||
           !message.id ||
           typeof message.content !== "string" ||
           message.turnId !== turnId ||
-          message.sessionId !== sessionId
+          message.sessionId !== sessionId ||
+          (turn.clarificationItem !== undefined &&
+            !validClarification(turn.clarificationItem))
         )
           throw new TiDBLinkError(
             "Saved Turn does not match the original successful execution",

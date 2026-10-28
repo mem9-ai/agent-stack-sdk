@@ -363,11 +363,12 @@ export class Session {
     options?: WaitForResultOptions,
   ): Promise<TurnResult> {
     validateWaitOptions(options);
-    await this.submitMessage(input);
-    return this.waitForResult(input.clientEventId, {
+    const waitOptions = {
       ...(input.signal ? { signal: input.signal } : {}),
       ...options,
-    });
+    };
+    const accepted = await this.submitMessage(input);
+    return this.waitForResult(accepted.inputId, waitOptions);
   }
 }
 

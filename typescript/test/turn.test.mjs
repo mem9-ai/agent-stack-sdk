@@ -257,6 +257,7 @@ test("a final answer must belong to the original execution and cannot be substit
     { status: "running" },
     { id: "other" },
     { assistantMessage: null },
+    { assistantMessage: { ...savedTurn().assistantMessage, id: 42 } },
     { assistantMessage: { ...savedTurn().assistantMessage, turnId: "other" } },
   ]) {
     const baseUrl = await serve((req, res) =>
@@ -380,5 +381,65 @@ test("the wait deadline also interrupts a response whose body never completes", 
   await assert.rejects(
     sessionFor(baseUrl).waitForResult("input_1", { timeoutMs: 20 }),
     (e) => e.name === "TurnWaitTimeoutError" && e.inputId === "input_1",
+  );
+});
+
+test("a malformed saved clarification cannot become a successful typed result", async () => {
+  for (const clarificationItem of [
+    {},
+    {
+      prompt: "Choose",
+      selectionMode: "impossible",
+      answerChoices: ["A", "B"],
+    },
+    { prompt: "", selectionMode: "single", answerChoices: ["A", "B"] },
+    {
+      prompt: "Choose",
+      selectionMode: "single",
+      answerChoices: ["A", "B", "C", "D"],
+    },
+    {
+      prompt: "Choose",
+      selectionMode: "multiple",
+      answerChoices: ["A", "B"],
+      response: { answers: [], responseTurnId: "turn_2" },
+    },
+  ]) {
+    const baseUrl = await serve((req, res) =>
+      json(
+        res,
+        req.url.endsWith("/turns/turn_1")
+          ? { turn: savedTurn({ clarificationItem }) }
+          : { interaction: finalReceipt() },
+      ),
+    );
+    await assert.rejects(
+      sessionFor(baseUrl).waitForResult("input_1"),
+      OutcomeUnknownError,
+    );
+  }
+});
+
+test("turn waiting stays bound to its submitted identity even if the caller mutates the input object", async () => {
+  const input = { clientEventId: "input_1", text: "Hello" };
+  const reads = [];
+  const baseUrl = await serve((req, res) => {
+    if (req.method === "POST") {
+      input.clientEventId = "other_input";
+      return json(res, { interaction: finalReceipt() }, 202);
+    }
+    reads.push(req.url);
+    json(
+      res,
+      req.url.endsWith("/turns/turn_1")
+        ? { turn: savedTurn() }
+        : { interaction: finalReceipt() },
+    );
+  });
+  const result = await sessionFor(baseUrl).turn(input);
+  assert.equal(result.inputId, "input_1");
+  assert.equal(
+    reads[0],
+    "/api/v1/user/sessions/session_1/interactions/input_1",
   );
 });

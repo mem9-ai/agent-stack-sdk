@@ -7,13 +7,14 @@ declarations and no runtime dependencies.
 
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
-text submission, original-result waiting, continuous progress and conversation history, and
+text submission, steering, cancellation, checkpoint retry, original-result waiting,
+continuous progress and conversation history, and
 Realtime Model/Connection preparation for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Explicit steering/cancellation/retry helpers, Client Tools, files, Schedulers and
+default Agents and general Agent overrides are removed. Client Tools, files, Schedulers and
 usage remain subsequent slices. Browser, MSP, management and device APIs are
 outside this refresh.
 
@@ -375,6 +376,62 @@ precede an already consumed Turn-list cursor; refresh Turn history or use
 Timeline for durable ordering. History is readable content, not authority for an
 original request's result: use its interaction receipt for that outcome.
 
+## Steering, cancellation and checkpoint retry
+
+Send another `submitMessage` while a Turn is active to add requirements. Its
+receipt reports `mode: "steered"` and the same `turnId`; `appliedAt` records actual
+incorporation. This is the service's ordinary message admission, so a message
+arriving after completion may start a new Turn. No target-locked steering command
+is offered by this service. Inspect the receipt rather than assuming which Turn
+accepted the message.
+
+Cancellation targets an exact Turn and has its own stable command identity:
+
+```ts
+const stop = await session.cancel({
+  clientEventId: savedCancellationId,
+  turnId: original.turnId,
+});
+const cancellation = await session.getInteraction(stop.inputId);
+```
+
+Acceptance requests a stop; it does not establish termination or undo completed
+effects. Read the cancellation receipt or the original message receipt until its
+`result.status` is terminal. A completed Turn can retain success if completion won
+the race. A stale target is refused rather than cancelling its successor.
+
+Checkpoint retry deliberately starts another execution of the selected Turn:
+
+```ts
+const retry = await session.retry({
+  clientEventId: savedRetryId,
+  turnId: original.turnId,
+});
+const retried = await session.waitForResult(retry.clientEventId);
+const earlier = await session.getInteraction(original.inputId);
+```
+
+The retry acceptance contains `{clientEventId, sessionId, turnId, disposition:
+"retrying"}`. Its durable interaction is readable using `clientEventId`, including
+through `reconcileInteraction`. Waiting accepts message and retry identities; a
+successful saved answer must match that interaction's execution completion time.
+Earlier failed or interrupted receipts keep their original outcome even when the
+Turn later succeeds. A cancellation receipt is not an answer receipt.
+
+Retry is disabled by default in Agent Service. `checkpoint_runtime_unavailable`
+and other eligibility or authority refusals remain `TiDBLinkApiError`; the SDK
+never substitutes a new message. An uncertain cancellation or retry preserves its
+Session, command and Turn IDs in `OutcomeUnknownError`. Read the original receipt
+before deciding whether to repeat the identical command. A new ID is a new
+request, not network recovery.
+
+The installed `@mem9/tidb-link/examples/control-turn.mjs` exports
+`controlTurnWorkflow`. It returns cancellation acceptance for `action: "cancel"`
+and waits for the separate retry result for `action: "retry"`. Run it with
+`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CLIENT_EVENT_ID` and
+`TURN_ACTION` set; retain those identities before dispatch. This example never
+chooses to retry automatically.
+
 ## Realtime connection preparation
 
 A backend can discover the published Realtime Models and prepare an existing
@@ -472,7 +529,7 @@ new token after reconciling the connection state.
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
 revision. The provisioning, lifecycle, Realtime and text constants and package
 fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
-`tidbLinkTextRevision` covers text commands, progress, original results and history;
+`tidbLinkTextRevision` covers text and control commands, progress, original results and history;
 `tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
@@ -505,8 +562,12 @@ exercise actual acceptance, final success/failure/interruption, local timeout an
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor
 reconnection/refusal, original-result confirmation, local observation timeout and
-live credential revocation without remote cancellation. A forwarding proxy drops only an actual
-service response to prove uncertain-submission recovery.
+live credential revocation without remote cancellation. A forwarding proxy drops only
+an actual service response to prove uncertain-submission recovery. Control cases
+verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
+enabled checkpoint retry with an unchanged original outcome. The enabled fixture
+uses the existing controlled Drive9 and model suppliers; real supplier deployment
+certification is outside this evidence.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

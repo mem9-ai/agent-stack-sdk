@@ -231,12 +231,13 @@ export const waitForResult = async (
       });
       turnId = interaction.turnId;
       if (
-        interaction.kind !== "message" ||
-        !interaction.message ||
-        interaction.message.role !== "user"
+        (interaction.kind !== "message" && interaction.kind !== "retry") ||
+        (interaction.kind === "message" &&
+          (!interaction.message || interaction.message.role !== "user")) ||
+        (interaction.kind === "retry" && interaction.message !== null)
       )
         throw new TiDBLinkError(
-          "Waiting for a text result requires a message receipt",
+          "Waiting for a result requires a message or checkpoint retry receipt",
         );
       if (interaction.rejection || interaction.mode === "rejected")
         throw new InputNotAppliedError(sessionId, inputId, turnId);
@@ -258,7 +259,7 @@ export const waitForResult = async (
       if (interaction.result.status === "interrupted")
         throw new TurnInterruptedError(turnId, undefined, sessionId, inputId);
       if (interaction.result.status === "succeeded") {
-        if (!interaction.appliedAt)
+        if (interaction.kind === "message" && !interaction.appliedAt)
           throw new InputNotAppliedError(sessionId, inputId, turnId);
         const turn = await getTurn(http, sessionId, turnId, {
           signal,

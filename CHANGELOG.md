@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Add explicit exact-Turn cancellation and checkpoint retry with recoverable
+  command identities; wait for retry results without replacing earlier outcomes.
+- Verify active-Turn steering through message admission, eventual cancellation,
+  enabled and disabled checkpoint retry using the installed SDK and real service.
+
 - Observe Session progress with resumable event cursors and complete draft snapshots;
   confirm final results through the original receipt and preserve recovery identities
   when observation stops. Include a runnable installed-package observation example.

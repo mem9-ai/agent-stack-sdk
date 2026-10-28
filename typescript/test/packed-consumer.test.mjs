@@ -31,6 +31,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
+  assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
@@ -43,6 +44,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
+        file === "examples/control-turn.mjs" ||
         file === "examples/observe-message.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
@@ -89,6 +91,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionTimelinePage,
       TurnPage,
       WaitForResultOptions,
+      TurnCommandInput,
+      RetryReceipt,
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
     } from "@mem9/tidb-link";
     import {
@@ -131,6 +135,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const revoked: UserApiKey = await organization.revokeUserApiKey(rotated.apiKey.apiKeyId);
       void current; void users; void keys; void revoked;
       return found;
+    }
+    async function controlWorkflow(session: Session): Promise<TurnResult> {
+      const input: TurnCommandInput = { clientEventId: "cancel-command", turnId: "turn" };
+      const cancellation: SessionInteraction = await session.cancel(input);
+      const retried: RetryReceipt = await session.retry({ ...input, clientEventId: "retry-command" });
+      void cancellation;
+      return session.waitForResult(retried.clientEventId);
     }
     async function progressWorkflow(session: Session) {
       const options: SessionEventsOptions = {cursor: "saved-position"};

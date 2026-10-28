@@ -18,6 +18,7 @@
     "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
     "./examples/create-session.mjs": "./examples/create-session.mjs",
     "./examples/send-message.mjs": "./examples/send-message.mjs",
+    "./examples/control-turn.mjs": "./examples/control-turn.mjs",
     "./examples/observe-message.mjs": "./examples/observe-message.mjs"
   },
   "files": [
@@ -27,6 +28,7 @@
     "examples/prepare-realtime-connection.mjs",
     "examples/create-session.mjs",
     "examples/send-message.mjs",
+    "examples/control-turn.mjs",
     "examples/observe-message.mjs"
   ],
   "scripts": {

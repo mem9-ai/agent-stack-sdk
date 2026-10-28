@@ -33,6 +33,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/send-message.mjs"));
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
+  assert(files.includes("examples/upload-file.mjs"));
+  assert(files.includes("examples/schedule-task.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
@@ -47,6 +49,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
+        file === "examples/upload-file.mjs" ||
+        file === "examples/schedule-task.mjs" ||
         file === "examples/observe-message.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
@@ -69,6 +73,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   await writeFile(
     path.join(temporary, "consumer.ts"),
     `import type {
+      Scheduler, SchedulerResponse, SchedulerFirePage, SchedulerPage, CreateSchedulerInput,
+      UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
+      FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
       Agent,
       AgentRecord,
       AgentTemplatePage,
@@ -147,6 +154,36 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const retried: RetryReceipt = await session.retry({ ...input, clientEventId: "retry-command" });
       void cancellation;
       return session.waitForResult(retried.clientEventId);
+    }
+    async function schedulerWorkflow(user: UserClient): Promise<Scheduler> {
+      const input: CreateSchedulerInput = {agentId:"agent-1",title:"Report",prompt:"Summarize",schedule:{kind:"once",after:"1h"},idempotencyKey:"scheduler-1"};
+      const created: SchedulerResponse = await user.schedulers.create(input);
+      const bound: CreateSchedulerInput = {delivery:{target:"bound_session",sessionId:"session-1"},title:"Report",prompt:"Summarize",schedule:{kind:"cron",cronExpr:"0 9 * * *",timezone:"Asia/Shanghai"},idempotencyKey:"scheduler-2"};
+      await user.schedulers.create(bound);
+      // @ts-expect-error A once schedule takes exactly one time form.
+      const invalid: CreateSchedulerInput = {...input,schedule:{kind:"once",after:"1h",runAt:"2099-01-01T00:00:00.000Z"}};
+      const current = await user.schedulers.get(created.scheduler.schedulerId);
+      const updated = await user.schedulers.update(current.scheduler.schedulerId,{enabled:false,validUntil:null},{ifMatch:current.etag});
+      const list: SchedulerPage = await user.schedulers.list({status:"disabled",limit:1});
+      const fires: SchedulerFirePage = await user.schedulers.fires(current.scheduler.schedulerId,{limit:1});
+      await user.schedulers.delete(current.scheduler.schedulerId,{ifMatch:updated.etag});
+      void invalid; void list; void fires;
+      return current.scheduler;
+    }
+    async function fileWorkflow(user: UserClient): Promise<UserFile> {
+      const capabilities: FileUploadCapabilities = await user.files.capabilities();
+      const intent: FileUpload = await user.files.createUpload({originalName:"empty", byteSize:0, sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", contentType:null,idempotencyKey:"empty-file"});
+      const status: FileUploadStatus = await user.files.getUpload(intent.uploadId);
+      const part: FileUploadPart = await user.files.presignPart(intent.uploadId,1,"a".repeat(64));
+      const uploaded: UploadedFilePart = await user.files.uploadPart(part,new Uint8Array());
+      await user.files.completeUpload(intent.uploadId,[uploaded]);
+      const page: FilePage = await user.files.list({history:true,limit:1});
+      const content: FileContent = await user.files.getContent(intent.file.fileId);
+      if(content.type === "download") { const grant: FileDownloadGrant = content.grant; await user.files.downloadFromGrant(grant); }
+      await user.files.download(intent.file.fileId);
+      await user.files.cancelUpload(intent.uploadId);
+      void capabilities; void status; void page;
+      return user.files.upload({originalName:"empty",bytes:new Uint8Array(),idempotencyKey:"another-file"});
     }
     async function progressWorkflow(session: Session) {
       const options: SessionEventsOptions = {cursor: "saved-position"};
@@ -374,6 +411,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof readUserUsage,"function");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
+    const { uploadFileWorkflow } = await import("@mem9/tidb-link/examples/upload-file.mjs");
+    assert.equal(typeof uploadFileWorkflow,"function");
+    const { scheduleTaskWorkflow } = await import("@mem9/tidb-link/examples/schedule-task.mjs");
+    assert.equal(typeof scheduleTaskWorkflow,"function");
     const { observeMessageWorkflow } = await import("@mem9/tidb-link/examples/observe-message.mjs");
     assert.equal(typeof observeMessageWorkflow,"function");
     assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");

@@ -8,13 +8,14 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress and conversation history, and
+continuous progress, conversation history, file attachments, Schedulers,
 Realtime Model/Connection preparation and User usage reads for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Client Tools, files and Schedulers remain subsequent slices. Browser, MSP, management and device APIs are
+default Agents and general Agent overrides are removed. Client Tools remain
+a subsequent slice. Browser, MSP, management and device APIs are
 outside this refresh.
 
 ## Quick start
@@ -306,7 +307,9 @@ const accepted = await session.submitMessage({
 });
 let cursor: string | undefined;
 let draft = "";
-for await (const update of session.observe(accepted.inputId, { timeoutMs: 60_000 })) {
+for await (const update of session.observe(accepted.inputId, {
+  timeoutMs: 60_000,
+})) {
   if (update.type === "result") {
     console.log(update.result.text);
   } else {
@@ -488,6 +491,146 @@ const prepared = await prepareRealtimeConnection({
 Set `AGENT_SERVICE_URL`, `USER_API_KEY`, and `SESSION_ID` to run the example
 directly. `REALTIME_MODEL_ID` is optional.
 
+## File attachments
+
+`user.files` manages owned uploaded files. Upload from a `Uint8Array` (including
+Node.js `Buffer`) and retain a stable creation key with the exact bytes and name.
+The service chooses inline or multipart transfer; the SDK supplies complete and
+per-part SHA-256 digests, transfers the required bytes, and confirms whole-file
+verification before returning a ready file. Empty files are supported.
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const file = await customer.files.upload({
+  originalName: "notes.txt",
+  bytes: await readFile("notes.txt"),
+  contentType: "text/plain",
+  idempotencyKey: savedUploadKey,
+});
+const result = await session.turn({
+  clientEventId: savedMessageId,
+  text: "Summarize the attached notes.",
+  userFileIds: [file.fileId],
+});
+const downloaded = await customer.files.download(file.fileId);
+```
+
+Only ready files authorized for the Session's User may be attached. The service
+checks that authority at message admission; an earlier local readiness check
+cannot grant access to another User's file. File bytes remain separate from the
+message text. `capabilities()` exposes current upload limits; a typed 413 requires
+reading them again and explicitly deciding whether to create another upload.
+
+For explicit recovery use `createUpload()` with the original metadata and key,
+`getUpload(uploadId)`, `uploadContent()`, `presignPart()` / `uploadPart()`,
+`completeUpload()`, and `cancelUpload()`. Retain each returned part number, ETag
+and digest until completion. A status read never creates or transfers anything.
+Create replay retains the original file and fixed upload expiry; it may renew a
+short-lived inline transfer URL. An expired or failed upload requires a new key
+and file. The SDK never chooses that new identity or repeats a failed transfer
+automatically.
+
+`FileUploadOutcomeUnknownError` carries `idempotencyKey` and, once creation was
+acknowledged, `uploadId`. Read that upload before deciding what to repeat. A lost
+creation response can be reconciled with `createUpload()` using the exact
+original metadata and key. A pending multipart part can be signed again for its
+original digest; after an uncertain completion, read status rather than assuming
+failure or sending the message. Cancellation marks the incomplete file unusable;
+it does not delete a previously accepted conversation.
+
+`list({ history, limit, cursor })` returns `{ files, nextCursor }`; it has no
+`hasMore` field. `get(fileId)` reads metadata. `getContent(fileId)` returns either
+`{ type: "bytes", bytes, contentType }` or, for a large file,
+`{ type: "download", grant }`. `downloadFromGrant(grant)` redeems the latter;
+`download(fileId)` handles both forms and verifies complete size and SHA-256.
+A new authorized content read obtains a fresh grant after expiry. Upload and
+download grants are bearer credentials: do not log or store their URLs beyond
+need. Transfers send only the grant's required headers, never the User API Key.
+Uploads reject redirects; a download may follow one HTTPS redirect without an
+API Key. Files are held in memory while hashing or downloading, so size your
+backend's concurrency for the service's advertised maximum.
+
+The packaged `upload-file.mjs` example uploads and attaches one file. Set
+`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `FILE_PATH`,
+`UPLOAD_IDEMPOTENCY_KEY`, and `CLIENT_EVENT_ID`, then run:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/upload-file.mjs
+```
+
+The example returns the final conversation result; its exported
+`uploadFileWorkflow()` accepts bytes directly. It does not manage general Drive
+directories, write Session text files, or grant Organization access to User files.
+
+## Scheduled work
+
+`user.schedulers` uses the full customer Scheduler API. A new-Session schedule
+requires an owned Agent; a bound-Session schedule supplies only its Session.
+The service resolves the Agent from that Session.
+
+```ts
+const created = await customer.schedulers.create({
+  agentId: agent.id,
+  title: "Morning report",
+  prompt: "Summarize the latest activity.",
+  schedule: { kind: "cron", cronExpr: "0 9 * * *", timezone: "Asia/Shanghai" },
+  idempotencyKey: savedSchedulerKey,
+});
+const current = await customer.schedulers.get(created.scheduler.schedulerId);
+const updated = await customer.schedulers.update(
+  current.scheduler.schedulerId,
+  { enabled: false },
+  { ifMatch: current.etag },
+);
+const history = await customer.schedulers.fires(current.scheduler.schedulerId, {
+  limit: 20,
+});
+```
+
+For one-time work use exactly one of `{ kind: "once", runAt: isoTimestamp }` or
+`{ kind: "once", after: "1h30m" }`. `runAt` includes a timezone offset; cron
+requires an IANA timezone. The service owns timing and validation. Optional
+`validFrom` and `validUntil` restrict the execution window. A bound-Session create
+uses `delivery: { target: "bound_session", sessionId }` and omits `agentId`.
+
+Creation returns `{ scheduler, etag }`. Persist the key and exact input before
+calling. A same-key replay returns the **original creation response and ETag**,
+even if the Scheduler has since changed; use `get()` for current state before an
+edit. A changed input with that key is refused. Uncertain responses raise
+`OutcomeUnknownError` rather than repeating the command automatically.
+`idempotency_in_progress` retains the service's raw `retryAfter` header on the
+error so the application can decide when to replay the original request.
+
+`update(id, changes, { ifMatch })` and `delete(id, { ifMatch })` require a
+previously read ETag. Stale writes retain the service's 412 conflict; the SDK
+never refreshes and overwrites another writer's changes. Updates support title,
+prompt, Agent/delivery target, schedule, enabled state, validity window and
+`snoozeUntil`. Enabling an elapsed one-time schedule requires a future time.
+Disabling or deleting a Scheduler does not roll back completed effects. Deleted
+Schedulers are no longer available through detail or fire-history reads.
+
+`list({ status, limit, cursor })` and `fires(id, { limit, cursor })` return
+`nextCursor` rather than `hasMore`. Cursors retain their original owner/filter
+scope. Each fire preserves its execution prompt and delivery snapshot; later
+Scheduler edits cannot rewrite it. `pending` is not success. A `completed` fire
+or a `failed` fire retains nullable result identities and a nullable failure code.
+When `result.sessionId` and `result.turnId` are present, read the saved Turn with
+`customer.session(sessionId).getTurn(turnId)`; do not invent a message identity
+when `messageId` is null.
+
+The installed `schedule-task.mjs` example creates one scheduled task, waits
+locally for a settled fire and reads its associated Turn. Set `AGENT_SERVICE_URL`,
+`USER_API_KEY`, `AGENT_ID`, `SCHEDULER_IDEMPOTENCY_KEY`, `SCHEDULE_RUN_AT` and
+`SCHEDULE_PROMPT`, then run:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/schedule-task.mjs
+```
+
+A local example timeout leaves the schedule active and prints its identity for
+later fire-history reads. The separate Scheduler plans API is outside this SDK.
+
 ## Errors and uncertain outcomes
 
 Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
@@ -581,7 +724,7 @@ fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks a frozen selected SDK OpenAPI subset from
+`npm run test:service-contract` checks frozen selected SDK OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -613,8 +756,15 @@ live credential revocation without remote cancellation. A forwarding proxy drops
 an actual service response to prove uncertain-submission recovery. Control cases
 verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture
-uses the existing controlled Drive9 and model suppliers; real supplier deployment
-certification is outside this evidence.
+uses the existing controlled Drive9 and model suppliers. File cases use a separate
+fixture lifecycle with real upload state and a controlled Drive9/S3 byte supplier.
+They verify inline, multipart and empty uploads, cancellation and invalid content,
+large-file download-ticket redemption, and a real Runtime file read whose answer
+contains the uploaded content. The installed upload example exercises the same
+public workflow. Real supplier deployment certification is outside this evidence.
+Scheduler cases enable the real background runner and use SDK-created schedules
+to verify successful and failed execution, delivery changes, retained fire
+snapshots and the installed example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

@@ -97,6 +97,8 @@ beforeAll(async () => {
     .useValue(
       loadE2eEnv({
         NODE_ENV: "test",
+        SCHEDULER_RUNNER: "1",
+        SCHEDULER_POLL_INTERVAL_MS: "100",
         OPS_SERVICE_ALLOWED_HOSTS: "example.test",
         WORKSPACE_KEK: "fictional-sdk-service-test-kek",
         SESSION_SECRET: "fictional-sdk-service-session-secret",

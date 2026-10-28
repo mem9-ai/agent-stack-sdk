@@ -6,12 +6,22 @@
   preserving separate date/paging contracts and unknown, unpriced or incomplete
   facts. Include the installed usage example and actual-service verification.
 
+- Create and manage one-time and recurring Schedulers with stable creation keys,
+  explicit conditional writes, paginated reads and immutable fire results.
+- Preserve service retry hints and verify SDK-created schedules through the real
+  background runner, including failed execution and a packaged runnable example.
 
 - Add explicit exact-Turn cancellation and checkpoint retry with recoverable
   command identities; wait for retry results without replacing earlier outcomes.
 - Verify active-Turn steering through message admission, eventual cancellation,
   enabled and disabled checkpoint retry using the installed SDK and real service.
 
+- Upload and verify owned file attachments using service-selected inline or
+  multipart transfer, with explicit recovery, cancellation and fixed expiry.
+- List and inspect files, download complete verified content, and redeem
+  short-lived transfer credentials without forwarding API Keys.
+- Include a runnable upload-and-attach example and actual-service evidence that
+  uploaded bytes participate in a conversation.
 - Observe Session progress with resumable event cursors and complete draft snapshots;
   confirm final results through the original receipt and preserve recovery identities
   when observation stops. Include a runnable installed-package observation example.

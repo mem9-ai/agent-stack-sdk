@@ -875,10 +875,9 @@ a first detail page is complete history.
 ## Compatibility and verification
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
-revision. The retained provisioning, lifecycle, Realtime and text constants and package
-fields point to that same baseline. All supported capabilities use this revision. `TIDB_LINK_TEXT_REVISION` /
-`tidbLinkTextRevision` covers text and control commands, progress, original results and history;
-`tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
+revision for every supported capability. `tidbLinkOpenApiSha256` pins that
+service's `docs/openapi.yaml`. The former per-feature revision constants and
+package fields have been removed; use these shared values instead.
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 

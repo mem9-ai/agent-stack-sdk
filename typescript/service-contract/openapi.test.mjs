@@ -29,9 +29,9 @@ test("text and history keep the selected immutable service contract", () => {
   assert.equal(metadata.tidbLinkRevision, expectedRevision);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
   assert.equal(metadata.sourceOpenApiSha256, expectedSourceSha256);
-  assert.equal(packageJson.tidbLinkTextRevision, metadata.tidbLinkRevision);
+  assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
   assert.equal(
-    packageJson.tidbLinkTextOpenApiSha256,
+    packageJson.tidbLinkOpenApiSha256,
     metadata.sourceOpenApiSha256,
   );
   assert.equal(packageJson.tidbLinkApiVersion, metadata.tidbLinkApiVersion);

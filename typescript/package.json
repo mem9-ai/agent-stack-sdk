@@ -44,7 +44,7 @@
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
-    "typecheck": "npm run build && tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run build",
     "test": "npm run build && node --test 'test/**/*.test.mjs'",
     "test:service-contract": "node --test 'service-contract/**/*.test.mjs'",
     "pack:check": "npm pack --dry-run",

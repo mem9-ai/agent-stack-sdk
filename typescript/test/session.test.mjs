@@ -34,20 +34,10 @@ const clientFor = (baseUrl) =>
 
 const agent = {
   agentId: "agent_1",
-  name: "Agent One",
-  sandboxProfile: "default",
-  agentTemplateId: null,
-  agentTemplate: null,
-  config: {
-    memory: {
-      enabled: false,
-      provider: "mem9",
-      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
-    },
-    sessionRecall: { enabled: false },
-    generatedMedia: { enabled: true },
-  },
-  configVersion: 1,
+  organizationId: "org_1",
+  ownerUserId: "user_1",
+  agentTemplateId: "template_1",
+  additionalInstructions: "",
   status: "active",
   createdAt: "2026-08-25T00:00:00.000Z",
   updatedAt: "2026-08-25T00:00:00.000Z",
@@ -64,10 +54,15 @@ const sessionRecord = (overrides = {}) => ({
   readOnly: false,
   sourceSchedulerId: null,
   sourceSchedulerFireId: null,
-  sourceVoiceSessionId: null,
   billingTag: { key: "customer", value: "acme" },
   model: "gpt-5.6-terra",
   modelRevision: 1,
+  realtimeModel: null,
+  realtimeModelRevision: 1,
+  realtimeModelEtag: '"session-realtime-model:session_1:1"',
+  realtimeVoice: null,
+  template: { templateId: "template_1", contentDigest: "a".repeat(64) },
+  realtime: null,
   createdWithAgentId: "agent_1",
   modelPolicyStatus: "allowed",
   status: "active",
@@ -91,7 +86,6 @@ test("an Agent creates a persistent Session and retains its model ETag", async (
     });
     response.setHeader("content-type", "application/json");
     if (request.method === "GET") {
-      response.setHeader("etag", '"agent-v1"');
       response.end(JSON.stringify({ agent }));
       return;
     }

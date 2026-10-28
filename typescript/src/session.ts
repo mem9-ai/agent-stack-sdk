@@ -1,6 +1,39 @@
+import {
+  audioTurn,
+  streamAudio,
+  type AudioTurnInput,
+  type AudioTurnEvent,
+  type AudioTurnResult,
+} from "./audio.js";
+import {
+  getClientTools,
+  replaceClientTools,
+  validateClientTools,
+  listPendingClientToolCalls,
+  submitClientToolOutput,
+  type PendingClientToolCall,
+  type ClientToolOutputInput,
+  type ClientToolDeclaration,
+  type ClientToolSet,
+  type ReplaceClientToolsOptions,
+} from "./client-tools.js";
+import {
+  submitTurnCommand,
+  type TurnCommandInput,
+  type RetryReceipt,
+} from "./control.js";
+import {
+  sessionEvents,
+  observeTurn,
+  type SessionEvent,
+  type SessionEventsOptions,
+  type ObserveTurnOptions,
+  type TurnObservation,
+} from "./progress.js";
 import { OutcomeUnknownError } from "./errors.js";
 import type { RequestOptions } from "./organization.js";
 import {
+  requestOptions,
   HttpClient,
   requireEtag,
   requireKnownKeys,
@@ -51,6 +84,7 @@ export interface CreateSessionOptions extends RequestOptions {
   model?: string;
   realtimeModel?: string;
   billingTag?: BillingTag | null;
+  tools?: ClientToolDeclaration[];
 }
 
 export interface SuggestSessionNameInput {
@@ -139,6 +173,7 @@ export class Session {
   }
 
   async refresh(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.getResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
       options,
@@ -153,6 +188,7 @@ export class Session {
     model: SelectableSessionModel,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     if (!this.#etag) await this.refresh(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/model`,
@@ -175,6 +211,7 @@ export class Session {
   }
 
   async rename(name: string, options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.postResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name`,
       { name },
@@ -188,6 +225,7 @@ export class Session {
     input: SuggestSessionNameInput,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     requireKnownKeys(
       input,
       ["userText", "assistantText"],
@@ -206,6 +244,7 @@ export class Session {
     billingTag: BillingTag | null,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/billing-tag`,
       { billingTag },
@@ -216,6 +255,7 @@ export class Session {
   }
 
   async delete(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.deleteResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
       { ...options, outcomeUnknown: true },
@@ -228,6 +268,7 @@ export class Session {
     input: OpenRealtimeConnectionInput = {},
     options?: { signal?: AbortSignal },
   ): Promise<OpenRealtimeConnectionResult> {
+    options = requestOptions(options);
     requireKnownKeys(input, ["audio", "metadata"], "Realtime Connection input");
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
@@ -243,6 +284,7 @@ export class Session {
   async getRealtimeConnection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnection> {
+    options = requestOptions(options);
     const response = await this.#http.get<{
       realtimeConnection: RealtimeConnection;
     }>(
@@ -255,6 +297,7 @@ export class Session {
   async createRealtimeConnectToken(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnectGrant> {
+    options = requestOptions(options);
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime/connect-tokens`,
       undefined,
@@ -269,6 +312,7 @@ export class Session {
   async endRealtimeConnection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnection> {
+    options = requestOptions(options);
     const result = await this.#http.deleteResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
       {
@@ -282,6 +326,7 @@ export class Session {
   async getRealtimeModelSelection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeModelSelection> {
+    options = requestOptions(options);
     const response = await this.#http.get<{
       session: RealtimeSessionSelectionFields;
     }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}`, options);
@@ -317,6 +362,48 @@ export class Session {
     );
   }
 
+  events(options?: SessionEventsOptions): AsyncGenerator<SessionEvent> {
+    return sessionEvents(this.#http, this.id, options);
+  }
+
+  observe(
+    inputId: string,
+    options?: ObserveTurnOptions,
+  ): AsyncGenerator<TurnObservation> {
+    return observeTurn(this.#http, this.id, inputId, options);
+  }
+
+  streamAudio(input: AudioTurnInput): AsyncGenerator<AudioTurnEvent> {
+    return streamAudio(this.#http, this.id, input);
+  }
+
+  audio(input: AudioTurnInput): Promise<AudioTurnResult> {
+    return audioTurn(this.#http, this.id, input);
+  }
+
+  getClientTools(options?: RequestOptions): Promise<ClientToolSet> {
+    return getClientTools(this.#http, this.id, options);
+  }
+
+  replaceClientTools(
+    tools: readonly ClientToolDeclaration[],
+    options: ReplaceClientToolsOptions,
+  ): Promise<ClientToolSet> {
+    return replaceClientTools(this.#http, this.id, tools, options);
+  }
+
+  listPendingClientToolCalls(
+    options?: RequestOptions,
+  ): Promise<PendingClientToolCall[]> {
+    return listPendingClientToolCalls(this.#http, this.id, options);
+  }
+
+  submitClientToolOutput(
+    input: ClientToolOutputInput,
+  ): Promise<SessionInteraction> {
+    return submitClientToolOutput(this.#http, this.id, input);
+  }
+
   history(options?: ListOptions): Promise<TurnPage> {
     return history(this.#http, this.id, options);
   }
@@ -345,6 +432,16 @@ export class Session {
     options?: RequestOptions,
   ): Promise<SessionInteraction | null> {
     return reconcileInteraction(this.#http, this.id, clientEventId, options);
+  }
+
+  /** Acceptance requests cancellation; read the receipt for the eventual outcome. */
+  cancel(input: TurnCommandInput): Promise<SessionInteraction> {
+    return submitTurnCommand(this.#http, this.id, "cancel", input);
+  }
+
+  /** Explicit checkpoint retry has its own identity and original execution result. */
+  retry(input: TurnCommandInput): Promise<RetryReceipt> {
+    return submitTurnCommand(this.#http, this.id, "retry", input);
   }
 
   submitMessage(input: CreateTurnInput): Promise<SessionInteraction> {
@@ -400,12 +497,14 @@ export const createSessionForAgent = async (
       "model",
       "realtimeModel",
       "billingTag",
+      "tools",
       "signal",
       "requestId",
     ],
     "Session options",
   );
   requireCreationKey(options.idempotencyKey);
+  if (options.tools !== undefined) validateClientTools(options.tools);
   const { idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/api/v1/user/sessions",

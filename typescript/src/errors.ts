@@ -18,6 +18,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
   readonly status: number;
   readonly code: string;
   readonly details?: unknown;
+  readonly retryAfter: string | undefined;
 
   constructor(input: {
     status: number;
@@ -25,6 +26,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
     message: string;
     requestId?: string;
     details?: unknown;
+    retryAfter?: string;
   }) {
     super(
       input.message,
@@ -35,6 +37,7 @@ export class TiDBLinkApiError extends TiDBLinkError {
     this.status = input.status;
     this.code = input.code;
     this.details = input.details;
+    this.retryAfter = input.retryAfter;
   }
 }
 
@@ -111,5 +114,28 @@ export class TurnInterruptedError extends TiDBLinkError {
   ) {
     super(message);
     this.turnId = turnId;
+  }
+}
+
+/** Observation stopped locally; the original command can still be queried or observed. */
+export class ObservationStoppedError extends OutcomeUnknownError {
+  readonly cursor: string | undefined;
+  readonly timedOut: boolean;
+
+  constructor(
+    message: string,
+    options: {
+      sessionId: string;
+      inputId: string;
+      turnId?: string;
+      cursor?: string;
+      requestId?: string;
+      timedOut?: boolean;
+      cause?: unknown;
+    },
+  ) {
+    super(message, options);
+    this.cursor = options.cursor;
+    this.timedOut = options.timedOut ?? false;
   }
 }

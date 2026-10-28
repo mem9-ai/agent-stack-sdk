@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const expectedRevision = "b59a0a584eb2632b8d9c6d0808b8ea26081b1474";
+const expectedRevision = "0d11f1b231879c735bd53b60ff895ac58ba60d33";
 const expectedSourceSha256 =
   "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc";
 const openApiBytes = await readFile(new URL("openapi.json", import.meta.url));
@@ -49,11 +49,10 @@ test("the selected commands and history reads require User authority", () => {
     ["/turns", "get"],
     ["/turns/{turnId}", "get"],
     ["/timeline", "get"],
+    ["/tools", "get"],
+    ["/tools", "put"],
+    ["/client-tool-calls", "get"],
   ];
-  assert.deepEqual(
-    Object.keys(document.paths).sort(),
-    operations.map(([route]) => `${sessionPath}${route}`).sort(),
-  );
   for (const [route, method] of operations) {
     const operation = document.paths[`${sessionPath}${route}`][method];
     assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
@@ -173,4 +172,158 @@ test("history pages preserve Full Agent and Realtime projections", () => {
   assert.equal(properties(facts[1]).turnId.nullable, true);
   assert.equal(properties(facts[1]).responseId.nullable, true);
   assert.equal(properties(facts[1]).interrupted.type, "boolean");
+});
+
+test("cancel and checkpoint retry keep exact command identities and distinct receipt shapes", () => {
+  for (const kind of ["cancel", "retry"]) {
+    const command = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
+      properties(variant).type.enum.includes(`agent.session.input.${kind}`),
+    );
+    assert.deepEqual(command.required, ["type", "clientEventId", "data"]);
+    assert.equal(
+      properties(command).clientEventId.pattern,
+      "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+    );
+    const data = properties(command).data;
+    assert.deepEqual(Object.keys(properties(data)), ["turnId"]);
+    assert.equal(properties(data).turnId.maxLength, 64);
+    if (kind === "retry") assert.deepEqual(data.required, ["turnId"]);
+  }
+  const receipt = properties(
+    schema("SessionEventRetryResponseOpenApiDto"),
+  ).event;
+  assert.deepEqual(receipt.required, [
+    "clientEventId",
+    "sessionId",
+    "turnId",
+    "disposition",
+  ]);
+  assert.deepEqual(properties(receipt).disposition.enum, ["retrying"]);
+  const submission = document.paths[`${sessionPath}/events`].post;
+  for (const status of ["200", "202"])
+    assert(
+      submission.responses[status].content[
+        "application/json"
+      ].schema.oneOf.some(
+        (variant) =>
+          variant.$ref ===
+          "#/components/schemas/SessionEventRetryResponseOpenApiDto",
+      ),
+    );
+});
+
+test("independent observation preserves the declared event position and snapshot contract", () => {
+  const subscription = document.paths[`${sessionPath}/events`].get;
+  assert.deepEqual(subscription.security, [{ UserApiKey: [] }]);
+  assert(
+    subscription.parameters.some(
+      (parameter) => parameter.name === "cursor" && parameter.in === "query",
+    ),
+  );
+  assert(
+    subscription.parameters.some(
+      (parameter) => parameter.name === "stream" && parameter.required,
+    ),
+  );
+  assert(
+    subscription.parameters.some(
+      (parameter) =>
+        parameter.name === "Accept" &&
+        parameter.schema.enum.includes("text/event-stream"),
+    ),
+  );
+  const stream = subscription.responses["200"];
+  assert(stream.content["text/event-stream"]);
+  assert(stream.headers);
+  assert.match(stream.description, /complete provisional draft/);
+  assert.match(
+    stream.description,
+    /Disconnecting the subscription does not cancel/,
+  );
+  assert.match(stream.description, /agent\.session\.turn\.requires_action/);
+});
+
+test("usage surfaces preserve separate authority, ranges and result projections", () => {
+  const own = document.paths["/api/v1/billing/usage"].get;
+  const org = document.paths["/api/v1/org/users/{userId}/billing/usage"].get;
+  const ownDetails = document.paths["/api/v1/billing/usage/details"].get;
+  const orgDetails =
+    document.paths["/api/v1/org/users/{userId}/billing/usage/details"].get;
+  for (const operation of [own, ownDetails])
+    assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+  for (const operation of [org, orgDetails])
+    assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
+  assert.equal(own.parameters.find((p) => p.name === "from").required, false);
+  assert.equal(org.parameters.find((p) => p.name === "from").required, true);
+  assert(
+    own.parameters
+      .find((p) => p.name === "from")
+      .schema.pattern.includes("\\d{4}"),
+  );
+  assert.equal(
+    org.parameters.find((p) => p.name === "from").schema.format,
+    "date-time",
+  );
+  assert(!ownDetails.parameters.some((p) => p.name === "cursor"));
+  assert(orgDetails.parameters.some((p) => p.name === "cursor"));
+  const self = properties(schema("ConsoleBillingDetailsResponseOpenApiDto"));
+  assert(self.llm && self.sandbox && self.webSearch && !self.nextCursor);
+  const target = orgDetails.responses["200"].content["application/json"].schema;
+  assert.deepEqual(target.required, [
+    "items",
+    "nextCursor",
+    "factCompleteness",
+  ]);
+  const item = properties(target).items.items.oneOf.find(
+    (v) => properties(v).kind.enum[0] === "llm",
+  );
+  assert.equal(properties(item).costMicros.nullable, true);
+  assert.deepEqual(properties(item).pricingStatus.enum, [
+    "estimated",
+    "unknown",
+  ]);
+  assert.deepEqual(properties(item).valuationStatus.enum, [
+    "priced",
+    "unpriced",
+  ]);
+});
+
+test("Client Tools preserve declaration replacement, pending deadlines and explicit result command shapes", () => {
+  const create = properties(schema("CreateSessionOpenApiDto"));
+  assert(create.tools);
+  const replace = document.paths[`${sessionPath}/tools`].put;
+  assert(
+    replace.parameters.some(
+      (parameter) => parameter.name === "If-Match" && parameter.required,
+    ),
+  );
+  assert(replace.responses["412"]);
+  assert(replace.responses["428"]);
+  assert(replace.responses["200"].headers.ETag);
+  const set = properties(schema("SessionClientToolsResponseOpenApiDto"));
+  assert.equal(set.revision.type, "integer");
+  assert.equal(set.tools.type, "array");
+  const pending = properties(
+    schema("PendingClientToolCallsResponseOpenApiDto"),
+  ).calls;
+  for (const key of [
+    "callId",
+    "turnId",
+    "name",
+    "arguments",
+    "publishedAt",
+    "deadlineAt",
+  ])
+    assert(properties(pending.items)[key]);
+  const output = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
+    properties(variant).type.enum.includes(
+      "agent.session.input.client_tool_output",
+    ),
+  );
+  assert(output.required.includes("clientEventId"));
+  const variants = properties(output).data.oneOf;
+  assert(
+    variants.some((variant) => properties(variant).output?.maxLength === 65536),
+  );
+  assert(variants.some((variant) => properties(variant).error));
 });

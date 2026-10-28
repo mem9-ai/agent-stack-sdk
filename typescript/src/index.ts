@@ -2,23 +2,23 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
 /** Exact service revision verified for Organization, End User and User Key provisioning. */
 export const TIDB_LINK_PROVISIONING_REVISION =
-  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
 /** Exact service revision verified for Realtime Model and Connection preparation. */
 export const TIDB_LINK_REALTIME_REVISION =
-  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
 /** Exact service revision verified for Template, Agent and Session lifecycle. */
 export const TIDB_LINK_LIFECYCLE_REVISION =
-  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
 /** Exact service revision verified for text commands, original results and history. */
 export const TIDB_LINK_TEXT_REVISION =
-  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
 export {
   TiDBLinkApiError,
@@ -28,6 +28,7 @@ export {
   TurnWaitTimeoutError,
   InputNotAppliedError,
   OutcomeUnknownError,
+  ObservationStoppedError,
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
@@ -105,3 +106,108 @@ export type {
   SessionTimelineEntry,
   SessionTimelinePage,
 } from "./history.js";
+
+export type { TurnCommandInput, RetryReceipt } from "./control.js";
+export { UserFiles, FileUploadOutcomeUnknownError } from "./files.js";
+export type {
+  UserFile,
+  FileUploadCapabilities,
+  CreateFileUploadInput,
+  UploadFileInput,
+  FileUpload,
+  FileUploadStatus,
+  FileUploadPart,
+  UploadedFilePart,
+  FileListOptions,
+  FilePage,
+  FileDownloadGrant,
+  FileContent,
+} from "./files.js";
+export type {
+  SessionEvent,
+  SessionEventsOptions,
+  ObserveTurnOptions,
+  TurnObservation,
+} from "./progress.js";
+
+export type {
+  BillingUsageFactKind,
+  BillingCostBearer,
+  BillingPrincipalBucket,
+  BillingAttributionKind,
+  BillingAuthKind,
+  BillingLlmRequestPurpose,
+  LlmPricingStatus,
+  LlmPricingContextTier,
+  SandboxUsageStatus,
+  BillingUsageEvidenceStatus,
+  BillingValuationStatus,
+  BillingValuationSummary,
+  BillingValuationBreakdown,
+  BillingFactCompletenessCounters,
+  BillingFactCompleteness,
+  UserUsageScopeLevel,
+  UserUsagePeriod,
+  UserUsageScope,
+  UserUsageRange,
+  UsageTotals,
+  BillingBearerCostTotals,
+  BillingAttributionCounters,
+  BillingAttributionBreakdown,
+  LlmUsageAggregate,
+  UserUsageAggregate,
+  SandboxUsageAggregate,
+  WebSearchUsageAggregate,
+  UsageDayPoint,
+  BillingUsageSeriesInterval,
+  BillingUsageSeriesRange,
+  BillingUsageSeriesLlmBreakdown,
+  BillingUsageSeriesSandboxBreakdown,
+  BillingUsageSeriesWebSearchBreakdown,
+  BillingUsageSeriesBreakdown,
+  BillingUsageSeriesBreakdownGroups,
+  BillingUsageSeriesPoint,
+  UserUsageSummary,
+  UserLlmUsage,
+  UserSandboxUsage,
+  UserWebSearchUsage,
+  UserUsageDetails,
+  OrganizationUserUsageSummary,
+  OrganizationLlmUsage,
+  OrganizationSandboxUsage,
+  OrganizationWebSearchUsage,
+  OrganizationUsageItem,
+  OrganizationUserUsageDetails,
+  UserUsageOptions,
+  UserUsageDetailsOptions,
+  OrganizationUserUsageOptions,
+  OrganizationUserUsageDetailsOptions,
+} from "./usage.js";
+export type {
+  ClientToolDeclaration,
+  ClientToolSet,
+  ReplaceClientToolsOptions,
+  PendingClientToolCall,
+  ClientToolOutputInput,
+} from "./client-tools.js";
+export { UserSchedulers } from "./schedulers.js";
+export type {
+  SchedulerSchedule,
+  SchedulerDelivery,
+  CreateSchedulerInput,
+  UpdateSchedulerInput,
+  Scheduler,
+  SchedulerResponse,
+  SchedulerPage,
+  SchedulerListOptions,
+  SchedulerMutationOptions,
+  SchedulerFire,
+  SchedulerFirePage,
+} from "./schedulers.js";
+
+export { AudioTurnStoppedError } from "./audio.js";
+export type {
+  AudioTurnInput,
+  AudioTurnEvent,
+  AudioTurnResult,
+} from "./audio.js";

@@ -8,7 +8,7 @@
     "node": ">=22.12"
   },
   "tidbLinkApiVersion": "0.0.1",
-  "tidbLinkRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -17,7 +17,14 @@
     "./examples/provision-user.mjs": "./examples/provision-user.mjs",
     "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
     "./examples/create-session.mjs": "./examples/create-session.mjs",
-    "./examples/send-message.mjs": "./examples/send-message.mjs"
+    "./examples/send-message.mjs": "./examples/send-message.mjs",
+    "./examples/control-turn.mjs": "./examples/control-turn.mjs",
+    "./examples/observe-message.mjs": "./examples/observe-message.mjs",
+    "./examples/read-usage.mjs": "./examples/read-usage.mjs",
+    "./examples/upload-file.mjs": "./examples/upload-file.mjs",
+    "./examples/schedule-task.mjs": "./examples/schedule-task.mjs",
+    "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs",
+    "./examples/submit-audio.mjs": "./examples/submit-audio.mjs"
   },
   "files": [
     "dist",
@@ -25,7 +32,14 @@
     "examples/provision-user.mjs",
     "examples/prepare-realtime-connection.mjs",
     "examples/create-session.mjs",
-    "examples/send-message.mjs"
+    "examples/send-message.mjs",
+    "examples/control-turn.mjs",
+    "examples/observe-message.mjs",
+    "examples/read-usage.mjs",
+    "examples/upload-file.mjs",
+    "examples/schedule-task.mjs",
+    "examples/answer-client-tool.mjs",
+    "examples/submit-audio.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
@@ -47,12 +61,12 @@
     "url": "https://github.com/mem9-ai/agent-stack-sdk/issues"
   },
   "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme",
-  "tidbLinkProvisioningRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkProvisioningRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   "tidbLinkProvisioningOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkRealtimeRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkRealtimeRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkLifecycleRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkLifecycleRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   "tidbLinkLifecycleOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkTextRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkTextRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   "tidbLinkTextOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
 }

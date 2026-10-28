@@ -14,21 +14,23 @@ npm test
 npm run pack:check
 ```
 
-The frozen text/history contract check uses the committed exact-service snapshot:
+The frozen selected SDK contract checks use committed exact-service snapshots:
 
 ```sh
 npm run test:service-contract
 ```
 
-For current provisioning, Template/Agent/Session management, text/results/history and Realtime preparation,
+For actual compatibility across the supported package surface,
 run `npm run test:service` with the exact service checkout and a dedicated TiDB
 test database; setup is in [the package README](typescript/README.md#compatibility-and-verification).
 This verifies the installed packed SDK and its examples against the actual service.
-The default HTTP tests supplement reproducible failure cases. Keep the
+The service runner discovers each `*.fixture.ts` with neighboring `*.cases.mjs`
+and runs those distinct dependency lifecycles sequentially. Every case must have
+exactly one fixture owner. The default HTTP tests supplement reproducible failure cases. Keep the
 package free of runtime dependencies and do not commit credentials, recorded
 production responses, or plaintext API Keys.
 
-TiDB Link OpenAPI is the public contract source. CI verifies the frozen text/history contract. The slice revisions and OpenAPI
+TiDB Link OpenAPI is the public contract source. CI verifies the selected frozen contracts. The slice revisions and OpenAPI
 fingerprints in `typescript/package.json` identify the actual-service baselines.
 Contract snapshots supplement actual-service execution evidence.
 A public API change updates that service contract first, then updates the SDK,

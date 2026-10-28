@@ -1,0 +1,1783 @@
+{
+  "revision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
+  "sourceOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "paths": {
+    "/api/v1/schedulers": {
+      "post": {
+        "operationId": "SchedulerPublicController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CreateNewSessionPublicSchedulerOpenApiDto"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CreateBoundSessionPublicSchedulerOpenApiDto"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying an in-progress idempotent request",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Stored idempotency witness is invalid (idempotency_witness_invalid).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "summary": "Create or replay a Scheduler",
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "get": {
+        "operationId": "SchedulerPublicController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the caller scope and status filter.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of Schedulers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerListResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/schedulers/{schedulerId}": {
+      "get": {
+        "operationId": "SchedulerPublicController_get",
+        "parameters": [
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "patch": {
+        "operationId": "SchedulerPublicController_update",
+        "parameters": [
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePublicSchedulerOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "delete": {
+        "operationId": "SchedulerPublicController_remove",
+        "parameters": [
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/schedulers/{schedulerId}/fires": {
+      "get": {
+        "operationId": "SchedulerPublicController_fires",
+        "parameters": [
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the caller scope and Scheduler.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of immutable Fire execution snapshots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerFiresResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateNewSessionPublicSchedulerOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "runAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "runAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "after": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "after"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "cron"
+                    ]
+                  },
+                  "cronExpr": {
+                    "description": "The server trims surrounding whitespace, then enforces a 128-character maximum.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "cronExpr",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "agentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": [
+                  "new_session"
+                ]
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "title",
+          "prompt",
+          "schedule",
+          "agentId"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBoundSessionPublicSchedulerOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "runAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "runAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "after": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "after"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "cron"
+                    ]
+                  },
+                  "cronExpr": {
+                    "description": "The server trims surrounding whitespace, then enforces a 128-character maximum.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "cronExpr",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "delivery": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": [
+                  "bound_session"
+                ]
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "target",
+              "sessionId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "title",
+          "prompt",
+          "schedule",
+          "delivery"
+        ],
+        "additionalProperties": false
+      },
+      "PublicSchedulerResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "scheduler": {
+            "type": "object",
+            "properties": {
+              "schedulerId": {
+                "type": "string"
+              },
+              "ownerUserId": {
+                "type": "string"
+              },
+              "organizationId": {
+                "type": "string"
+              },
+              "agentId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "delivery": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "new_session",
+                      "bound_session"
+                    ]
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "target",
+                  "sessionId"
+                ],
+                "additionalProperties": false
+              },
+              "schedule": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once",
+                      "cron"
+                    ]
+                  },
+                  "cronExpr": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "nullable": true
+                  },
+                  "runAt": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "cronExpr",
+                  "runAt",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              },
+              "validFrom": {
+                "type": "string",
+                "nullable": true
+              },
+              "validUntil": {
+                "type": "string",
+                "nullable": true
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "enabled",
+                  "disabled"
+                ]
+              },
+              "nextFireAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "lastFiredAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": false
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "schedulerId",
+              "ownerUserId",
+              "organizationId",
+              "agentId",
+              "title",
+              "prompt",
+              "delivery",
+              "schedule",
+              "validFrom",
+              "validUntil",
+              "status",
+              "nextFireAt",
+              "lastFiredAt",
+              "revision",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "scheduler"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent_instructions_too_large",
+                  "hardware_connection_unavailable",
+                  "websocket_required",
+                  "hardware_binding_unavailable",
+                  "hardware_registration_unavailable",
+                  "binding_commit_unknown",
+                  "hardware_credential_unavailable",
+                  "hardware_command_closed",
+                  "hardware_command_outcome_unknown",
+                  "binding_receipt_integrity",
+                  "validation_error",
+                  "template_test_busy",
+                  "template_test_closed",
+                  "template_test_expired",
+                  "template_test_dependency_unavailable",
+                  "template_test_model_unavailable",
+                  "template_test_authority_lost",
+                  "invalid_organization_context",
+                  "authentication_required",
+                  "organization_owner_required",
+                  "organization_last_owner",
+                  "organization_already_joined",
+                  "resource_not_found",
+                  "invalid_cursor",
+                  "console_temporarily_unavailable",
+                  "service_configuration_unavailable",
+                  "human_principal_required",
+                  "user_api_key_required",
+                  "organization_membership_required",
+                  "admin_required",
+                  "org_admin_required",
+                  "agent_not_found",
+                  "agent_template_creation_conflict",
+                  "agent_template_apply_busy",
+                  "agent_template_recall_acknowledgment_required",
+                  "requires_explicit_agent_creation",
+                  "agent_template_application_conflict",
+                  "agent_template_dependency_conflict",
+                  "agent_template_unavailable",
+                  "session_agent_required",
+                  "session_agent_unavailable",
+                  "session_model_not_allowed",
+                  "session_execution_dependency_unavailable",
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "sandbox_validation_pending",
+                  "sandbox_scope_incompatible",
+                  "sandbox_configuration_incompatible",
+                  "sandbox_unavailable",
+                  "vision_model_unsupported",
+                  "vision_image_count_exceeded",
+                  "vision_image_unsupported",
+                  "vision_image_source_too_large",
+                  "vision_image_invalid",
+                  "vision_image_decode_limit_exceeded",
+                  "vision_image_payload_too_large",
+                  "vision_image_processing_unavailable",
+                  "organization_default_agent_unconfigured",
+                  "user_default_agent_mapping_invalid",
+                  "session_not_found",
+                  "session_read_only",
+                  "provider_unavailable",
+                  "realtime_connection_not_found",
+                  "realtime_connection_live",
+                  "realtime_model_conflict",
+                  "realtime_model_unavailable",
+                  "realtime_not_enabled",
+                  "realtime_language_unsupported",
+                  "realtime_language_unavailable",
+                  "realtime_connection_ended",
+                  "audio_format_unsupported",
+                  "admission_unavailable",
+                  "turn_not_found",
+                  "checkpoint_runtime_unavailable",
+                  "artifact_not_found",
+                  "chat_image_not_found",
+                  "artifact_cursor_invalid",
+                  "artifact_idempotency_conflict",
+                  "artifact_quota_exceeded",
+                  "artifact_not_writable",
+                  "artifact_revision_conflict",
+                  "artifact_source_not_found",
+                  "artifact_source_not_file",
+                  "artifact_source_changed",
+                  "artifact_storage_contract_unavailable",
+                  "artifact_publish_failed",
+                  "artifact_bytes_need_repair",
+                  "drive_file_not_found",
+                  "drive_path_too_long",
+                  "drive_download_rate_limited",
+                  "llm_spend_limit_exhausted",
+                  "drive_download_provider_error",
+                  "drive_download_unavailable",
+                  "invalid_idempotency_key",
+                  "idempotency_key_required",
+                  "session_creation_conflict",
+                  "agent_creation_conflict",
+                  "interaction_input_conflict",
+                  "interaction_not_found",
+                  "interaction_admission_closed",
+                  "interaction_target_conflict",
+                  "client_tool_call_unavailable",
+                  "client_tool_call_settled",
+                  "idempotency_key_reused",
+                  "identity_conversion_command_retired",
+                  "idempotency_in_progress",
+                  "idempotency_key_expired",
+                  "secret_delivery_expired",
+                  "idempotency_completion_failed",
+                  "idempotency_witness_invalid",
+                  "skill_name_conflict",
+                  "skill_delete_blocked",
+                  "invalid_skill_package",
+                  "skill_ingestion_not_found",
+                  "skill_import_job_not_found",
+                  "skill_import_state_conflict",
+                  "skill_ingestion_expired",
+                  "precondition_required",
+                  "precondition_failed",
+                  "resource_conflict",
+                  "hardware_model_conflict",
+                  "hardware_model_in_use",
+                  "agent_template_profile_unavailable",
+                  "agent_template_dependency_unavailable",
+                  "agent_template_archived",
+                  "agent_template_conflict",
+                  "agent_template_list_changed",
+                  "skill_not_found",
+                  "skill_version_not_found",
+                  "skill_file_not_found",
+                  "skill_package_file_rejected",
+                  "skill_package_store_unavailable",
+                  "skill_head_required",
+                  "skill_canonical_name_conflict",
+                  "skill_already_installed",
+                  "skill_installation_not_found",
+                  "skill_upgrade_not_forward",
+                  "unsupported_media_type",
+                  "raw_upload_too_large",
+                  "upload_too_large",
+                  "upload_ticket_invalid",
+                  "upload_failed",
+                  "upload_expired",
+                  "upload_incomplete",
+                  "upload_integrity_failed",
+                  "upload_requires_multipart",
+                  "upload_temporarily_unavailable",
+                  "skill_authoring_forbidden",
+                  "skill_read_forbidden",
+                  "restore_requires_historical_version",
+                  "private_skill_required",
+                  "publication_head_required",
+                  "open_publication_request_exists",
+                  "publication_target_changed",
+                  "publication_conflict",
+                  "publication_request_not_found",
+                  "publication_request_already_decided",
+                  "publication_request_invalidated",
+                  "publication_request_conflict",
+                  "publication_snapshot_not_found",
+                  "scheduler_not_found",
+                  "asr_disabled",
+                  "asr_failed",
+                  "turn_admission_closed",
+                  "session_has_active_turn",
+                  "clarification_source_conflict",
+                  "configuration_unavailable",
+                  "organization_api_key_rotation_conflict",
+                  "auth_kind_forbidden",
+                  "billing_target_not_found",
+                  "invalid_billing_usage_query",
+                  "invalid_billing_usage_cursor",
+                  "billing_audit_unavailable",
+                  "session_observation_audit_unavailable",
+                  "drive9_provision_config_conflict",
+                  "runtime_error",
+                  "invalid_credentials",
+                  "invalid_current_password",
+                  "account_already_exists",
+                  "account_not_found",
+                  "password_not_configured",
+                  "password_already_configured",
+                  "google_identity_already_linked",
+                  "verification_not_found",
+                  "verification_code_invalid",
+                  "verification_replaced",
+                  "verification_already_completed",
+                  "verification_expired",
+                  "verification_attempts_exhausted",
+                  "verification_rate_limited",
+                  "login_rate_limited",
+                  "password_rate_limited",
+                  "auth_temporarily_unavailable",
+                  "auth_outcome_unknown",
+                  "password_changed",
+                  "invalid_origin",
+                  "platform_operator_required",
+                  "personal_organization_eligibility_concurrent_change",
+                  "personal_organization_eligibility_unavailable",
+                  "personal_organization_eligibility_outcome_unknown",
+                  "personal_organization_creation_unavailable",
+                  "onboarding_temporarily_unavailable",
+                  "onboarding_outcome_unknown",
+                  "organization_destination_not_available",
+                  "invitation_not_available",
+                  "invitation_not_actionable",
+                  "invite_delivery_failed",
+                  "access_request_not_available",
+                  "access_requests_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "PublicSchedulerListResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "schedulers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schedulerId": {
+                  "type": "string"
+                },
+                "ownerUserId": {
+                  "type": "string"
+                },
+                "organizationId": {
+                  "type": "string"
+                },
+                "agentId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "delivery": {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "string",
+                      "enum": [
+                        "new_session",
+                        "bound_session"
+                      ]
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "target",
+                    "sessionId"
+                  ],
+                  "additionalProperties": false
+                },
+                "schedule": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "once",
+                        "cron"
+                      ]
+                    },
+                    "cronExpr": {
+                      "type": "string",
+                      "maxLength": 128,
+                      "nullable": true
+                    },
+                    "runAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "timezone": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "cronExpr",
+                    "runAt",
+                    "timezone"
+                  ],
+                  "additionalProperties": false
+                },
+                "validFrom": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "validUntil": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "nextFireAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "lastFiredAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": false
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "schedulerId",
+                "ownerUserId",
+                "organizationId",
+                "agentId",
+                "title",
+                "prompt",
+                "delivery",
+                "schedule",
+                "validFrom",
+                "validUntil",
+                "status",
+                "nextFireAt",
+                "lastFiredAt",
+                "revision",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "schedulers",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePublicSchedulerOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "new_session"
+                    ]
+                  }
+                },
+                "required": [
+                  "target"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "bound_session"
+                    ]
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "target",
+                  "sessionId"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "runAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "runAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "once"
+                    ]
+                  },
+                  "after": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "after"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "cron"
+                    ]
+                  },
+                  "cronExpr": {
+                    "description": "The server trims surrounding whitespace, then enforces a 128-character maximum.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "cronExpr",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "snoozeUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PublicSchedulerFiresResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "fires": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fireId": {
+                  "type": "string"
+                },
+                "schedulerId": {
+                  "type": "string"
+                },
+                "scheduledFor": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "executionStatus": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "execution": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "type": "string",
+                          "enum": [
+                            "new_session",
+                            "bound_session"
+                          ]
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "sessionId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "agentId",
+                    "prompt",
+                    "delivery"
+                  ],
+                  "additionalProperties": false
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "sessionId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "turnId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "messageId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "sessionId",
+                    "turnId",
+                    "messageId",
+                    "failureCode"
+                  ],
+                  "additionalProperties": false
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "settledAt": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "fireId",
+                "schedulerId",
+                "scheduledFor",
+                "executionStatus",
+                "execution",
+                "result",
+                "createdAt",
+                "settledAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "fires",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "UserApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      }
+    }
+  }
+}

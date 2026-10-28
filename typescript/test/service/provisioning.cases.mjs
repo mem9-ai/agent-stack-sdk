@@ -8,10 +8,13 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import {
   OrganizationClient,
+  UserClient,
   TiDBLinkApiError,
   ConflictError,
 } from "@mem9/tidb-link";
 import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
+import { createSessionWorkflow } from "@mem9/tidb-link/examples/create-session.mjs";
+import { sendMessageWorkflow } from "@mem9/tidb-link/examples/send-message.mjs";
 
 const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
@@ -191,4 +194,64 @@ test("provisioning, scoped identity and key lifecycle work in an installed consu
   } finally {
     await rm(credentialFile, { force: true });
   }
+});
+
+test("one installed consumer provisions a new User and completes and recovers the full application quickstart", async () => {
+  const provisioned = await provisionUser({
+    baseUrl,
+    organizationApiKey: apiKey,
+    externalId: `sdk-quickstart-${randomUUID()}`,
+  });
+  const customer = new UserClient({ baseUrl, apiKey: provisioned.token });
+  const catalog = await customer.listAgentTemplates({ limit: 200 });
+  const template = catalog.templates.find(
+    (item) => item.agentTemplateId === process.env.SDK_TEMPLATE_ID,
+  );
+  assert(
+    template,
+    "The newly provisioned User must discover the available Template",
+  );
+  const models = await customer.listModels();
+  assert(
+    models.models.some((model) => model.model === models.effectiveDefaultModel),
+  );
+  const creation = {
+    baseUrl,
+    userApiKey: provisioned.token,
+    agentTemplateId: template.agentTemplateId,
+    agentCreationKey: randomUUID(),
+    sessionCreationKey: randomUUID(),
+    model: models.effectiveDefaultModel,
+  };
+  const { agent, session } = await createSessionWorkflow(creation);
+  const input = {
+    baseUrl,
+    userApiKey: provisioned.token,
+    sessionId: session.id,
+    clientEventId: randomUUID(),
+    text: "SDK_FIXTURE_SUCCESS",
+    timeoutMs: 15000,
+  };
+  const result = await sendMessageWorkflow(input);
+  assert.equal(result.text, "SDK final answer.");
+  assert.equal(result.interaction.result.status, "succeeded");
+  assert(result.interaction.appliedAt);
+  const recovered = await createSessionWorkflow(creation);
+  assert.equal(recovered.agent.id, agent.id);
+  assert.equal(recovered.session.id, session.id);
+  assert.deepEqual(
+    await session.reconcileInteraction(input.clientEventId),
+    result.interaction,
+  );
+  assert.deepEqual(await sendMessageWorkflow(input), result);
+  const history = await recovered.session.history();
+  assert.equal(history.turns.length, 1);
+  assert.equal(history.turns[0].id, result.turnId);
+  assert.equal(history.turns[0].assistantMessage.content, result.text);
+  const organization = new OrganizationClient({ baseUrl, apiKey });
+  assert.equal(
+    (await organization.listUserApiKeys(provisioned.user.userId)).length,
+    1,
+  );
+  await organization.revokeUserApiKey(provisioned.apiKey.apiKeyId);
 });

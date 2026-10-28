@@ -1,5 +1,15 @@
+import {
+  usageQuery,
+  type UserUsageOptions,
+  type UserUsageDetailsOptions,
+  type UserUsageSummary,
+  type UserUsageDetails,
+} from "./usage.js";
+import { UserSchedulers } from "./schedulers.js";
+import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
+  requestOptions,
   HttpClient,
   isApiKey,
   paginationQuery,
@@ -103,6 +113,7 @@ export class Agent {
   }
 
   async refresh(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
       `/api/v1/user/agents/${encodeURIComponent(this.id)}`,
       options,
@@ -115,6 +126,7 @@ export class Agent {
     input: UpdateAgentInput,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     requireKnownKeys(input, ["additionalInstructions"], "Agent preferences");
     if (
       input.additionalInstructions !== null &&
@@ -143,15 +155,28 @@ export interface SessionPage {
 
 export class UserClient {
   readonly #http: HttpClient;
+  readonly #files: UserFiles;
+  readonly #schedulers: UserSchedulers;
+
+  get schedulers(): UserSchedulers {
+    return this.#schedulers;
+  }
+
+  get files(): UserFiles {
+    return this.#files;
+  }
 
   constructor(options: UserClientOptions) {
     requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
     if (!isApiKey(options.apiKey, "user"))
       throw new TypeError("UserClient requires a User API Key");
     this.#http = new HttpClient(options);
+    this.#files = new UserFiles(this.#http);
+    this.#schedulers = new UserSchedulers(this.#http);
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agents: AgentRecord[] }>(
       "/api/v1/user/agents",
       options,
@@ -185,7 +210,24 @@ export class UserClient {
     return new Agent(this.#http, agentReceipt(result.data, result.requestId));
   }
 
+  getUsage(options: UserUsageOptions = {}): Promise<UserUsageSummary> {
+    return this.#http.get(
+      `/api/v1/billing/usage${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue"])}`,
+      options,
+    );
+  }
+
+  getUsageDetails(
+    options: UserUsageDetailsOptions = {},
+  ): Promise<UserUsageDetails> {
+    return this.#http.get(
+      `/api/v1/billing/usage/details${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue", "limit"])}`,
+      options,
+    );
+  }
+
   async getAgent(id: string, options?: RequestOptions): Promise<Agent> {
+    options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
       `/api/v1/user/agents/${encodeURIComponent(id)}`,
       options,
@@ -203,6 +245,12 @@ export class UserClient {
   listModels(
     options?: RequestOptions & { agentId?: string },
   ): Promise<AgentModelCatalog> {
+    if (options)
+      requireKnownKeys(
+        options,
+        ["agentId", "signal", "requestId"],
+        "Model list options",
+      );
     const query =
       options?.agentId === undefined
         ? ""
@@ -211,7 +259,7 @@ export class UserClient {
   }
 
   listRealtimeModels(options?: RequestOptions): Promise<RealtimeModelCatalog> {
-    return this.#http.get("/api/v1/realtime-models", options);
+    return this.#http.get("/api/v1/realtime-models", requestOptions(options));
   }
 
   async listSessions(options?: ListOptions): Promise<SessionPage> {

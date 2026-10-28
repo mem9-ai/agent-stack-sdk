@@ -11,6 +11,11 @@ import {
   type ReplaceClientToolsOptions,
 } from "./client-tools.js";
 import {
+  submitTurnCommand,
+  type TurnCommandInput,
+  type RetryReceipt,
+} from "./control.js";
+import {
   sessionEvents,
   observeTurn,
   type SessionEvent,
@@ -400,6 +405,16 @@ export class Session {
     options?: RequestOptions,
   ): Promise<SessionInteraction | null> {
     return reconcileInteraction(this.#http, this.id, clientEventId, options);
+  }
+
+  /** Acceptance requests cancellation; read the receipt for the eventual outcome. */
+  cancel(input: TurnCommandInput): Promise<SessionInteraction> {
+    return submitTurnCommand(this.#http, this.id, "cancel", input);
+  }
+
+  /** Explicit checkpoint retry has its own identity and original execution result. */
+  retry(input: TurnCommandInput): Promise<RetryReceipt> {
+    return submitTurnCommand(this.#http, this.id, "retry", input);
   }
 
   submitMessage(input: CreateTurnInput): Promise<SessionInteraction> {

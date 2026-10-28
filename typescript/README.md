@@ -7,13 +7,14 @@ declarations and no runtime dependencies.
 
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
-text submission, original-result waiting, continuous progress, Client Tools and conversation history, and
+text submission, steering, cancellation, checkpoint retry, original-result waiting,
+continuous progress, Client Tools, conversation history, file attachments, and
 Realtime Model/Connection preparation for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Explicit steering/cancellation/retry helpers, files, Schedulers and
+default Agents and general Agent overrides are removed. Schedulers and
 usage remain subsequent slices. Browser, MSP, management and device APIs are
 outside this refresh.
 
@@ -456,6 +457,62 @@ precede an already consumed Turn-list cursor; refresh Turn history or use
 Timeline for durable ordering. History is readable content, not authority for an
 original request's result: use its interaction receipt for that outcome.
 
+## Steering, cancellation and checkpoint retry
+
+Send another `submitMessage` while a Turn is active to add requirements. Its
+receipt reports `mode: "steered"` and the same `turnId`; `appliedAt` records actual
+incorporation. This is the service's ordinary message admission, so a message
+arriving after completion may start a new Turn. No target-locked steering command
+is offered by this service. Inspect the receipt rather than assuming which Turn
+accepted the message.
+
+Cancellation targets an exact Turn and has its own stable command identity:
+
+```ts
+const stop = await session.cancel({
+  clientEventId: savedCancellationId,
+  turnId: original.turnId,
+});
+const cancellation = await session.getInteraction(stop.inputId);
+```
+
+Acceptance requests a stop; it does not establish termination or undo completed
+effects. Read the cancellation receipt or the original message receipt until its
+`result.status` is terminal. A completed Turn can retain success if completion won
+the race. A stale target is refused rather than cancelling its successor.
+
+Checkpoint retry deliberately starts another execution of the selected Turn:
+
+```ts
+const retry = await session.retry({
+  clientEventId: savedRetryId,
+  turnId: original.turnId,
+});
+const retried = await session.waitForResult(retry.clientEventId);
+const earlier = await session.getInteraction(original.inputId);
+```
+
+The retry acceptance contains `{clientEventId, sessionId, turnId, disposition:
+"retrying"}`. Its durable interaction is readable using `clientEventId`, including
+through `reconcileInteraction`. Waiting accepts message and retry identities; a
+successful saved answer must match that interaction's execution completion time.
+Earlier failed or interrupted receipts keep their original outcome even when the
+Turn later succeeds. A cancellation receipt is not an answer receipt.
+
+Retry is disabled by default in Agent Service. `checkpoint_runtime_unavailable`
+and other eligibility or authority refusals remain `TiDBLinkApiError`; the SDK
+never substitutes a new message. An uncertain cancellation or retry preserves its
+Session, command and Turn IDs in `OutcomeUnknownError`. Read the original receipt
+before deciding whether to repeat the identical command. A new ID is a new
+request, not network recovery.
+
+The installed `@mem9/tidb-link/examples/control-turn.mjs` exports
+`controlTurnWorkflow`. It returns cancellation acceptance for `action: "cancel"`
+and waits for the separate retry result for `action: "retry"`. Run it with
+`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CLIENT_EVENT_ID` and
+`TURN_ACTION` set; retain those identities before dispatch. This example never
+chooses to retry automatically.
+
 ## Realtime connection preparation
 
 A backend can discover the published Realtime Models and prepare an existing
@@ -513,6 +570,78 @@ const prepared = await prepareRealtimeConnection({
 Set `AGENT_SERVICE_URL`, `USER_API_KEY`, and `SESSION_ID` to run the example
 directly. `REALTIME_MODEL_ID` is optional.
 
+## File attachments
+
+`user.files` manages owned uploaded files. Upload from a `Uint8Array` (including
+Node.js `Buffer`) and retain a stable creation key with the exact bytes and name.
+The service chooses inline or multipart transfer; the SDK supplies complete and
+per-part SHA-256 digests, transfers the required bytes, and confirms whole-file
+verification before returning a ready file. Empty files are supported.
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const file = await customer.files.upload({
+  originalName: "notes.txt",
+  bytes: await readFile("notes.txt"),
+  contentType: "text/plain",
+  idempotencyKey: savedUploadKey,
+});
+const result = await session.turn({
+  clientEventId: savedMessageId,
+  text: "Summarize the attached notes.",
+  userFileIds: [file.fileId],
+});
+const downloaded = await customer.files.download(file.fileId);
+```
+
+Only ready files authorized for the Session's User may be attached. The service
+checks that authority at message admission; an earlier local readiness check
+cannot grant access to another User's file. File bytes remain separate from the
+message text. `capabilities()` exposes current upload limits; a typed 413 requires
+reading them again and explicitly deciding whether to create another upload.
+
+For explicit recovery use `createUpload()` with the original metadata and key,
+`getUpload(uploadId)`, `uploadContent()`, `presignPart()` / `uploadPart()`,
+`completeUpload()`, and `cancelUpload()`. Retain each returned part number, ETag
+and digest until completion. A status read never creates or transfers anything.
+Create replay retains the original file and fixed upload expiry; it may renew a
+short-lived inline transfer URL. An expired or failed upload requires a new key
+and file. The SDK never chooses that new identity or repeats a failed transfer
+automatically.
+
+`FileUploadOutcomeUnknownError` carries `idempotencyKey` and, once creation was
+acknowledged, `uploadId`. Read that upload before deciding what to repeat. A lost
+creation response can be reconciled with `createUpload()` using the exact
+original metadata and key. A pending multipart part can be signed again for its
+original digest; after an uncertain completion, read status rather than assuming
+failure or sending the message. Cancellation marks the incomplete file unusable;
+it does not delete a previously accepted conversation.
+
+`list({ history, limit, cursor })` returns `{ files, nextCursor }`; it has no
+`hasMore` field. `get(fileId)` reads metadata. `getContent(fileId)` returns either
+`{ type: "bytes", bytes, contentType }` or, for a large file,
+`{ type: "download", grant }`. `downloadFromGrant(grant)` redeems the latter;
+`download(fileId)` handles both forms and verifies complete size and SHA-256.
+A new authorized content read obtains a fresh grant after expiry. Upload and
+download grants are bearer credentials: do not log or store their URLs beyond
+need. Transfers send only the grant's required headers, never the User API Key.
+Uploads reject redirects; a download may follow one HTTPS redirect without an
+API Key. Files are held in memory while hashing or downloading, so size your
+backend's concurrency for the service's advertised maximum.
+
+The packaged `upload-file.mjs` example uploads and attaches one file. Set
+`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `FILE_PATH`,
+`UPLOAD_IDEMPOTENCY_KEY`, and `CLIENT_EVENT_ID`, then run:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/upload-file.mjs
+```
+
+The example returns the final conversation result; its exported
+`uploadFileWorkflow()` accepts bytes directly. It does not manage general Drive
+directories, write Session text files, or grant Organization access to User files.
+
 ## Errors and uncertain outcomes
 
 Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
@@ -553,12 +682,12 @@ new token after reconciling the connection state.
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
 revision. The provisioning, lifecycle, Realtime and text constants and package
 fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
-`tidbLinkTextRevision` covers text commands, progress, original results and history;
+`tidbLinkTextRevision` covers text and control commands, progress, original results and history;
 `tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks a frozen text/progress/history OpenAPI subset from
+`npm run test:service-contract` checks frozen text/progress/history and file-transfer OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -586,11 +715,18 @@ exercise actual acceptance, final success/failure/interruption, local timeout an
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor
 reconnection/refusal, original-result confirmation, local observation timeout and
-live credential revocation without remote cancellation. Client Tool cases declare
-and replace tools, resume pending reads, explicitly return application output or
-errors, and observe those values in real Runtime answers, with ownership, stale
-revision, settled-call and unavailable-call refusals. A forwarding proxy drops only an actual
-service response to prove uncertain-submission recovery.
+live credential revocation without remote cancellation. Client Tool cases declare and replace tools, resume pending reads, explicitly return
+application output or errors, and observe those values in real Runtime answers, with
+ownership, stale revision, settled-call and unavailable-call refusals. A forwarding proxy drops only
+an actual service response to prove uncertain-submission recovery. Control cases
+verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
+enabled checkpoint retry with an unchanged original outcome. The enabled fixture
+uses the existing controlled Drive9 and model suppliers. File cases use a separate
+fixture lifecycle with real upload state and a controlled Drive9/S3 byte supplier.
+They verify inline, multipart and empty uploads, cancellation and invalid content,
+large-file download-ticket redemption, and a real Runtime file read whose answer
+contains the uploaded content. The installed upload example exercises the same
+public workflow. Real supplier deployment certification is outside this evidence.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

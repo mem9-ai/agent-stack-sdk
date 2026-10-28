@@ -183,6 +183,44 @@ test("history pages preserve Full Agent and Realtime projections", () => {
   assert.equal(properties(facts[1]).interrupted.type, "boolean");
 });
 
+test("cancel and checkpoint retry keep exact command identities and distinct receipt shapes", () => {
+  for (const kind of ["cancel", "retry"]) {
+    const command = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
+      properties(variant).type.enum.includes(`agent.session.input.${kind}`),
+    );
+    assert.deepEqual(command.required, ["type", "clientEventId", "data"]);
+    assert.equal(
+      properties(command).clientEventId.pattern,
+      "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+    );
+    const data = properties(command).data;
+    assert.deepEqual(Object.keys(properties(data)), ["turnId"]);
+    assert.equal(properties(data).turnId.maxLength, 64);
+    if (kind === "retry") assert.deepEqual(data.required, ["turnId"]);
+  }
+  const receipt = properties(
+    schema("SessionEventRetryResponseOpenApiDto"),
+  ).event;
+  assert.deepEqual(receipt.required, [
+    "clientEventId",
+    "sessionId",
+    "turnId",
+    "disposition",
+  ]);
+  assert.deepEqual(properties(receipt).disposition.enum, ["retrying"]);
+  const submission = document.paths[`${sessionPath}/events`].post;
+  for (const status of ["200", "202"])
+    assert(
+      submission.responses[status].content[
+        "application/json"
+      ].schema.oneOf.some(
+        (variant) =>
+          variant.$ref ===
+          "#/components/schemas/SessionEventRetryResponseOpenApiDto",
+      ),
+    );
+});
+
 test("independent observation preserves the declared event position and snapshot contract", () => {
   const subscription = document.paths[`${sessionPath}/events`].get;
   assert.deepEqual(subscription.security, [{ UserApiKey: [] }]);

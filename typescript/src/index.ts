@@ -107,6 +107,22 @@ export type {
   SessionTimelinePage,
 } from "./history.js";
 
+export type { TurnCommandInput, RetryReceipt } from "./control.js";
+export { UserFiles, FileUploadOutcomeUnknownError } from "./files.js";
+export type {
+  UserFile,
+  FileUploadCapabilities,
+  CreateFileUploadInput,
+  UploadFileInput,
+  FileUpload,
+  FileUploadStatus,
+  FileUploadPart,
+  UploadedFilePart,
+  FileListOptions,
+  FilePage,
+  FileDownloadGrant,
+  FileContent,
+} from "./files.js";
 export type {
   SessionEvent,
   SessionEventsOptions,

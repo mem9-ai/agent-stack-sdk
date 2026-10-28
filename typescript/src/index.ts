@@ -204,3 +204,10 @@ export type {
   SchedulerFire,
   SchedulerFirePage,
 } from "./schedulers.js";
+
+export { AudioTurnStoppedError } from "./audio.js";
+export type {
+  AudioTurnInput,
+  AudioTurnEvent,
+  AudioTurnResult,
+} from "./audio.js";

@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Submit prerecorded audio with multipart bytes and optional JSON Billing Tags;
+  consume its distinct event envelope or wait for the final answer.
+- Preserve audio response interruption and unknown outcomes without text replay
+  promises; verify actual transcription, budget refusal and saved Turn outcomes.
+
 - Add User self-usage and Organization target-User usage summaries and details,
   preserving separate date/paging contracts and unknown, unpriced or incomplete
   facts. Include the installed usage example and actual-service verification.

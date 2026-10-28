@@ -1,0 +1,1069 @@
+{
+  "revision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
+  "sourceOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "paths": {
+    "/api/v1/user/sessions/{id}/turns/audio": {
+      "post": {
+        "operationId": "SessionsController_createAudioTurn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Audio file to transcribe. Supported formats: mp3, mp4, mpeg, mpga, m4a, wav, webm."
+                  },
+                  "billingTag": {
+                    "nullable": true,
+                    "description": "Omit to inherit the Session default, send one JSON Billing Tag object to override it, or send the JSON literal null to clear it for this Turn.",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/BillingTag"
+                      }
+                    ]
+                  }
+                }
+              },
+              "encoding": {
+                "billingTag": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Audio Turn outside ordinary JSON text input identity/recovery guarantees. The owning response uses SSE frames whose event name and JSON data identify the TurnStreamEvent, with comment keepalives; turn_started may omit inputId. Closing its active upstream requests interruption. Cancel an owned live Turn through POST events with a stable clientEventId and its exact turnId.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Each SSE frame contains event: <TurnStreamEvent.event> and data: <TurnStreamEvent JSON>, terminated by a blank line. Comment frames are keepalive heartbeats.",
+                  "x-sse-event-schema": {
+                    "$ref": "#/components/schemas/TurnStreamEvent"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-cache, no-transform"
+                  ]
+                }
+              },
+              "X-Accel-Buffering": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Session is read-only (session_read_only), or already has an active Turn (session_has_active_turn), either before transcription or reservation, or because another Turn starts during transcription. Conflicts after accepted transcription retain ASR usage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The platform-funded LLM spend limit is exhausted before streaming starts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "llm_spend_limit_exhausted",
+                    "message": "LLM spend limit exhausted"
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Audio transcription is disabled because ASR_OPENAI_API_KEY is not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "New Turn admission is temporarily closed for deployment maintenance or recovery (turn_admission_closed), or the deployment lacks the Sandbox or Drive9 service a new Turn needs (service_configuration_unavailable; details.reason names it). Normally this refusal happens before the audio is read, transcribed or billed and before anything is saved. If the configuration changes concurrently, the same 503 can follow transcription; that transcription remains billed and no Turn is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "turn_admission_closed",
+                    "message": "New Turns are temporarily unavailable"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BillingTag": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "value"
+        ],
+        "description": "A non-secret attribution label. The pair is matched exactly and is not an authorization boundary.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "description": "Case-sensitive key: a lowercase ASCII letter followed by up to 63 lowercase ASCII letters, digits, underscores, dots, or hyphens."
+          },
+          "value": {
+            "type": "string",
+            "description": "Case-sensitive value normalized to NFC and limited to 1–128 bytes in UTF-8. Leading or trailing Unicode whitespace and Unicode control or format characters are rejected."
+          }
+        }
+      },
+      "TurnStreamEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "turn_started"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "inputId": {
+                    "type": "string",
+                    "description": "Stable customer input identity, required on ordinary JSON text starts. Historical, checkpoint retry and retained advanced audio/internal starts may omit it."
+                  },
+                  "execution": {
+                    "description": "Display-safe frozen Runtime request settings for this AgentRun. Historical persisted events may omit it.",
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "progress"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "assistant_draft"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "operation_step"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "required": [
+                  "operationId",
+                  "status",
+                  "label"
+                ],
+                "properties": {
+                  "operationId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "running",
+                      "succeeded",
+                      "failed",
+                      "interrupted",
+                      "unknown_result"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "tool_call",
+                      "skill_read"
+                    ],
+                    "description": "The same grouping as the Operation's category in Turn reads. Absent on non-tool and metadata-only Operations and on events saved before this field existed."
+                  },
+                  "skill": {
+                    "$ref": "#/components/schemas/OperationSkill"
+                  },
+                  "source": {
+                    "$ref": "#/components/schemas/ClientToolOperationSource"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "assistant_message"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "required": [
+                  "messageId",
+                  "text"
+                ],
+                "properties": {
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "clarificationItem": {
+                    "$ref": "#/components/schemas/ClarificationItem"
+                  }
+                }
+              }
+            },
+            "example": {
+              "event": "assistant_message",
+              "turnId": "turn_123",
+              "sessionId": "sess_123",
+              "seq": 3,
+              "createdAt": "2026-07-13T00:00:00.000Z",
+              "payload": {
+                "messageId": "msg_123",
+                "text": "Choose a deployment target.",
+                "clarificationItem": {
+                  "prompt": "Where should I deploy?",
+                  "selectionMode": "single",
+                  "answerChoices": [
+                    "Staging",
+                    "Production"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "turn_error"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/TurnFailure"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "turn_finished"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "succeeded",
+                      "failed",
+                      "interrupted"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "OperationSkill": {
+        "type": "object",
+        "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
+        "required": [
+          "skillId",
+          "name"
+        ],
+        "properties": {
+          "skillId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientToolOperationSource": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "session_client"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "hardwareRequirementId",
+              "method"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "hardware"
+                ]
+              },
+              "hardwareRequirementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+              }
+            }
+          }
+        ],
+        "description": "Client Tool source; only safe requirement and original method are exposed for Hardware. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source."
+      },
+      "ClarificationItem": {
+        "description": "A structured blocking question and its optional canonical persisted response. The linked user Message remains the readable conversation projection.",
+        "discriminator": {
+          "propertyName": "selectionMode"
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "prompt",
+              "selectionMode",
+              "answerChoices"
+            ],
+            "properties": {
+              "prompt": {
+                "type": "string"
+              },
+              "selectionMode": {
+                "type": "string",
+                "enum": [
+                  "single"
+                ],
+                "description": "Requires exactly one answer and two or three mutually exclusive candidates."
+              },
+              "answerChoices": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "description": "Candidate display order is also the canonical structured-answer order.",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "response": {
+                "type": "object",
+                "required": [
+                  "answers",
+                  "responseTurnId"
+                ],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "description": "The single structured answer.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "responseTurnId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "prompt",
+              "selectionMode",
+              "answerChoices"
+            ],
+            "properties": {
+              "prompt": {
+                "type": "string"
+              },
+              "selectionMode": {
+                "type": "string",
+                "enum": [
+                  "multiple"
+                ],
+                "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates."
+              },
+              "answerChoices": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 8,
+                "description": "Candidate display order is also the canonical structured-answer order.",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "response": {
+                "type": "object",
+                "required": [
+                  "answers",
+                  "responseTurnId"
+                ],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 9,
+                    "description": "Distinct structured values in candidate display order, followed by at most one user-supplied answer.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "responseTurnId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TurnFailure": {
+        "type": "object",
+        "description": "A failed Turn's public error, as carried by its turn_error event and Turn.failure. The message is fixed text for the code and never contains supplier or internal error text.",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "service_configuration_unavailable (details.reason names the missing service), model_provider_failed (details.provider carries bounded supplier facts), runtime_error, interrupted, or another stable failure code."
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "description": "Present only with code service_configuration_unavailable, when the Turn failed because the deployment or Organization lacks a service it needs. The reason and message match the service_configuration_unavailable error response.",
+                "type": "string",
+                "enum": [
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "drive9_unconfigured",
+                  "drive9_disabled_for_organization"
+                ]
+              },
+              "provider": {
+                "description": "Present only with code model_provider_failed. The failure category, the HTTP status the supplier returned and the supplier's own error type and code, each null when unknown. A supplier redirect is never followed and reads as supplier_error with the 3xx status and errorType redirect. Never supplier message text, request paths or credentials.",
+                "type": "object",
+                "required": [
+                  "category",
+                  "httpStatus",
+                  "errorType",
+                  "errorCode"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "authentication",
+                      "supplier_error",
+                      "supplier_unavailable",
+                      "network",
+                      "provider_stream_error"
+                    ]
+                  },
+                  "httpStatus": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "errorType": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "errorCode": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent_instructions_too_large",
+                  "hardware_connection_unavailable",
+                  "websocket_required",
+                  "hardware_binding_unavailable",
+                  "hardware_registration_unavailable",
+                  "binding_commit_unknown",
+                  "hardware_credential_unavailable",
+                  "hardware_command_closed",
+                  "hardware_command_outcome_unknown",
+                  "binding_receipt_integrity",
+                  "validation_error",
+                  "template_test_busy",
+                  "template_test_closed",
+                  "template_test_expired",
+                  "template_test_dependency_unavailable",
+                  "template_test_model_unavailable",
+                  "template_test_authority_lost",
+                  "invalid_organization_context",
+                  "authentication_required",
+                  "organization_owner_required",
+                  "organization_last_owner",
+                  "organization_already_joined",
+                  "resource_not_found",
+                  "invalid_cursor",
+                  "console_temporarily_unavailable",
+                  "service_configuration_unavailable",
+                  "human_principal_required",
+                  "user_api_key_required",
+                  "organization_membership_required",
+                  "admin_required",
+                  "org_admin_required",
+                  "agent_not_found",
+                  "agent_template_creation_conflict",
+                  "agent_template_apply_busy",
+                  "agent_template_recall_acknowledgment_required",
+                  "requires_explicit_agent_creation",
+                  "agent_template_application_conflict",
+                  "agent_template_dependency_conflict",
+                  "agent_template_unavailable",
+                  "session_agent_required",
+                  "session_agent_unavailable",
+                  "session_model_not_allowed",
+                  "session_execution_dependency_unavailable",
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "sandbox_validation_pending",
+                  "sandbox_scope_incompatible",
+                  "sandbox_configuration_incompatible",
+                  "sandbox_unavailable",
+                  "vision_model_unsupported",
+                  "vision_image_count_exceeded",
+                  "vision_image_unsupported",
+                  "vision_image_source_too_large",
+                  "vision_image_invalid",
+                  "vision_image_decode_limit_exceeded",
+                  "vision_image_payload_too_large",
+                  "vision_image_processing_unavailable",
+                  "organization_default_agent_unconfigured",
+                  "user_default_agent_mapping_invalid",
+                  "session_not_found",
+                  "session_read_only",
+                  "provider_unavailable",
+                  "realtime_connection_not_found",
+                  "realtime_connection_live",
+                  "realtime_model_conflict",
+                  "realtime_model_unavailable",
+                  "realtime_not_enabled",
+                  "realtime_language_unsupported",
+                  "realtime_language_unavailable",
+                  "realtime_connection_ended",
+                  "audio_format_unsupported",
+                  "admission_unavailable",
+                  "turn_not_found",
+                  "checkpoint_runtime_unavailable",
+                  "artifact_not_found",
+                  "chat_image_not_found",
+                  "artifact_cursor_invalid",
+                  "artifact_idempotency_conflict",
+                  "artifact_quota_exceeded",
+                  "artifact_not_writable",
+                  "artifact_revision_conflict",
+                  "artifact_source_not_found",
+                  "artifact_source_not_file",
+                  "artifact_source_changed",
+                  "artifact_storage_contract_unavailable",
+                  "artifact_publish_failed",
+                  "artifact_bytes_need_repair",
+                  "drive_file_not_found",
+                  "drive_path_too_long",
+                  "drive_download_rate_limited",
+                  "llm_spend_limit_exhausted",
+                  "drive_download_provider_error",
+                  "drive_download_unavailable",
+                  "invalid_idempotency_key",
+                  "idempotency_key_required",
+                  "session_creation_conflict",
+                  "agent_creation_conflict",
+                  "interaction_input_conflict",
+                  "interaction_not_found",
+                  "interaction_admission_closed",
+                  "interaction_target_conflict",
+                  "client_tool_call_unavailable",
+                  "client_tool_call_settled",
+                  "idempotency_key_reused",
+                  "identity_conversion_command_retired",
+                  "idempotency_in_progress",
+                  "idempotency_key_expired",
+                  "secret_delivery_expired",
+                  "idempotency_completion_failed",
+                  "idempotency_witness_invalid",
+                  "skill_name_conflict",
+                  "skill_delete_blocked",
+                  "invalid_skill_package",
+                  "skill_ingestion_not_found",
+                  "skill_import_job_not_found",
+                  "skill_import_state_conflict",
+                  "skill_ingestion_expired",
+                  "precondition_required",
+                  "precondition_failed",
+                  "resource_conflict",
+                  "hardware_model_conflict",
+                  "hardware_model_in_use",
+                  "agent_template_profile_unavailable",
+                  "agent_template_dependency_unavailable",
+                  "agent_template_archived",
+                  "agent_template_conflict",
+                  "agent_template_list_changed",
+                  "skill_not_found",
+                  "skill_version_not_found",
+                  "skill_file_not_found",
+                  "skill_package_file_rejected",
+                  "skill_package_store_unavailable",
+                  "skill_head_required",
+                  "skill_canonical_name_conflict",
+                  "skill_already_installed",
+                  "skill_installation_not_found",
+                  "skill_upgrade_not_forward",
+                  "unsupported_media_type",
+                  "raw_upload_too_large",
+                  "upload_too_large",
+                  "upload_ticket_invalid",
+                  "upload_failed",
+                  "upload_expired",
+                  "upload_incomplete",
+                  "upload_integrity_failed",
+                  "upload_requires_multipart",
+                  "upload_temporarily_unavailable",
+                  "skill_authoring_forbidden",
+                  "skill_read_forbidden",
+                  "restore_requires_historical_version",
+                  "private_skill_required",
+                  "publication_head_required",
+                  "open_publication_request_exists",
+                  "publication_target_changed",
+                  "publication_conflict",
+                  "publication_request_not_found",
+                  "publication_request_already_decided",
+                  "publication_request_invalidated",
+                  "publication_request_conflict",
+                  "publication_snapshot_not_found",
+                  "scheduler_not_found",
+                  "asr_disabled",
+                  "asr_failed",
+                  "turn_admission_closed",
+                  "session_has_active_turn",
+                  "clarification_source_conflict",
+                  "configuration_unavailable",
+                  "organization_api_key_rotation_conflict",
+                  "auth_kind_forbidden",
+                  "billing_target_not_found",
+                  "invalid_billing_usage_query",
+                  "invalid_billing_usage_cursor",
+                  "billing_audit_unavailable",
+                  "session_observation_audit_unavailable",
+                  "drive9_provision_config_conflict",
+                  "runtime_error",
+                  "invalid_credentials",
+                  "invalid_current_password",
+                  "account_already_exists",
+                  "account_not_found",
+                  "password_not_configured",
+                  "password_already_configured",
+                  "google_identity_already_linked",
+                  "verification_not_found",
+                  "verification_code_invalid",
+                  "verification_replaced",
+                  "verification_already_completed",
+                  "verification_expired",
+                  "verification_attempts_exhausted",
+                  "verification_rate_limited",
+                  "login_rate_limited",
+                  "password_rate_limited",
+                  "auth_temporarily_unavailable",
+                  "auth_outcome_unknown",
+                  "password_changed",
+                  "invalid_origin",
+                  "platform_operator_required",
+                  "personal_organization_eligibility_concurrent_change",
+                  "personal_organization_eligibility_unavailable",
+                  "personal_organization_eligibility_outcome_unknown",
+                  "personal_organization_creation_unavailable",
+                  "onboarding_temporarily_unavailable",
+                  "onboarding_outcome_unknown",
+                  "organization_destination_not_available",
+                  "invitation_not_available",
+                  "invitation_not_actionable",
+                  "invite_delivery_failed",
+                  "access_request_not_available",
+                  "access_requests_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "UserApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      }
+    }
+  }
+}

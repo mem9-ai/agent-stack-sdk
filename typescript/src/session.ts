@@ -1,4 +1,11 @@
 import {
+  audioTurn,
+  streamAudio,
+  type AudioTurnInput,
+  type AudioTurnEvent,
+  type AudioTurnResult,
+} from "./audio.js";
+import {
   getClientTools,
   replaceClientTools,
   validateClientTools,
@@ -352,6 +359,14 @@ export class Session {
     options?: ObserveTurnOptions,
   ): AsyncGenerator<TurnObservation> {
     return observeTurn(this.#http, this.id, inputId, options);
+  }
+
+  streamAudio(input: AudioTurnInput): AsyncGenerator<AudioTurnEvent> {
+    return streamAudio(this.#http, this.id, input);
+  }
+
+  audio(input: AudioTurnInput): Promise<AudioTurnResult> {
+    return audioTurn(this.#http, this.id, input);
   }
 
   getClientTools(options?: RequestOptions): Promise<ClientToolSet> {

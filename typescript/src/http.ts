@@ -267,26 +267,11 @@ export class HttpClient {
     return this.response(path, { ...options, method: "PATCH", body });
   }
 
-  put<T>(
-    path: string,
-    body: unknown,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
-  ): Promise<T> {
-    return this.request(path, { ...options, method: "PUT", body });
-  }
-
   deleteResponse<T>(
     path: string,
     options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
   ): Promise<HttpResult<T>> {
     return this.response(path, { ...options, method: "DELETE" });
-  }
-
-  delete<T>(
-    path: string,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
-  ): Promise<T> {
-    return this.request(path, { ...options, method: "DELETE" });
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {

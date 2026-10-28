@@ -174,3 +174,34 @@ test("history pages preserve Full Agent and Realtime projections", () => {
   assert.equal(properties(facts[1]).responseId.nullable, true);
   assert.equal(properties(facts[1]).interrupted.type, "boolean");
 });
+
+test("independent observation preserves the declared event position and snapshot contract", () => {
+  const subscription = document.paths[`${sessionPath}/events`].get;
+  assert.deepEqual(subscription.security, [{ UserApiKey: [] }]);
+  assert(
+    subscription.parameters.some(
+      (parameter) => parameter.name === "cursor" && parameter.in === "query",
+    ),
+  );
+  assert(
+    subscription.parameters.some(
+      (parameter) => parameter.name === "stream" && parameter.required,
+    ),
+  );
+  assert(
+    subscription.parameters.some(
+      (parameter) =>
+        parameter.name === "Accept" &&
+        parameter.schema.enum.includes("text/event-stream"),
+    ),
+  );
+  const stream = subscription.responses["200"];
+  assert(stream.content["text/event-stream"]);
+  assert(stream.headers);
+  assert.match(stream.description, /complete provisional draft/);
+  assert.match(
+    stream.description,
+    /Disconnecting the subscription does not cancel/,
+  );
+  assert.match(stream.description, /agent\.session\.turn\.requires_action/);
+});

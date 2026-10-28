@@ -28,6 +28,7 @@ export {
   TurnWaitTimeoutError,
   InputNotAppliedError,
   OutcomeUnknownError,
+  ObservationStoppedError,
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
@@ -121,3 +122,9 @@ export type {
   FileDownloadGrant,
   FileContent,
 } from "./files.js";
+export type {
+  SessionEvent,
+  SessionEventsOptions,
+  ObserveTurnOptions,
+  TurnObservation,
+} from "./progress.js";

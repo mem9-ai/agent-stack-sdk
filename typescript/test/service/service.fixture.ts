@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import {
   AppTestingPersistenceFixture,
@@ -21,6 +21,10 @@ import { ENV } from "../src/config/config.module";
 import { DEFAULT_ORG_ID } from "../src/chat/dto";
 import { OrganizationStore } from "../src/organizations/organization-store";
 import { OpsRealtimeModelSource } from "../src/ops/ops-realtime-model-source";
+
+import { developmentReleaseServices } from "../test/support/ops-release-fixture";
+import { AGENT_MODEL_NAMES } from "../src/agent-models/agent-model-registry";
+import type { StreamFn, AssistantMessage } from "@earendil-works/pi-ai";
 
 const exec = promisify(execFile);
 let app: NestFastifyApplication;
@@ -61,16 +65,30 @@ const realtimeSource = {
   current: async () => realtimeModels[0].settings,
   readiness: async () => "configured" as const,
   open: async () => {
-    throw new Error("SDK Realtime verification does not redeem WebSocket credentials");
+    throw new Error(
+      "SDK Realtime verification does not redeem WebSocket credentials",
+    );
   },
 };
 
 beforeAll(async () => {
-  const moduleRef = await createAppTestingModule()
+  const releaseServices = developmentReleaseServices({
+    models: [
+      {
+        provider: "openai_compatible",
+        endpoint: "https://example.test/v1",
+        apiMode: "responses",
+        modelIds: AGENT_MODEL_NAMES,
+        apiKey: "fictional-sdk-naming-key",
+      },
+    ],
+  });
+  const moduleRef = await createAppTestingModule({ releaseServices })
     .overrideProvider(ENV)
     .useValue(
       loadE2eEnv({
         NODE_ENV: "test",
+        OPS_SERVICE_ALLOWED_HOSTS: "example.test",
         WORKSPACE_KEK: "fictional-sdk-service-test-kek",
         SESSION_SECRET: "fictional-sdk-service-session-secret",
       }),
@@ -85,11 +103,48 @@ beforeAll(async () => {
   await expect(
     app.get(AppTestingPersistenceFixture).hasActiveServiceRelease(),
   ).resolves.toBe(true);
+  // Control only the external model transport; real naming admission and persistence still run.
+  const remote: StreamFn = async (model, _context, options) => {
+    await options?.onResponse?.(
+      { status: 200, headers: { "request-id": "fictional-sdk-title" } },
+      model,
+    );
+    const message = {
+      role: "assistant",
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      content: [{ type: "text", text: "Trip planning" }],
+      stopReason: "stop",
+      timestamp: 0,
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    } as AssistantMessage;
+    return {
+      async *[Symbol.asyncIterator]() {
+        yield { type: "done", reason: "stop", message } as const;
+      },
+      result: async () => message,
+    } as unknown as Awaited<ReturnType<StreamFn>>;
+  };
+  vi.spyOn(
+    getAppPersistencePorts(app).manualTitleConnections as unknown as {
+      providerStream(): Promise<StreamFn>;
+    },
+    "providerStream",
+  ).mockResolvedValue(remote);
   await app.listen(0, "127.0.0.1");
 }, 120_000);
 
 afterAll(async () => {
   await app?.close();
+  vi.restoreAllMocks();
   if (temporary) await rm(temporary, { recursive: true, force: true });
 });
 
@@ -107,7 +162,7 @@ const createSession = async (token: string, agentId: string) => {
   return response.json().session.sessionId as string;
 };
 
-it("the packed SDK provisions users and prepares Realtime Connections through the selected service", async () => {
+it("the packed SDK provisions users and manages Agents, Sessions and Realtime Connections through the selected service", async () => {
   const store = app.get(OrganizationStore);
   const foreignOrganizationId = `org_sdk_${randomUUID().replaceAll("-", "")}`;
   await store.seedOrganization({
@@ -188,9 +243,18 @@ it("the packed SDK provisions users and prepares Realtime Connections through th
     userId: owner.userId,
     agentTemplateId: disabledTemplateId,
   });
-  const enabledSessionId = await createSession(ownerKey.token, enabledAgent.agentId);
-  const exampleSessionId = await createSession(ownerKey.token, enabledAgent.agentId);
-  const disabledSessionId = await createSession(ownerKey.token, disabledAgent.agentId);
+  const enabledSessionId = await createSession(
+    ownerKey.token,
+    enabledAgent.agentId,
+  );
+  const exampleSessionId = await createSession(
+    ownerKey.token,
+    enabledAgent.agentId,
+  );
+  const disabledSessionId = await createSession(
+    ownerKey.token,
+    disabledAgent.agentId,
+  );
 
   temporary = await mkdtemp(path.join(tmpdir(), "agent-stack-sdk-service-"));
   const packed = JSON.parse(
@@ -229,7 +293,11 @@ it("the packed SDK provisions users and prepares Realtime Connections through th
   try {
     const result = await exec(
       process.execPath,
-      ["--test", "--test-concurrency=1", ...serviceCases.map(({ name }) => name)],
+      [
+        "--test",
+        "--test-concurrency=1",
+        ...serviceCases.map(({ name }) => name),
+      ],
       {
         cwd: temporary,
         env: {
@@ -240,6 +308,8 @@ it("the packed SDK provisions users and prepares Realtime Connections through th
           SDK_USER_KEY: ownerKey.token,
           SDK_FOREIGN_USER_KEY: strangerKey.token,
           SDK_REALTIME_SESSION_ID: enabledSessionId,
+          SDK_TEMPLATE_ID: enabledTemplateId,
+          SDK_OTHER_TEMPLATE_ID: disabledTemplateId,
           SDK_REALTIME_EXAMPLE_SESSION_ID: exampleSessionId,
           SDK_REALTIME_DISABLED_SESSION_ID: disabledSessionId,
         },

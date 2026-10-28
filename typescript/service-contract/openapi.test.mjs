@@ -45,28 +45,19 @@ const propertyNames = (value, names = new Set()) => {
   return names;
 };
 
-test("retained User APIs keep their historical immutable contract evidence", () => {
+test("retained Turn APIs keep their historical immutable contract evidence", () => {
   assert.equal(metadata.tidbLinkRevision, expectedServiceRevision);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
   assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
-  assert.equal(
-    packageJson.tidbLinkApiVersion,
-    metadata.tidbLinkApiVersion,
-  );
+  assert.equal(packageJson.tidbLinkApiVersion, metadata.tidbLinkApiVersion);
   assert.equal(
     createHash("sha256").update(openApiBytes).digest("hex"),
     metadata.sha256,
   );
 });
 
-test("the historical contract records retained User workflows", () => {
+test("the historical contract records retained Turn/history workflows", () => {
   for (const route of [
-    "/api/agents",
-    "/api/agents/{id}/config",
-    "/api/agents/{id}/memory/mem9/key",
-    "/api/agents/memory/mem9/key-validations",
-    "/api/sessions",
-    "/api/sessions/{id}/model",
     "/api/sessions/{id}/turns",
     "/api/sessions/{id}/turns/{turnId}",
   ]) {
@@ -83,20 +74,12 @@ test("the historical contract records retained User workflows", () => {
     assert.equal(securitySchemes[name].scheme, "bearer");
     assert.notEqual(securitySchemes[name].bearerFormat, "JWT");
   }
-  const userSecurity = document.paths["/api/agents"].post.security;
+  const userSecurity = document.paths["/api/sessions/{id}/turns"].get.security;
   assert(userSecurity.some((item) => "UserApiKey" in item));
 });
 
 test("the declared request and response schemas contain only retained SDK capabilities", () => {
-  const retained = [
-    "CreateAgentOpenApiDto",
-    "PatchAgentConfigOpenApiDto",
-    "AgentResponseOpenApiDto",
-    "CreateSessionOpenApiDto",
-    "SessionResponseOpenApiDto",
-    "CreateTurnOpenApiDto",
-    "TurnStreamEvent",
-  ];
+  const retained = ["CreateTurnOpenApiDto", "TurnStreamEvent"];
   const removed = [
     "agentDefinitionId",
     "authId",
@@ -112,52 +95,6 @@ test("the declared request and response schemas contain only retained SDK capabi
     for (const field of removed)
       assert(!actual.has(field), `${name} exposes ${field}`);
   }
-
-  const createAgent = properties(schema("CreateAgentOpenApiDto"));
-  assert(createAgent.memoryCredential);
-  assert.equal(createAgent.agentTemplateId.minLength, 1);
-  assert.match(createAgent.agentTemplateId.description, /Required for a new Agent/);
-  assert(createAgent.templateVersion && createAgent.overrides);
-  assert(properties(createAgent.config).hardware);
-  const patch = properties(schema("PatchAgentConfigOpenApiDto"));
-  assert(patch.hardware && patch.instructions);
-  const agent = properties(properties(schema("AgentResponseOpenApiDto")).agent);
-  assert(
-    agent.instructions && agent.creationOrigin && agent.templateApplication,
-  );
-  for (const route of [
-    "/api/agents/template-versions/{templateId}/{version}",
-    "/api/agents/{agentId}/template-application-previews",
-    "/api/agents/{agentId}/template-applications",
-  ])
-    assert(document.paths[route], `missing ${route}`);
-  assert.deepEqual(
-    Object.keys(properties(properties(createAgent.config).memory)),
-    ["enabled"],
-  );
-  const agentConfig = properties(
-    properties(schema("AgentResponseOpenApiDto")).agent,
-  ).config;
-  assert(properties(properties(agentConfig).memory).provider);
-  assert(properties(properties(properties(agentConfig).memory).mem9).hasKey);
-
-  const createSession = properties(schema("CreateSessionOpenApiDto"));
-  assert(createSession.agentId);
-  const session = properties(
-    properties(schema("SessionResponseOpenApiDto")).session,
-  );
-  assert(
-    session.organizationId &&
-      session.ownerUserId &&
-      session.createdWithAgentId &&
-      session.model,
-  );
-  assert(
-    !properties(schema("UpdateSessionModelOpenApiDto")).model.enum.includes(
-      "gpt-5.4",
-    ),
-  );
-  assert(session.model.enum.includes("gpt-5.4"));
 
   const createTurn = properties(schema("CreateTurnOpenApiDto"));
   assert(createTurn.clarificationSourceTurnId);

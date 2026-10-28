@@ -6,7 +6,7 @@
   API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
 - Replace the obsolete ServiceUser handle with explicit Organization operations;
   preserve uncertain creation/issuance and one-time credential delivery.
-- Verify the packed SDK and provisioning/Realtime preparation examples against
+- Verify the packed SDK and provisioning, Session creation and Realtime examples against
   the actual service and TiDB. Retain the earlier contract evidence for APIs
   awaiting their refresh.
 - Discover Realtime Models, conditionally select the next connection's model,
@@ -16,9 +16,15 @@
 - Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases.
 - Reject unusable one-time User Key responses without automatically repeating issuance.
 
-- Require explicit published Template selection for new Agents.
-- Add descriptive Hardware configuration, content version 2 types, published version reads and explicit Template application with preserved override/reset intent.
-- Keep Console Draft Preview separate from the User-key SDK.
+- Discover available Templates with cursor pagination and deployment models by
+  their current IDs; create independent Agents for the same Template with stable
+  creation keys and update owner-only additional instructions.
+- Create, list, retrieve, rename and delete owned Sessions; select models with
+  stale-update protection and replace or clear Billing Tags.
+- Explicitly unlink a target User's Agent with Organization authority while
+  retaining Session ownership and configuration.
+- Remove retired Template version/application, Memory, default-Agent and general
+  Agent configuration exports. Turn execution and history remain awaiting refresh.
 
 ## 0.2.0
 

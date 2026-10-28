@@ -4,12 +4,12 @@ TypeScript releases use SemVer and remain `0.x` while the TiDB Link HTTP API
 is pre-1.0.
 
 1. Confirm `typescript/package.json` declares the supported TiDB Link API
-   version, historical revision, provisioning revision and Realtime revision,
+   version, historical revision, provisioning, lifecycle and Realtime revisions,
    and that the exported values match. The package README must accurately limit
    each baseline's scope.
 2. Update the package version and release notes.
 3. Run the local checks in `CONTRIBUTING.md`; CI also verifies the pinned TiDB
-   Link contract on Node.js 22.12. Verify the current provisioning and Realtime
+   Link contract on Node.js 22.12. Verify the current provisioning, lifecycle and Realtime
    slices with `npm run test:service` on the service's Node.js 26 runtime and a
    dedicated test database as documented in the package README. CI's immutable
    historical contract check alone does not replace actual-service evidence.

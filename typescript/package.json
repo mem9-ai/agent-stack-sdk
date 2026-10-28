@@ -15,13 +15,15 @@
       "import": "./dist/index.js"
     },
     "./examples/provision-user.mjs": "./examples/provision-user.mjs",
-    "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs"
+    "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
+    "./examples/create-session.mjs": "./examples/create-session.mjs"
   },
   "files": [
     "dist",
     "README.md",
     "examples/provision-user.mjs",
-    "examples/prepare-realtime-connection.mjs"
+    "examples/prepare-realtime-connection.mjs",
+    "examples/create-session.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
@@ -46,5 +48,7 @@
   "tidbLinkProvisioningRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
   "tidbLinkProvisioningOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
   "tidbLinkRealtimeRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
-  "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
+  "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "tidbLinkLifecycleRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkLifecycleOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
 }

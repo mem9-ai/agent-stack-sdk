@@ -1,506 +1,219 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
+import { OutcomeUnknownError, UserClient } from "../dist/index.js";
 
-import { ConflictError, UserClient } from "../dist/index.js";
-
+const key = "ti_user_key_" + "x".repeat(43);
 const servers = [];
-const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
-
-after(async () => {
-  await Promise.all(
+after(async () =>
+  Promise.all(
     servers.map((server) => new Promise((resolve) => server.close(resolve))),
-  );
-});
-
+  ),
+);
 const serve = async (handler) => {
   const server = createServer(handler);
   servers.push(server);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  assert(address && typeof address === "object");
-  return `http://127.0.0.1:${address.port}`;
+  return `http://127.0.0.1:${server.address().port}`;
+};
+const record = {
+  agentId: "agent_1",
+  organizationId: "org_1",
+  ownerUserId: "user_1",
+  agentTemplateId: "template_1",
+  status: "active",
+  createdAt: "2026-10-27T00:00:00.000Z",
+  updatedAt: "2026-10-27T00:00:00.000Z",
 };
 
-const agentRecord = (overrides = {}) => ({
-  agentId: "agent_1",
-  name: "Agent One",
-  sandboxProfile: "default",
-  agentTemplateId: null,
-  agentTemplate: null,
-  config: {
-    memory: {
-      enabled: false,
-      provider: "mem9",
-      mem9: { hasKey: false, ownershipState: "admin_not_configured" },
-    },
-    sessionRecall: { enabled: false },
-    generatedMedia: { enabled: true },
-  },
-  configVersion: 1,
-  status: "active",
-  createdAt: "2026-08-25T00:00:00.000Z",
-  updatedAt: "2026-08-25T00:00:00.000Z",
-  ...overrides,
-});
-
-const userClient = (baseUrl) => new UserClient({ baseUrl, apiKey: userApiKey });
-
-test("Agent creation retries with stable identities and retains the ETag", async () => {
-  const requests = [];
-  const baseUrl = await serve(async (request, response) => {
+test("Agent creation recovers through the caller's stable identity without an Agent ETag", async () => {
+  const calls = [];
+  const baseUrl = await serve(async (req, res) => {
     let body = "";
-    for await (const chunk of request) body += chunk;
-    requests.push({ headers: request.headers, body });
-    response.setHeader("content-type", "application/json");
-    if (requests.length === 1) {
-      response
-        .writeHead(503)
-        .end(
-          JSON.stringify({
-            error: {
-              code: "idempotency_in_progress",
-              message: "Still creating",
-            },
-          }),
-        );
+    for await (const chunk of req) body += chunk;
+    calls.push({ url: req.url, headers: req.headers, body: JSON.parse(body) });
+    if (calls.length === 1) {
+      res.destroy();
       return;
     }
-    response.setHeader("etag", '"agent-v1"');
-    response
-      .writeHead(201)
-      .end(
-        JSON.stringify({
-          agent: agentRecord({ agentTemplateId: "template_1" }),
-        }),
-      );
+    res
+      .writeHead(201, { "content-type": "application/json" })
+      .end(JSON.stringify({ agent: record }));
   });
-
-  const agent = await userClient(baseUrl).createAgent({
-    name: "Agent One",
+  const user = new UserClient({ baseUrl, apiKey: key });
+  const agent = await user.createAgent({
     agentTemplateId: "template_1",
-    templateVersion: 2,
-    config: {
-      hardware: {
-        requirements: [
-          {
-            definitionId: "hdef_" + "a".repeat(32),
-            capabilityNames: ["set_level"],
-          },
-        ],
-      },
-    },
     idempotencyKey: "create-agent-1",
   });
-
   assert.equal(agent.id, "agent_1");
-  assert.equal(agent.name, "Agent One");
-  assert.equal(requests.length, 2);
-  assert.equal(requests[0].headers["idempotency-key"], "create-agent-1");
+  assert.equal(calls.length, 2);
   assert.equal(
-    requests[0].headers["idempotency-key"],
-    requests[1].headers["idempotency-key"],
+    calls[0].headers["x-request-id"],
+    calls[1].headers["x-request-id"],
   );
-  assert.equal(
-    requests[0].headers["x-request-id"],
-    requests[1].headers["x-request-id"],
-  );
-  assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
-  assert.equal(requests[0].headers["x-ti-project-id"], undefined);
-  assert.deepEqual(JSON.parse(requests[0].body), {
-    name: "Agent One",
-    agentTemplateId: "template_1",
-    templateVersion: 2,
-    config: {
-      hardware: {
-        requirements: [
-          {
-            definitionId: "hdef_" + "a".repeat(32),
-            capabilityNames: ["set_level"],
-          },
-        ],
-      },
-    },
-  });
+  for (const call of calls) {
+    assert.equal(call.url, "/api/v1/user/agents");
+    assert.equal(call.headers["idempotency-key"], "create-agent-1");
+    assert.deepEqual(call.body, { agentTemplateId: "template_1" });
+  }
 });
 
-test("Agent mutations refresh once when needed and retain each fresh ETag", async () => {
+test("exhausted Agent creation remains recoverable with the caller's key", async () => {
+  let fail = true;
+  const identities = [];
+  const baseUrl = await serve((req, res) => {
+    identities.push(req.headers["idempotency-key"]);
+    if (fail) {
+      res.destroy();
+      return;
+    }
+    res
+      .writeHead(201, { "content-type": "application/json" })
+      .end(JSON.stringify({ agent: record }));
+  });
+  const user = new UserClient({ baseUrl, apiKey: key });
+  const input = { agentTemplateId: "template_1", idempotencyKey: "recover-1" };
+  await assert.rejects(user.createAgent(input), OutcomeUnknownError);
+  fail = false;
+  assert.equal((await user.createAgent(input)).id, "agent_1");
+  assert(identities.every((value) => value === input.idempotencyKey));
+});
+
+test("owner preferences use a partial last-write-wins update and never replay an uncertain write", async () => {
   const calls = [];
-  const baseUrl = await serve(async (request, response) => {
+  const baseUrl = await serve(async (req, res) => {
     let body = "";
-    for await (const chunk of request) body += chunk;
+    for await (const chunk of req) body += chunk;
     calls.push({
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
       body,
     });
-    response.setHeader("content-type", "application/json");
-    if (request.url === "/api/agents" && request.method === "GET") {
-      response.end(JSON.stringify({ agents: [agentRecord()] }));
+    if (body.includes("lost")) {
+      res.destroy();
       return;
     }
-    if (request.url === "/api/agents/agent_1" && request.method === "GET") {
-      response.setHeader("etag", '"agent-v1"');
-      response.end(JSON.stringify({ agent: agentRecord() }));
-      return;
-    }
-    if (request.url === "/api/agents/agent_1/name") {
-      assert.equal(request.headers["if-match"], '"agent-v1"');
-      response.setHeader("etag", '"agent-v2"');
-      response.end(
-        JSON.stringify({
-          agent: agentRecord({ name: "Renamed", configVersion: 2 }),
-        }),
-      );
-      return;
-    }
-    if (request.url === "/api/agents/agent_1/config") {
-      assert.equal(request.headers["if-match"], '"agent-v2"');
-      response.setHeader("etag", '"agent-v3"');
-      response.end(
-        JSON.stringify({
-          agent: agentRecord({
-            name: "Renamed",
-            config: {
-              ...agentRecord().config,
-              sessionRecall: { enabled: true },
-            },
-            configVersion: 3,
-          }),
-        }),
-      );
-      return;
-    }
-    assert.equal(request.headers["if-match"], '"agent-v3"');
-    response.writeHead(204).end();
+    res.writeHead(200, { "content-type": "application/json" }).end(
+      JSON.stringify({
+        agent: {
+          ...record,
+          additionalInstructions: req.method === "PATCH" ? "Concise" : "",
+        },
+      }),
+    );
   });
-  const client = userClient(baseUrl);
-  const [agent] = await client.listAgents();
-
-  await agent.rename("Renamed");
-  assert.equal(agent.name, "Renamed");
-  await agent.configure({ sessionRecall: { enabled: true } });
-  assert.deepEqual(agent.config.sessionRecall, { enabled: true });
-  await agent.archive();
-  assert.equal(agent.status, "archived");
-
+  const user = new UserClient({ baseUrl, apiKey: key });
+  const agent = await user.getAgent("agent_1");
+  await agent.update({ additionalInstructions: "Concise" });
+  assert.equal(agent.data.additionalInstructions, "Concise");
+  await assert.rejects(
+    agent.update({ additionalInstructions: "lost" }),
+    OutcomeUnknownError,
+  );
+  assert.equal(calls.length, 3);
+  assert.equal(agent.data.additionalInstructions, "Concise");
   assert.deepEqual(
-    calls.map(({ method, url }) => [method, url]),
+    calls.map((c) => [c.method, c.url]),
     [
-      ["GET", "/api/agents"],
-      ["GET", "/api/agents/agent_1"],
-      ["PATCH", "/api/agents/agent_1/name"],
-      ["PATCH", "/api/agents/agent_1/config"],
-      ["POST", "/api/agents/agent_1/archive"],
+      ["GET", "/api/v1/user/agents/agent_1"],
+      ["PATCH", "/api/v1/user/agents/agent_1"],
+      ["PATCH", "/api/v1/user/agents/agent_1"],
     ],
   );
+  assert(calls.every((c) => c.headers["if-match"] === undefined));
 });
 
-test("a stale Agent mutation fails without an automatic overwrite", async () => {
-  const calls = [];
-  const baseUrl = await serve((request, response) => {
-    calls.push(`${request.method} ${request.url}`);
-    response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.setHeader("etag", '"agent-v1"');
-      response.end(JSON.stringify({ agent: agentRecord() }));
-      return;
-    }
-    response
-      .writeHead(412)
-      .end(
-        JSON.stringify({
-          error: { code: "precondition_failed", message: "Stale Agent" },
-        }),
-      );
+test("Template discovery preserves empty continuation pages and model discovery accepts dynamic IDs", async () => {
+  const urls = [];
+  const baseUrl = await serve((req, res) => {
+    urls.push(req.url);
+    res.writeHead(200, { "content-type": "application/json" }).end(
+      JSON.stringify(
+        req.url.startsWith("/api/v1/agent-models")
+          ? {
+              models: [
+                {
+                  model: "future.model-1",
+                  label: "Future",
+                  availability: "available",
+                },
+              ],
+              effectiveDefaultModel: "future.model-1",
+            }
+          : { templates: [], hasMore: true, nextCursor: "opaque+/=" },
+      ),
+    );
   });
-  const agent = await userClient(baseUrl).getAgent("agent_1");
-
-  await assert.rejects(agent.rename("Lost update"), ConflictError);
-
-  assert.equal(agent.name, "Agent One");
-  assert.deepEqual(calls, [
-    "GET /api/agents/agent_1",
-    "PATCH /api/agents/agent_1/name",
+  const user = new UserClient({ baseUrl, apiKey: key });
+  assert.deepEqual(
+    await user.listAgentTemplates({ limit: 1, cursor: "opaque+/=" }),
+    { templates: [], hasMore: true, nextCursor: "opaque+/=" },
+  );
+  assert.equal(
+    (await user.listModels({ agentId: "agent/a" })).models[0].model,
+    "future.model-1",
+  );
+  assert.deepEqual(urls, [
+    "/api/v1/user/agent-templates?limit=1&cursor=opaque%2B%2F%3D",
+    "/api/v1/agent-models?agentId=agent%2Fa",
   ]);
 });
 
-test("the User client exposes real default Agents and read-only AgentTemplates", async () => {
-  const calls = [];
-  const template = {
-    agentTemplateId: "template_1",
-    organizationId: "org_1",
-    name: "Support",
-    sandboxProfile: "default",
-    status: "active",
-    createdAt: "2026-08-25T00:00:00.000Z",
-    updatedAt: "2026-08-25T00:00:00.000Z",
-  };
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    calls.push({ method: request.method, url: request.url, body });
-    response.setHeader("content-type", "application/json");
-    if (request.url === "/api/agents/default/ensure") {
-      response.setHeader("etag", '"agent-v1"');
-      response.writeHead(201).end(JSON.stringify({ agent: agentRecord() }));
-      return;
-    }
-    if (request.url === "/api/agents/default") {
-      response.end(JSON.stringify({ defaultAgentId: "agent_1" }));
-      return;
-    }
-    response.end(JSON.stringify({ agentTemplates: [template] }));
+test("retired creation selectors, missing identities and wrong authority fail before dispatch without exposing credentials", async () => {
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    res.end("{}");
   });
-  const client = userClient(baseUrl);
-
-  const agent = await client.getOrCreateDefaultAgent();
-  await agent.makeDefault();
-  assert.deepEqual(await client.listAgentTemplates(), [template]);
-
-  assert.deepEqual(
-    calls.map(({ method, url }) => [method, url]),
-    [
-      ["POST", "/api/agents/default/ensure"],
-      ["PUT", "/api/agents/default"],
-      ["GET", "/api/console/model"],
-    ],
-  );
-  assert.deepEqual(JSON.parse(calls[1].body), { agentId: "agent_1" });
-});
-
-test("Memory provisioning, retained state, and creator credential operations use the canonical contract", async () => {
-  const calls = [];
-  let configVersion = 1;
-  const memoryAgent = (enabled = true) =>
-    agentRecord({
-      configVersion,
-      config: {
-        ...agentRecord().config,
-        memory: {
-          enabled,
-          provider: "mem9",
-          mem9: { hasKey: true, ownershipState: "claimed" },
-        },
-      },
-    });
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    calls.push({ method: request.method, url: request.url, body });
-    response.setHeader("content-type", "application/json");
-    if (request.url === "/api/agents") {
-      response.setHeader("etag", `"agent-v${configVersion}"`);
-      response.writeHead(201).end(JSON.stringify({ agent: memoryAgent() }));
-      return;
-    }
-    if (request.url === "/api/agents/memory/mem9/key-validations") {
-      response.setHeader("cache-control", "no-store");
-      response.end(JSON.stringify({ valid: true }));
-      return;
-    }
-    if (
-      request.url === "/api/agents/agent_1/memory/mem9/key" &&
-      request.method === "GET"
-    ) {
-      response.setHeader("cache-control", "no-store");
-      response.end(JSON.stringify({ mem9Key: "test-memory-key" }));
-      return;
-    }
-    if (
-      request.url === "/api/agents/agent_1/memory/mem9/key" &&
-      request.method === "PUT"
-    ) {
-      response.setHeader("cache-control", "no-store");
-      response.end(JSON.stringify({ agent: memoryAgent() }));
-      return;
-    }
-    if (request.url === "/api/agents/agent_1" && request.method === "GET") {
-      response.setHeader("etag", `"agent-v${configVersion}"`);
-      response.end(JSON.stringify({ agent: memoryAgent() }));
-      return;
-    }
-    configVersion += 1;
-    response.setHeader("etag", `"agent-v${configVersion}"`);
-    response.end(
-      JSON.stringify({
-        agent: memoryAgent(JSON.parse(body).memory.enabled),
-      }),
-    );
-  });
-  const client = userClient(baseUrl);
-
-  const agent = await client.createAgent({
-    agentTemplateId: "template_1",
-    config: { memory: { enabled: true } },
-    memoryCredential: { mode: "provision" },
-  });
-  await client.createAgent({
-    agentTemplateId: "template_1",
-    config: { memory: { enabled: true } },
-    memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
-  });
-  assert.deepEqual(await client.validateMemoryKey("test-memory-key"), {
-    valid: true,
-  });
-  assert.equal(await agent.revealMemoryKey(), "test-memory-key");
-  await agent.replaceMemoryKey("replacement-memory-key");
-  await agent.configure({ memory: { enabled: false } });
-  await agent.configure({ memory: { enabled: true } });
-
-  assert.equal(agent.config.memory.enabled, true);
-  assert.equal(agent.config.memory.mem9.hasKey, true);
-  assert.equal("mem9Key" in agent.config.memory.mem9, false);
-  assert.deepEqual(JSON.parse(calls[0].body), {
-    agentTemplateId: "template_1",
-    config: { memory: { enabled: true } },
-    memoryCredential: { mode: "provision" },
-  });
-  assert.deepEqual(JSON.parse(calls[1].body), {
-    agentTemplateId: "template_1",
-    config: { memory: { enabled: true } },
-    memoryCredential: { mode: "use_existing", mem9Key: "test-memory-key" },
-  });
-  assert.deepEqual(JSON.parse(calls[2].body), { mem9Key: "test-memory-key" });
-  assert.deepEqual(JSON.parse(calls[4].body), {
-    mem9Key: "replacement-memory-key",
-  });
-  assert.deepEqual(JSON.parse(calls[6].body), { memory: { enabled: false } });
-  assert.deepEqual(JSON.parse(calls[7].body), { memory: { enabled: true } });
-});
-
-test("a User client rejects Organization authority without exposing it", () => {
-  const organizationKey = "ti_org_" + "keyId_" + "x".repeat(43);
+  const user = new UserClient({ baseUrl, apiKey: key });
+  for (const input of [
+    { agentTemplateId: "t" },
+    { agentTemplateId: "t", idempotencyKey: "bad key" },
+    { agentTemplateId: "t", idempotencyKey: "ok", templateVersion: 1 },
+    {
+      agentTemplateId: "t",
+      idempotencyKey: "ok",
+      memoryCredential: { mode: "provision" },
+    },
+  ])
+    await assert.rejects(user.createAgent(input), TypeError);
   assert.throws(
-    () =>
-      new UserClient({
-        baseUrl: "https://agent.example.com",
-        apiKey: organizationKey,
-      }),
-    (error) => !String(error).includes(organizationKey),
+    () => new UserClient({ baseUrl, apiKey: "ti_org_key_" + "s".repeat(43) }),
+    (error) =>
+      error instanceof TypeError && !String(error).includes("s".repeat(43)),
   );
   assert.throws(
-    () =>
-      new UserClient({
-        baseUrl: "https://agent.example.com",
-        apiKey: userApiKey,
-        projectId: "project_1",
-      }),
-    /projectId is not supported/,
+    () => new UserClient({ baseUrl, apiKey: "ag9_uak.key." + "s".repeat(32) }),
+    TypeError,
   );
+  assert.throws(
+    () => new UserClient({ baseUrl, apiKey: key, userId: "other" }),
+    TypeError,
+  );
+  assert.equal(calls, 0);
+  assert.equal(JSON.stringify(user), "{}");
 });
 
-test("a User client rejects the former User Key format without disclosing it", () => {
-  const apiKey = "ag9_uak_" + "key_" + "x".repeat(32);
-  assert.throws(() => new UserClient({ baseUrl: "https://agent.example.com", apiKey }), (error) => {
-    assert(error instanceof TypeError);
-    assert(!String(error).includes(apiKey));
-    assert(!JSON.stringify(error).includes(apiKey));
-    return true;
-  });
-});
-
-test("removed Agent fields are rejected before a request", async () => {
-  let requests = 0;
-  const baseUrl = await serve((_request, response) => {
-    requests += 1;
-    response.writeHead(500).end();
-  });
-  const client = userClient(baseUrl);
-
-  await assert.rejects(
-    client.createAgent({
-      agentTemplateId: "template_1",
-      config: { runtime: { backend: "codex" } },
-    }),
-    /Agent config.runtime is not supported/,
-  );
-  await assert.rejects(
-    client.createAgent({
-      agentTemplateId: "template_1",
-      config: { memory: { enabled: true, provider: "mem9" } },
-    }),
-    /Agent config.memory.provider is not supported/,
-  );
-  await assert.rejects(
-    client.createAgent({ model: "gpt-5.6-sol" }),
-    /Agent creation.model is not supported/,
-  );
-  assert.equal(requests, 0);
-});
-
-test("published hardware content and explicit application preserve empty overrides on the wire", async () => {
-  const calls = [];
-  const ref = {
-    templateId: "template_1",
-    version: 2,
-    contentDigest: "a".repeat(64),
-  };
-  const baseUrl = await serve(async (request, response) => {
-    let raw = "";
-    for await (const chunk of request) raw += chunk;
-    calls.push({
-      path: request.url,
-      headers: request.headers,
-      body: raw ? JSON.parse(raw) : null,
-    });
-    response.setHeader("content-type", "application/json");
-    response.setHeader("etag", '"agent-v2"');
-    if (request.url === "/api/agents/template-versions/template_1/2")
-      return response.end(
-        JSON.stringify({
-          agentTemplateId: "template_1",
-          templateVersion: 2,
-          contentDigest: ref.contentDigest,
-          content: {
-            schemaVersion: "agent-template-content@2",
-            hardware: { requirements: [] },
-          },
-          availability: "available",
-        }),
+test("aborting creation after dispatch reports an unknown outcome and keeps the replay identity", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    res
+      .writeHead(503, { "content-type": "application/json" })
+      .end(
+        JSON.stringify({ error: { code: "unavailable", message: "Unknown" } }),
       );
-    if (request.url.endsWith("template-application-previews"))
-      return response.end(
-        JSON.stringify({
-          targetRef: ref,
-          nextOverrides: { hardware: { requirements: [] } },
-        }),
-      );
-    response.end(
-      JSON.stringify({
-        agent: agentRecord({
-          templateApplication: {
-            ...ref,
-            overrides: { hardware: { requirements: [] } },
-          },
-          config: { hardware: { requirements: [] } },
-        }),
-      }),
-    );
+    setTimeout(() => controller.abort(), 20);
   });
-  const user = userClient(baseUrl),
-    version = await user.getPublishedTemplateVersion("template_1", 2);
-  assert.equal(version.content.schemaVersion, "agent-template-content@2");
-  assert.deepEqual(version.content.hardware.requirements, []);
-  const agent = await user.getAgent("agent_1");
-  const body = {
-    agentTemplateId: "template_1",
-    templateVersion: 2,
-    expectedApplication: null,
-    adoption: true,
-    resetOverridePaths: ["hardware.requirements"],
-    overrides: { hardware: { requirements: [] } },
-  };
-  assert.deepEqual(
-    (await agent.previewTemplateApplication(body)).nextOverrides,
-    { hardware: { requirements: [] } },
+  await assert.rejects(
+    new UserClient({ baseUrl, apiKey: key }).createAgent({
+      agentTemplateId: "template_1",
+      idempotencyKey: "abort-recover",
+      signal: controller.signal,
+    }),
+    OutcomeUnknownError,
   );
-  await agent.applyTemplate(body, { idempotencyKey: "apply-hardware-2" });
-  assert.deepEqual(calls.at(-1).body, body);
-  assert.equal(calls.at(-1).headers["if-match"], '"agent-v2"');
-  assert.equal(calls.at(-1).headers["idempotency-key"], "apply-hardware-2");
-  assert.deepEqual(agent.config.hardware, { requirements: [] });
-  await agent.configure({ hardware: { requirements: [] } });
-  assert.deepEqual(calls.at(-1).body, { hardware: { requirements: [] } });
+  assert.equal(calls, 1);
 });

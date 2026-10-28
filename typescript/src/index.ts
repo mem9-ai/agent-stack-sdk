@@ -1,6 +1,6 @@
 /** TiDB Link OpenAPI version supported by this SDK release. */
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
-/** Historical service baseline for retained APIs awaiting their refresh. */
+/** Historical service baseline for retained Turn/history APIs awaiting refresh. */
 export const TIDB_LINK_REVISION =
   "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
 
@@ -10,6 +10,10 @@ export const TIDB_LINK_PROVISIONING_REVISION =
 
 /** Exact service revision verified for Realtime Model and Connection preparation. */
 export const TIDB_LINK_REALTIME_REVISION =
+  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+
+/** Exact service revision verified for Template, Agent and Session lifecycle. */
+export const TIDB_LINK_LIFECYCLE_REVISION =
   "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
 export {
@@ -34,29 +38,21 @@ export type {
 } from "./organization.js";
 export { Agent, UserClient } from "./user.js";
 export type {
-  HardwareRequirement,
-  PublishedTemplateVersion,
-  ApplyTemplateInput,
-  TemplateApplicationPreview,
-  TemplateOverridePath,
-  TemplateContent,
-  TemplateOverrides,
-  TemplateApplicationReference,
-  AgentConfigInput,
-  AgentConfigPatch,
   AgentRecord,
   AgentTemplate,
-  AgentTemplateProvenance,
+  AgentTemplatePage,
+  AgentModelCatalog,
   CreateAgentInput,
-  EnabledAgentCapability,
-  McpServerReference,
-  MemoryCredentialInput,
-  PublicAgentConfig,
+  UpdateAgentInput,
+  SessionPage,
   UserClientOptions,
 } from "./user.js";
+export type { ListOptions } from "./http.js";
 export { Session } from "./session.js";
 export type {
   BillingTag,
+  CreateSessionOptions,
+  SuggestSessionNameInput,
   ClarificationItem,
   MessageRecord,
   SelectableSessionModel,

@@ -69,10 +69,18 @@ assert.equal(
   manifest.tidbLinkRealtimeOpenApiSha256,
   "Agent Service OpenAPI does not match the SDK Realtime baseline",
 );
+assert.equal(
+  revision,
+  manifest.tidbLinkLifecycleRevision,
+  "Agent Service revision does not match the SDK lifecycle baseline",
+);
+assert.equal(
+  openApiSha256,
+  manifest.tidbLinkLifecycleOpenApiSha256,
+  "Agent Service OpenAPI does not match the SDK lifecycle baseline",
+);
 const serviceCaseDirectory = fileURLToPath(new URL(".", import.meta.url));
-const serviceCases = (
-  await readdir(serviceCaseDirectory, { recursive: true })
-)
+const serviceCases = (await readdir(serviceCaseDirectory, { recursive: true }))
   .filter((name) => name.endsWith(".cases.mjs"))
   .sort()
   .map((name) => ({ source: path.join(serviceCaseDirectory, name), name }));

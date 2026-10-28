@@ -6,15 +6,15 @@ declarations and no runtime dependencies.
 ## Current refresh scope
 
 This refresh supports Organization information, End User provisioning, User API
-Key management, and Realtime Model/Connection preparation for [service revision
+Key management, Template/model discovery, personal Agent and Session management,
+and Realtime Model/Connection preparation for [service revision
 b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
-It replaces the removed Workspace/Service User provisioning surface and adds the
-current User-authorized Realtime routes for an existing owned Session.
 
-The other Agent, general Session and Turn exports are retained for subsequent
-refresh slices; they are **not verified or supported against this baseline**.
-Realtime preparation accepts an existing Session ID and does not depend on those
-retained lifecycle methods.
+Turn execution and history exports remain for subsequent refresh slices; they
+are **not verified or supported against this baseline**. Template version
+application, Memory configuration, default Agents and general Agent overrides
+are removed. This package remains a selective Node.js client; browser, MSP,
+management and device APIs are outside this refresh.
 
 ## Quick start
 
@@ -100,6 +100,117 @@ The returned User API Key (`ti_user_…`) authenticates that User's public APIs.
 It grants no Organization management authority; `OrganizationClient` rejects it.
 An Organization key likewise grants no User identity.
 
+## Templates, Agents and Sessions
+
+Use a User API Key to discover available Templates and deployment models. Model
+IDs are strings from the deployment catalog, including newly published models.
+`effectiveDefaultModel` is the create-time default; `defaultModel` is the
+service's canonical catalog default and may differ.
+
+```ts
+import { UserClient } from "@mem9/tidb-link";
+
+const customer = new UserClient({
+  baseUrl: process.env.AGENT_SERVICE_URL!,
+  apiKey: process.env.USER_API_KEY!,
+});
+const page = await customer.listAgentTemplates({ limit: 20 });
+const template = page.templates[0];
+if (!template) throw new Error("Select an available Template");
+const models = await customer.listModels();
+const agent = await customer.createAgent({
+  agentTemplateId: template.agentTemplateId,
+  idempotencyKey: "customer-agent-1",
+});
+await agent.update({ additionalInstructions: "Prefer concise answers." });
+const session = await agent.createSession({
+  idempotencyKey: "customer-conversation-1",
+  model: models.effectiveDefaultModel,
+  billingTag: { key: "account", value: "customer-1" },
+});
+await session.rename("Planning");
+await session.suggestName({ userText: "Plan a trip" }); // Generates and saves a name.
+await session.setBillingTag(null);
+```
+
+Persist each creation key before calling. A new Agent key creates an independent
+Agent even for the same Template; the same key and Template recover the original
+Agent, including after unlinking. Reusing the key for another Template raises
+`ConflictError` with `agent_creation_conflict`. Session creation likewise requires
+a stable key and the same original input when recovering a creation. Its model,
+Realtime Model and Billing Tag selections participate in that identity. Do not
+generate a new key just because a response was lost.
+
+`listAgentTemplates({ limit?, cursor? })` returns
+`{ templates, hasMore, nextCursor }`; `listSessions({ limit?, cursor? })` returns
+`{ sessions, hasMore, nextCursor }`, with `Session` handles in `sessions`.
+Continue with the returned opaque cursor until `hasMore` is false, including
+Template pages with no available entries. A changed Template catalog can refuse
+continuation with `agent_template_list_changed`; restart discovery.
+Session cursors belong to their owning User and list. `listAgents()` returns a
+complete `Agent[]` without pagination. Use `getAgent(id)` and `getSession(id)` to
+read current owned resources; `session(id)` creates a handle without a request.
+
+Agent create/list responses contain association metadata. `getAgent`,
+`agent.refresh()` and `agent.update()` also include `data.additionalInstructions`.
+The service normalizes line endings to LF and trims whitespace, allows up to
+4096 UTF-8 bytes after normalization, and rejects unsupported control characters.
+Null or empty text clears the setting. Updates use last committed write wins,
+without an ETag, and affect only future Sessions. Multiple Agents using the same
+Template retain independent settings and Sessions.
+
+Each Session freezes its Template recipe, digest and Agent preferences at
+creation. Later Template saves and Agent updates do not rewrite it. Session
+model selection is separate:
+
+```ts
+const current = await customer.getSession(session.id);
+await current.setModel(models.effectiveDefaultModel);
+// Another handle's intervening model change makes this handle stale.
+// Refresh and make an explicit choice after a ConflictError (HTTP 412).
+```
+
+`setModel` uses the model ETag retained by the handle, reading it first if needed.
+It never silently retries a stale update. Model changes apply to the next Turn;
+active execution, steering and retry retain the model admitted for that Turn.
+Realtime Model selection has its own independent revision token. Availability,
+Organization policy, read-only Sessions and current ownership remain service
+decisions. `session.delete()` returns the deleted tombstone; later ordinary reads
+and lists hide the Session. Active execution or a read-only Session can refuse
+deletion. Name and Billing Tag changes do not change the frozen recipe.
+
+Organization authority can explicitly unlink an Agent belonging to a target User:
+
+```ts
+const archived = await organization.unlinkAgent(user.userId, agent.id);
+```
+
+The returned association is archived. Unlinking retains existing Session
+ownership, binding, configuration and history; it does not grant the Organization
+access to the User's private Session content. The SDK's history methods remain
+outside this slice's supported surface.
+
+The packaged example completes discovery and creation without message execution:
+
+```js
+import { createSessionWorkflow } from "@mem9/tidb-link/examples/create-session.mjs";
+
+const { agent, session } = await createSessionWorkflow({
+  baseUrl: process.env.AGENT_SERVICE_URL,
+  userApiKey: process.env.USER_API_KEY,
+  agentCreationKey: process.env.AGENT_CREATION_KEY,
+  sessionCreationKey: process.env.SESSION_CREATION_KEY,
+  agentTemplateId: process.env.TEMPLATE_ID,
+  model: process.env.MODEL_ID,
+});
+```
+
+For direct execution, set `AGENT_SERVICE_URL`, `USER_API_KEY`,
+`AGENT_CREATION_KEY` and `SESSION_CREATION_KEY`; `TEMPLATE_ID` and `MODEL_ID` are
+optional. Without a Template ID it selects an available Template from the paged
+directory. Persist the selected Template ID and model with the keys for recovery;
+discovery can change between invocations.
+
 ## Realtime connection preparation
 
 A backend can discover the published Realtime Models and prepare an existing
@@ -159,16 +270,17 @@ directly. `REALTIME_MODEL_ID` is optional.
 
 ## Errors and uncertain outcomes
 
-Every Organization method accepts a final `{ requestId?, signal? }` option.
+Organization and refreshed Agent/Session lifecycle methods accept
+`{ requestId?, signal? }` options; creation and list options include these fields.
 `TiDBLinkApiError` preserves status, service code, request identity and details;
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
 request identity takes precedence over the one sent.
 
-Safe reads use bounded retries with the same request identity. User creation,
-key creation/rotation/revocation, Realtime Model selection, connection opening,
-connect-token issuance and connection termination are never automatically
-replayed. Disconnects, unusable success responses, HTTP 408 and server failures
-during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
+Safe reads and keyed Agent/Session creation use bounded retries with the same
+request identity and creation key. User creation, key issuance, preference and
+Session updates, unlinking, deletion and Realtime mutations are never
+automatically replayed. Disconnects, unusable success responses, HTTP 408 and
+server failures during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
 `cause` retains the `TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous
 failure still reports an unknown outcome. `AbortSignal` stops the local request;
 after dispatch it does not establish whether a mutation happened. Redirects are
@@ -180,6 +292,12 @@ After uncertain issuance or rotation, listing keys can confirm metadata but
 any unwanted key before deciding whether to issue again. The provisioning
 example never repeats an uncertain credential operation.
 
+After uncertain Agent/Session creation, repeat the original input with the same
+creation key. After an uncertain preference, name, tag or model update, read the
+resource before deciding on another change. Unlinking and deletion can hide a
+resource from ordinary reads, so a missing resource does not recover its original
+mutation receipt.
+
 After an uncertain Realtime Model update, read the selection again. After an
 uncertain connection open or end, inspect the newest connection. An uncertain
 connect-token response cannot recover that plaintext token; deliberately mint a
@@ -187,24 +305,27 @@ new token after reconciling the connection state.
 
 ## Compatibility and verification
 
-`TIDB_LINK_PROVISIONING_REVISION` / `tidbLinkProvisioningRevision` and
+`TIDB_LINK_PROVISIONING_REVISION` / `tidbLinkProvisioningRevision`,
+`TIDB_LINK_LIFECYCLE_REVISION` / `tidbLinkLifecycleRevision` and
 `TIDB_LINK_REALTIME_REVISION` / `tidbLinkRealtimeRevision` identify the exact
 service revision above for their named slices. The matching
-`tidbLinkProvisioningOpenApiSha256` and `tidbLinkRealtimeOpenApiSha256` fields pin
+`tidbLinkProvisioningOpenApiSha256`, `tidbLinkLifecycleOpenApiSha256` and
+`tidbLinkRealtimeOpenApiSha256` fields pin
 that revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
 version string alone does not establish compatibility. The verified scope is the
-provisioning and Realtime preparation described here, not every retained export
+provisioning, Template/Agent/Session management and Realtime preparation described
+here, not every retained export
 or every public API.
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` retain revision
-`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed User/Agent/Session/Turn
+`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed Turn/history
 APIs. The existing immutable contract checks preserve evidence for that historical
 surface; they do not certify it against the provisioning baseline. Run them with
 `TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract`, using the immutable artifact selected by this repository's CI workflow. It contains `openapi.json` and `metadata.json`.
 
 `npm test` covers the simulated HTTP failure boundary and installs the actual
 packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
-both examples against the real service, use the service's Node.js 26 runtime, install its
+its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
 [current-schema setup](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/docs/prisma-first-tidb-validation-and-rollout.md).
@@ -218,7 +339,12 @@ TIDB_SSL=off npm run test:service
 This command requires a clean service checkout at the exact revision and resets
 all rows in the selected test database before and after the run. It uses the
 service's existing AppModule test fixture, genuine credentials, real TiDB and a
-controlled Realtime Model catalog. Fixtures prepare eligible Sessions; public SDK
-methods perform discovery, selection and every Realtime Connection operation.
+controlled dependencies. Fixtures prepare identities, Templates and eligible
+Realtime Sessions; public SDK methods perform Template-to-Agent-to-Session
+creation, ownership checks, lifecycle updates and Realtime operations.
+The public Session projection exposes the frozen Template digest but hides stored
+Agent preferences. Preference snapshots and active-Turn model freezing also rely
+on the selected service's existing persistence evidence; SDK reads alone do not
+prove those hidden values.
 No production supplier credentials or WebSocket redemption are needed. A
 mismatch or unavailable service fails this check instead of silently skipping it.

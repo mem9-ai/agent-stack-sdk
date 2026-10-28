@@ -9,6 +9,7 @@
   },
   "tidbLinkApiVersion": "0.0.1",
   "tidbLinkRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
+  "tidbLinkOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -60,13 +61,5 @@
   "bugs": {
     "url": "https://github.com/mem9-ai/agent-stack-sdk/issues"
   },
-  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme",
-  "tidbLinkProvisioningRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "tidbLinkProvisioningOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkRealtimeRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkLifecycleRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "tidbLinkLifecycleOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  "tidbLinkTextRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "tidbLinkTextOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
+  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme"
 }

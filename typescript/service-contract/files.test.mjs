@@ -18,7 +18,7 @@ test("file transfers retain the exact selected service contract and separate Use
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,
-    manifest.tidbLinkTextOpenApiSha256,
+    manifest.tidbLinkOpenApiSha256,
   );
   for (const [path, methods] of Object.entries(contract.paths)) {
     for (const operation of Object.values(methods)) {

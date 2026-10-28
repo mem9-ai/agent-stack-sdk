@@ -116,10 +116,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     import {
       TIDB_LINK_API_VERSION,
       TIDB_LINK_REVISION,
-      TIDB_LINK_PROVISIONING_REVISION,
-      TIDB_LINK_REALTIME_REVISION,
-      TIDB_LINK_LIFECYCLE_REVISION,
-      TIDB_LINK_TEXT_REVISION,
       OutcomeUnknownError,
       ObservationStoppedError,
       TurnWaitTimeoutError,
@@ -325,11 +321,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         void inputId; void sessionId;
       }
     }
-    void textWorkflow; void recover; void TIDB_LINK_TEXT_REVISION;
+    void textWorkflow; void recover;
     void TIDB_LINK_API_VERSION;
     void TIDB_LINK_REVISION;
-    void TIDB_LINK_PROVISIONING_REVISION;
-    void TIDB_LINK_REALTIME_REVISION;
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
     void apiError;
     void WorkspaceClient;
@@ -381,21 +375,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   );
   assert.equal(
-    installedPackage.tidbLinkProvisioningRevision,
-    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  );
-  assert.equal(
-    installedPackage.tidbLinkProvisioningOpenApiSha256,
+    installedPackage.tidbLinkOpenApiSha256,
     "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
   );
-  assert.equal(
-    installedPackage.tidbLinkRealtimeRevision,
-    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  );
-  assert.equal(
-    installedPackage.tidbLinkRealtimeOpenApiSha256,
-    "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
-  );
+  for (const prefix of ["Provisioning", "Realtime", "Lifecycle", "Text"]) {
+    assert.equal("tidbLink" + prefix + "Revision" in installedPackage, false);
+    assert.equal("tidbLink" + prefix + "OpenApiSha256" in installedPackage, false);
+  }
   assert.equal(installedPackage.name, "@mem9/tidb-link");
   assert.match(installedPackage.version, /^0\./);
   assert.equal(installedPackage.type, "module");
@@ -431,9 +417,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     import * as sdk from "@mem9/tidb-link";
     assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
     assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
-    assert.equal(sdk.TIDB_LINK_PROVISIONING_REVISION, ${JSON.stringify(installedPackage.tidbLinkProvisioningRevision)});
-    assert.equal(sdk.TIDB_LINK_LIFECYCLE_REVISION, ${JSON.stringify(installedPackage.tidbLinkLifecycleRevision)});
-    assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
     const { readOwnUsage, readUserUsage } = await import("@mem9/tidb-link/examples/read-usage.mjs");
@@ -451,13 +434,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof observeMessageWorkflow,"function");
     const { answerClientToolWorkflow } = await import("@mem9/tidb-link/examples/answer-client-tool.mjs");
     assert.equal(typeof answerClientToolWorkflow,"function");
-    assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof provisionUser, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
-    for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError"]) {
+    for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError", "TIDB_LINK_PROVISIONING_REVISION", "TIDB_LINK_REALTIME_REVISION", "TIDB_LINK_LIFECYCLE_REVISION", "TIDB_LINK_TEXT_REVISION"]) {
       assert.equal(sdk[name], undefined);
     }
     const orgKey = "ti_org_key_" + "x".repeat(43);

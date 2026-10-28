@@ -17,7 +17,7 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,
-    manifest.tidbLinkTextOpenApiSha256,
+    manifest.tidbLinkOpenApiSha256,
   );
   const operation =
     contract.paths["/api/v1/user/sessions/{id}/turns/audio"].post;

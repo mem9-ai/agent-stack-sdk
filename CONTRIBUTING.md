@@ -30,8 +30,8 @@ exactly one fixture owner. The default HTTP tests supplement reproducible failur
 package free of runtime dependencies and do not commit credentials, recorded
 production responses, or plaintext API Keys.
 
-TiDB Link OpenAPI is the public contract source. CI verifies the selected frozen contracts. The slice revisions and OpenAPI
-fingerprints in `typescript/package.json` identify the actual-service baselines.
+TiDB Link OpenAPI is the public contract source. CI verifies the selected frozen contracts. The service revision and OpenAPI
+fingerprint in `typescript/package.json` identify the actual-service baseline.
 Contract snapshots supplement actual-service execution evidence.
 A public API change updates that service contract first, then updates the SDK,
 its compatibility declaration, tests, quick start, and release notes together.

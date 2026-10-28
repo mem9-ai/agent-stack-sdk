@@ -41,13 +41,8 @@ const revision = execFileSync("git", ["rev-parse", "HEAD"], {
 }).trim();
 assert.equal(
   revision,
-  manifest.tidbLinkProvisioningRevision,
-  "Agent Service revision does not match the SDK provisioning baseline",
-);
-assert.equal(
-  revision,
-  manifest.tidbLinkRealtimeRevision,
-  "Agent Service revision does not match the SDK Realtime baseline",
+  manifest.tidbLinkRevision,
+  "Agent Service revision does not match the SDK baseline",
 );
 assert.equal(
   execFileSync("git", ["status", "--porcelain"], {
@@ -61,33 +56,8 @@ const openapi = await readFile(path.join(serviceRoot, "docs/openapi.yaml"));
 const openApiSha256 = createHash("sha256").update(openapi).digest("hex");
 assert.equal(
   openApiSha256,
-  manifest.tidbLinkProvisioningOpenApiSha256,
-  "Agent Service OpenAPI does not match the SDK provisioning baseline",
-);
-assert.equal(
-  openApiSha256,
-  manifest.tidbLinkRealtimeOpenApiSha256,
-  "Agent Service OpenAPI does not match the SDK Realtime baseline",
-);
-assert.equal(
-  revision,
-  manifest.tidbLinkLifecycleRevision,
-  "Agent Service revision does not match the SDK lifecycle baseline",
-);
-assert.equal(
-  openApiSha256,
-  manifest.tidbLinkLifecycleOpenApiSha256,
-  "Agent Service OpenAPI does not match the SDK lifecycle baseline",
-);
-assert.equal(
-  revision,
-  manifest.tidbLinkTextRevision,
-  "Agent Service revision does not match the SDK text baseline",
-);
-assert.equal(
-  openApiSha256,
-  manifest.tidbLinkTextOpenApiSha256,
-  "Agent Service OpenAPI does not match the SDK text baseline",
+  manifest.tidbLinkOpenApiSha256,
+  "Agent Service OpenAPI does not match the SDK baseline",
 );
 const serviceCaseDirectory = fileURLToPath(new URL(".", import.meta.url));
 const entries = await readdir(serviceCaseDirectory, { recursive: true });

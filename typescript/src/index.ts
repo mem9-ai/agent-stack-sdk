@@ -4,22 +4,6 @@ export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 export const TIDB_LINK_REVISION =
   "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
 
-/** Exact service revision verified for Organization, End User and User Key provisioning. */
-export const TIDB_LINK_PROVISIONING_REVISION =
-  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
-
-/** Exact service revision verified for Realtime Model and Connection preparation. */
-export const TIDB_LINK_REALTIME_REVISION =
-  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
-
-/** Exact service revision verified for Template, Agent and Session lifecycle. */
-export const TIDB_LINK_LIFECYCLE_REVISION =
-  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
-
-/** Exact service revision verified for text commands, original results and history. */
-export const TIDB_LINK_TEXT_REVISION =
-  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
-
 export {
   TiDBLinkApiError,
   TiDBLinkError,

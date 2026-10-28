@@ -17,7 +17,7 @@ test("Schedulers keep their selected public authority, creation identity, condit
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,
-    manifest.tidbLinkTextOpenApiSha256,
+    manifest.tidbLinkOpenApiSha256,
   );
   for (const methods of Object.values(contract.paths))
     for (const operation of Object.values(methods))

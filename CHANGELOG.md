@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Consolidate service compatibility metadata under `TIDB_LINK_REVISION`,
+  `tidbLinkRevision` and `tidbLinkOpenApiSha256`. Remove the Provisioning,
+  Realtime, Lifecycle and Text revision exports and duplicate package fields;
+  the selected service revision and contract fingerprints are unchanged.
+
 - Refresh the Node.js ESM SDK for exact Agent Service revision
   `0d11f1b231879c735bd53b60ff895ac58ba60d33`, retaining Node.js 22.12 or newer
   and no runtime dependencies. The package remains unpublished by this change.

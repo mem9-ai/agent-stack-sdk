@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { setTimeout } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -123,7 +131,10 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
     chunks: ["Discarded draft."],
     pauseBeforeResponse: true,
   });
-  modelProvider.enqueueText({ chunks: ["Retried task completed."] });
+  const resumed = modelProvider.enqueueText({
+    chunks: ["Retried task ", "completed."],
+    pauseAfterChunk: 0,
+  });
   const fixture = app.get(AppTestingPersistenceFixture);
   const owner = await fixture.arrangeEndUser({
     organizationId: DEFAULT_ORG_ID,
@@ -170,6 +181,29 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
     await copyFile(source, path.join(temporary, name));
   }
   const pausedFile = path.join(temporary, "supplier-paused");
+  const observedDraftFile = path.join(temporary, "retry-draft-observed");
+  const resumeAfterObservation = (async () => {
+    await resumed.waitUntilPaused(15000);
+    const deadline = Date.now() + 10000;
+    try {
+      while (true) {
+        try {
+          await access(observedDraftFile);
+          return;
+        } catch (error) {
+          if (
+            (error as NodeJS.ErrnoException).code !== "ENOENT" ||
+            Date.now() >= deadline
+          )
+            throw error;
+        }
+        await setTimeout(20);
+      }
+    } finally {
+      resumed.release();
+    }
+  })();
+  void resumeAfterObservation.catch(() => undefined);
   const supplierReady = paused
     .waitUntilPaused(15000)
     .then(() => writeFile(pausedFile, "ready"));
@@ -186,10 +220,12 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
           SDK_USER_KEY: key.token,
           SDK_RETRY_AGENT_ID: agent.agentId,
           SDK_RETRY_PAUSED_FILE: pausedFile,
+          SDK_RETRY_OBSERVED_DRAFT_FILE: observedDraftFile,
         },
       },
     );
     await supplierReady;
+    await resumeAfterObservation;
     console.log(result.stdout);
   } catch (error) {
     const output = error as Error & { stdout?: string; stderr?: string };
@@ -198,5 +234,6 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
     );
   } finally {
     paused.release();
+    resumed.release();
   }
 }, 120000);

@@ -189,8 +189,10 @@ test("observation uses replacement drafts and the original receipt to establish 
   assert(requests.every((method) => method === "GET"));
 });
 
-test("observation follows a running checkpoint retry to its own saved terminal result", async () => {
+test("replayed terminal events do not hide a running retry's new progress and drafts", async () => {
   let completed = false;
+  let stream;
+  let sentRetryEvents = false;
   const retry = {
     ...runningReceipt,
     inputId: "retry_1",
@@ -199,31 +201,66 @@ test("observation follows a running checkpoint retry to its own saved terminal r
     appliedAt: null,
   };
   const baseUrl = await serve((req, res) => {
-    if (req.url.endsWith("/interactions/retry_1"))
-      return json(res, {
+    if (req.url.endsWith("/interactions/retry_1")) {
+      json(res, {
         interaction: completed
           ? { ...retry, result: { status: "succeeded", completedAt } }
           : retry,
       });
+      if (stream && !sentRetryEvents) {
+        sentRetryEvents = true;
+        setImmediate(() => {
+          stream.write(
+            frame("retry-progress", "agent.session.turn.progress", "progress", {
+              text: "Continuing original work",
+            }),
+          );
+          stream.write(
+            frame(
+              "retry-draft",
+              "agent.session.turn.output_text.snapshot",
+              "assistant_draft",
+              { text: "New retry draft" },
+            ),
+          );
+          completed = true;
+          stream.end(
+            frame(
+              "retry-complete",
+              "agent.session.turn.completed",
+              "turn_finished",
+              { status: "succeeded" },
+            ),
+          );
+        });
+      }
+      return;
+    }
     if (req.url.endsWith("/turns/turn_1"))
       return json(res, { turn: savedTurn });
-    completed = true;
-    res
-      .writeHead(200, { "content-type": "text/event-stream" })
-      .end(
-        frame("retry-progress", "agent.session.turn.progress", "progress", {
-          text: "Continuing original work",
-        }) +
-          frame(
-            "retry-complete",
-            "agent.session.turn.completed",
-            "turn_finished",
-            { status: "succeeded" },
-          ),
-      );
+    stream = res;
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    // All frame timestamps intentionally match: the original receipt owns completion.
+    res.write(
+      frame(
+        "original-terminal",
+        "agent.session.turn.completed",
+        "turn_finished",
+        { status: "interrupted" },
+      ),
+    );
   });
   const updates = await Array.fromAsync(sessionFor(baseUrl).observe("retry_1"));
-  assert.equal(updates[0].type, "progress");
+  assert.equal(updates[0].event.cursor, "original-terminal");
+  assert.deepEqual(
+    updates
+      .filter((update) => update.type === "progress" || update.type === "draft")
+      .map(({ type, text }) => ({ type, text })),
+    [
+      { type: "progress", text: "Continuing original work" },
+      { type: "draft", text: "New retry draft" },
+    ],
+  );
   const result = updates.at(-1).result;
   assert.equal(result.text, "Final answer");
   assert.equal(result.inputId, "retry_1");

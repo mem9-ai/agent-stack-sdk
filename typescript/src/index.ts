@@ -113,3 +113,11 @@ export type {
   ObserveTurnOptions,
   TurnObservation,
 } from "./progress.js";
+
+export type {
+  ClientToolDeclaration,
+  ClientToolSet,
+  ReplaceClientToolsOptions,
+  PendingClientToolCall,
+  ClientToolOutputInput,
+} from "./client-tools.js";

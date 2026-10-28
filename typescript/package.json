@@ -18,7 +18,8 @@
     "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
     "./examples/create-session.mjs": "./examples/create-session.mjs",
     "./examples/send-message.mjs": "./examples/send-message.mjs",
-    "./examples/observe-message.mjs": "./examples/observe-message.mjs"
+    "./examples/observe-message.mjs": "./examples/observe-message.mjs",
+    "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs"
   },
   "files": [
     "dist",
@@ -27,7 +28,8 @@
     "examples/prepare-realtime-connection.mjs",
     "examples/create-session.mjs",
     "examples/send-message.mjs",
-    "examples/observe-message.mjs"
+    "examples/observe-message.mjs",
+    "examples/answer-client-tool.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

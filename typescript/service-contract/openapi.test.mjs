@@ -49,10 +49,18 @@ test("the selected commands and history reads require User authority", () => {
     ["/turns", "get"],
     ["/turns/{turnId}", "get"],
     ["/timeline", "get"],
+    ["/tools", "get"],
+    ["/tools", "put"],
+    ["/client-tool-calls", "get"],
   ];
   assert.deepEqual(
     Object.keys(document.paths).sort(),
-    operations.map(([route]) => `${sessionPath}${route}`).sort(),
+    [
+      ...new Set([
+        ...operations.map(([route]) => `${sessionPath}${route}`),
+        "/api/v1/user/sessions",
+      ]),
+    ].sort(),
   );
   for (const [route, method] of operations) {
     const operation = document.paths[`${sessionPath}${route}`][method];
@@ -204,4 +212,44 @@ test("independent observation preserves the declared event position and snapshot
     /Disconnecting the subscription does not cancel/,
   );
   assert.match(stream.description, /agent\.session\.turn\.requires_action/);
+});
+
+test("Client Tools preserve declaration replacement, pending deadlines and explicit result command shapes", () => {
+  const create = properties(schema("CreateSessionOpenApiDto"));
+  assert(create.tools);
+  const replace = document.paths[`${sessionPath}/tools`].put;
+  assert(
+    replace.parameters.some(
+      (parameter) => parameter.name === "If-Match" && parameter.required,
+    ),
+  );
+  assert(replace.responses["412"]);
+  assert(replace.responses["428"]);
+  assert(replace.responses["200"].headers.ETag);
+  const set = properties(schema("SessionClientToolsResponseOpenApiDto"));
+  assert.equal(set.revision.type, "integer");
+  assert.equal(set.tools.type, "array");
+  const pending = properties(
+    schema("PendingClientToolCallsResponseOpenApiDto"),
+  ).calls;
+  for (const key of [
+    "callId",
+    "turnId",
+    "name",
+    "arguments",
+    "publishedAt",
+    "deadlineAt",
+  ])
+    assert(properties(pending.items)[key]);
+  const output = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
+    properties(variant).type.enum.includes(
+      "agent.session.input.client_tool_output",
+    ),
+  );
+  assert(output.required.includes("clientEventId"));
+  const variants = properties(output).data.oneOf;
+  assert(
+    variants.some((variant) => properties(variant).output?.maxLength === 65536),
+  );
+  assert(variants.some((variant) => properties(variant).error));
 });

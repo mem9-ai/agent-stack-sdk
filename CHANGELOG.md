@@ -2,6 +2,10 @@
 
 ## Unreleased (0.3.0)
 
+- Declare and replace Session Client Tools, recover pending calls, and explicitly
+  submit application results with stable command identities. Include an installed
+  result-submission example and real Runtime success/failure verification.
+
 - Observe Session progress with resumable event cursors and complete draft snapshots;
   confirm final results through the original receipt and preserve recovery identities
   when observation stops. Include a runnable installed-package observation example.

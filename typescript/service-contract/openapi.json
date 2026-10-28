@@ -589,6 +589,398 @@
         "tags": ["Sessions"],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
+    },
+    "/api/v1/user/sessions": {
+      "post": {
+        "operationId": "SessionsController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created Session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Opaque Session model revision token. Model changes apply to the next Turn. It does not version live `realtime` presence.",
+                "required": true,
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Session input or required Idempotency-Key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The selected Agent or published Template is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Idempotency-Key conflicts, the selected model provider is unconfigured, the Realtime Model is unavailable (realtime_model_unavailable), Realtime is disabled (realtime_not_enabled), or combined Agent instructions exceed 16 KiB (agent_instructions_too_large).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/tools": {
+      "get": {
+        "operationId": "SessionsController_getTools",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Session client-declared Client Tool set and its revision.",
+            "headers": {
+              "ETag": {
+                "description": "Strong ETag of the Session Client Tool set revision.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionClientToolsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "put": {
+        "operationId": "SessionsController_replaceTools",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Exact Client Tool set ETag from the latest tools response.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceSessionToolsOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The replaced Client Tool set. An identical set keeps its revision.",
+            "headers": {
+              "ETag": {
+                "description": "Strong ETag of the Session Client Tool set revision.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionClientToolsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Client Tool declarations are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Session is read-only (session_read_only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The supplied Client Tool set ETag is stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/client-tool-calls": {
+      "get": {
+        "operationId": "SessionsController_listPendingClientToolCalls",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["pending"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending Session-client Tool calls, oldest first. Hardware calls are delivered only over their device connection and never appear here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingClientToolCallsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The status filter is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
     }
   },
   "components": {
@@ -4472,6 +4864,527 @@
           }
         },
         "required": ["entries", "hasMore", "nextCursor"]
+      },
+      "CreateSessionOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+          },
+          "realtimeModel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "billingTag": {
+            "nullable": true,
+            "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BillingTag"
+              }
+            ]
+          },
+          "tools": {
+            "description": "Client Tools this Session client declares and executes; each client-started Turn uses the set current at its admission.",
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["function"]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": ["type", "name", "description", "parameters"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["agentId"],
+        "additionalProperties": false
+      },
+      "SessionResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
+              },
+              "autoTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "ownerUserId": {
+                "type": "string"
+              },
+              "startedByUserId": {
+                "type": "string"
+              },
+              "createdByType": {
+                "type": "string",
+                "enum": ["user", "scheduler"]
+              },
+              "readOnly": {
+                "type": "boolean"
+              },
+              "sourceSchedulerId": {
+                "type": "string",
+                "nullable": true
+              },
+              "sourceSchedulerFireId": {
+                "type": "string",
+                "nullable": true
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+              },
+              "modelRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "realtimeModel": {
+                "description": "Selection for the next Realtime Connection; null uses the active release default.",
+                "type": "string",
+                "nullable": true
+              },
+              "realtimeModelRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "realtimeModelEtag": {
+                "description": "Opaque If-Match token for PATCH /api/v1/user/sessions/{id}/realtime-model; independent of the text model ETag.",
+                "type": "string"
+              },
+              "createdWithAgentId": {
+                "type": "string"
+              },
+              "template": {
+                "type": "object",
+                "properties": {
+                  "templateId": {
+                    "type": "string"
+                  },
+                  "contentDigest": {
+                    "type": "string"
+                  }
+                },
+                "required": ["templateId", "contentDigest"],
+                "nullable": true
+              },
+              "modelPolicyStatus": {
+                "type": "string",
+                "enum": ["allowed", "organization_disallowed"]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "deleted"]
+              },
+              "billingTag": {
+                "nullable": true,
+                "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/BillingTag"
+                  }
+                ]
+              },
+              "activeTurnId": {
+                "type": "string",
+                "nullable": true
+              },
+              "realtimeVoice": {
+                "description": "Fixed Session voice setting; null disables voice. This does not guarantee current provider availability.",
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": ["zh-CN", "en-US"]
+                  }
+                },
+                "required": ["language"],
+                "nullable": true
+              },
+              "realtime": {
+                "description": "The live Realtime connection of this Session, read when the response is produced; null when none is live or the Session is deleted.",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Realtime connection ID.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "connecting: admitted, but the realtime audio stream is not open yet. active: the stream is open and the user can speak, including while a task runs. paused: the stream is still open, but the current task is waiting for the user to answer a clarification question; answering resumes it.",
+                    "type": "string",
+                    "enum": ["connecting", "active", "paused"]
+                  },
+                  "audio": {
+                    "type": "object",
+                    "properties": {
+                      "input": {
+                        "description": "One direction of the Realtime connection audio format.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "Little-endian mono samples.",
+                                "type": "string",
+                                "enum": ["pcm16"]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              }
+                            },
+                            "required": ["encoding", "sampleRate", "channels"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "One Opus packet per audio frame, decoded at sampleRate.",
+                                "type": "string",
+                                "enum": ["opus"]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              },
+                              "packetDurationMs": {
+                                "description": "Duration of each Opus packet.",
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "bitrate": {
+                                "description": "Output CBR in bps; absent on input and historical connections.",
+                                "oneOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 16000,
+                                    "maximum": 16000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 24000,
+                                    "maximum": 24000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 32000,
+                                    "maximum": 32000
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels",
+                              "packetDurationMs"
+                            ]
+                          }
+                        ]
+                      },
+                      "output": {
+                        "description": "One direction of the Realtime connection audio format.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "Little-endian mono samples.",
+                                "type": "string",
+                                "enum": ["pcm16"]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              }
+                            },
+                            "required": ["encoding", "sampleRate", "channels"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "encoding": {
+                                "description": "One Opus packet per audio frame, decoded at sampleRate.",
+                                "type": "string",
+                                "enum": ["opus"]
+                              },
+                              "sampleRate": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "channels": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 1
+                              },
+                              "packetDurationMs": {
+                                "description": "Duration of each Opus packet.",
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "bitrate": {
+                                "description": "Output CBR in bps; absent on input and historical connections.",
+                                "oneOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 16000,
+                                    "maximum": 16000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 24000,
+                                    "maximum": 24000
+                                  },
+                                  {
+                                    "type": "number",
+                                    "minimum": 32000,
+                                    "maximum": 32000
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "encoding",
+                              "sampleRate",
+                              "channels",
+                              "packetDurationMs"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["input", "output"]
+                  },
+                  "startedAt": {
+                    "description": "When the Realtime connection was admitted.",
+                    "type": "string"
+                  }
+                },
+                "required": ["id", "status", "audio", "startedAt"],
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "deletedAt": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "organizationId",
+              "sessionId",
+              "name",
+              "autoTitle",
+              "ownerUserId",
+              "startedByUserId",
+              "createdByType",
+              "readOnly",
+              "sourceSchedulerId",
+              "sourceSchedulerFireId",
+              "model",
+              "modelRevision",
+              "realtimeModel",
+              "realtimeModelRevision",
+              "realtimeModelEtag",
+              "createdWithAgentId",
+              "template",
+              "modelPolicyStatus",
+              "status",
+              "billingTag",
+              "activeTurnId",
+              "realtimeVoice",
+              "realtime",
+              "createdAt",
+              "updatedAt",
+              "deletedAt"
+            ]
+          }
+        },
+        "required": ["session"]
+      },
+      "SessionClientToolsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "description": "Increments on each replacement that changes the set; 0 before any declaration.",
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["function"]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": ["type", "name", "description", "parameters"]
+            }
+          }
+        },
+        "required": ["revision", "tools"]
+      },
+      "ReplaceSessionToolsOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["function"]
+                },
+                "name": {
+                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": ["type", "name", "description", "parameters"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["tools"],
+        "additionalProperties": false
+      },
+      "PendingClientToolCallsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "description": "Arguments for the declared parameters; the platform async choice is removed.",
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "publishedAt": {
+                  "type": "string"
+                },
+                "deadlineAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "callId",
+                "turnId",
+                "name",
+                "arguments",
+                "publishedAt",
+                "deadlineAt"
+              ]
+            }
+          }
+        },
+        "required": ["calls"]
       }
     },
     "parameters": {

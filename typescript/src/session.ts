@@ -1,4 +1,16 @@
 import {
+  getClientTools,
+  replaceClientTools,
+  validateClientTools,
+  listPendingClientToolCalls,
+  submitClientToolOutput,
+  type PendingClientToolCall,
+  type ClientToolOutputInput,
+  type ClientToolDeclaration,
+  type ClientToolSet,
+  type ReplaceClientToolsOptions,
+} from "./client-tools.js";
+import {
   sessionEvents,
   observeTurn,
   type SessionEvent,
@@ -59,6 +71,7 @@ export interface CreateSessionOptions extends RequestOptions {
   model?: string;
   realtimeModel?: string;
   billingTag?: BillingTag | null;
+  tools?: ClientToolDeclaration[];
 }
 
 export interface SuggestSessionNameInput {
@@ -336,6 +349,29 @@ export class Session {
     return observeTurn(this.#http, this.id, inputId, options);
   }
 
+  getClientTools(options?: RequestOptions): Promise<ClientToolSet> {
+    return getClientTools(this.#http, this.id, options);
+  }
+
+  replaceClientTools(
+    tools: readonly ClientToolDeclaration[],
+    options: ReplaceClientToolsOptions,
+  ): Promise<ClientToolSet> {
+    return replaceClientTools(this.#http, this.id, tools, options);
+  }
+
+  listPendingClientToolCalls(
+    options?: RequestOptions,
+  ): Promise<PendingClientToolCall[]> {
+    return listPendingClientToolCalls(this.#http, this.id, options);
+  }
+
+  submitClientToolOutput(
+    input: ClientToolOutputInput,
+  ): Promise<SessionInteraction> {
+    return submitClientToolOutput(this.#http, this.id, input);
+  }
+
   history(options?: ListOptions): Promise<TurnPage> {
     return history(this.#http, this.id, options);
   }
@@ -419,12 +455,14 @@ export const createSessionForAgent = async (
       "model",
       "realtimeModel",
       "billingTag",
+      "tools",
       "signal",
       "requestId",
     ],
     "Session options",
   );
   requireCreationKey(options.idempotencyKey);
+  if (options.tools !== undefined) validateClientTools(options.tools);
   const { idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/api/v1/user/sessions",

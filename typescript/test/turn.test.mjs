@@ -1,292 +1,384 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
-
-import {
-  InvalidTurnEventError,
-  OutcomeUnknownError,
-  TurnFailedError,
-  TurnInterruptedError,
-  UserClient,
-} from "../dist/index.js";
+import { OutcomeUnknownError, UserClient } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
-
 after(async () => {
-  await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
+  await Promise.all(servers.map((s) => new Promise((r) => s.close(r))));
 });
-
 const serve = async (handler) => {
   const server = createServer(handler);
   servers.push(server);
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  assert(address && typeof address === "object");
-  return `http://127.0.0.1:${address.port}`;
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  return `http://127.0.0.1:${server.address().port}`;
 };
-
 const sessionFor = (baseUrl) =>
-  new UserClient({
-    baseUrl,
-    apiKey: userApiKey,
-  }).session("session_1");
-
-const event = (eventName, seq, payload) => ({
-  event: eventName,
+  new UserClient({ baseUrl, apiKey: "ti_user_key_" + "x".repeat(43) }).session(
+    "session_1",
+  );
+const receipt = (overrides = {}) => ({
+  inputId: "input_1",
+  sequence: 1,
+  kind: "message",
+  mode: "started",
   turnId: "turn_1",
-  sessionId: "session_1",
-  agentRunId: "run_1",
-  seq,
-  createdAt: `2026-08-25T00:00:0${seq}.000Z`,
-  payload,
+  message: {
+    id: "user_1",
+    role: "user",
+    content: "Hello",
+    createdAt: "2026-10-28T00:00:00Z",
+  },
+  createdAt: "2026-10-28T00:00:00Z",
+  appliedAt: null,
+  rejection: null,
+  result: { status: "running", completedAt: null },
+  ...overrides,
 });
+const json = (res, value, status = 200) =>
+  res
+    .writeHead(status, { "content-type": "application/json" })
+    .end(JSON.stringify(value));
 
-const writeEvents = (response, events) => {
-  response.writeHead(201, { "content-type": "application/x-ndjson" });
-  response.end(events.map((value) => JSON.stringify(value)).join("\n"));
-};
-
-test("the Turn stream validates ordered events across chunks and heartbeats", async () => {
-  const requests = [];
-  const events = [
-    event("turn_started", 0, { execution: { model: "gpt-5.6-sol" } }),
-    event("progress", 1, { text: "Working" }),
-    event("assistant_message", 2, { messageId: "message_1", text: "Done" }),
-    event("turn_finished", 3, { status: "succeeded" }),
-  ];
-  const payload = events.map((value) => JSON.stringify(value)).join("\n\n") + "\n";
-  const baseUrl = await serve(async (request, response) => {
+test("text submission exposes acceptance with the caller's stable identity and does not wait for success", async () => {
+  const calls = [];
+  const baseUrl = await serve(async (req, res) => {
     let body = "";
-    for await (const chunk of request) body += chunk;
-    requests.push({ method: request.method, url: request.url, body, headers: request.headers });
-    response.writeHead(201, { "content-type": "application/x-ndjson" });
-    let offset = 0;
-    for (const boundary of [3, 17, 61, 109, payload.length]) {
-      response.write(payload.slice(offset, boundary));
-      offset = boundary;
-    }
-    response.end();
+    for await (const chunk of req) body += chunk;
+    calls.push({
+      url: req.url,
+      method: req.method,
+      headers: req.headers,
+      body: JSON.parse(body),
+    });
+    json(res, { interaction: receipt() }, 202);
   });
-
-  const received = [];
-  for await (const item of sessionFor(baseUrl).streamTurn({
-    text: "Hello",
-    billingTag: { key: "customer", value: "acme" },
-  })) {
-    received.push(item);
-  }
-
-  assert.deepEqual(received, events);
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].method, "POST");
-  assert.equal(requests[0].url, "/api/sessions/session_1/turns");
-  assert.deepEqual(JSON.parse(requests[0].body), {
-    input: { type: "text", text: "Hello" },
-    billingTag: { key: "customer", value: "acme" },
+  assert.deepEqual(
+    await sessionFor(baseUrl).submitMessage({
+      clientEventId: "input_1",
+      text: "Hello",
+      requestId: "http_1",
+    }),
+    receipt(),
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/api/v1/user/sessions/session_1/events");
+  assert.equal(calls[0].headers["x-request-id"], "http_1");
+  assert.deepEqual(calls[0].body, {
+    type: "agent.session.input.message",
+    clientEventId: "input_1",
+    data: { text: "Hello" },
   });
-  assert.equal(requests[0].headers["x-agent9-project-id"], undefined);
-  assert.equal(requests[0].headers["x-ti-project-id"], undefined);
 });
 
-test("malformed Turn payloads are rejected at the package boundary", async () => {
-  const invalid = [
-    event("turn_started", 0, { execution: { model: "unsupported-model" } }),
-    event("progress", 0, { text: 42 }),
-    event("assistant_message", 0, {
-      messageId: "message_1",
-      text: "Choose one",
-      clarificationItem: { prompt: "Choose one", answerChoices: ["A", "B"] },
-    }),
-    event("assistant_message", 0, {
-      messageId: "message_1",
-      text: "Choose one",
-      clarificationItem: {
-        prompt: "Choose one",
-        selectionMode: "single",
-        answerChoices: ["A", "B", "C", "D"],
-      },
-    }),
-    event("assistant_message", 0, {
-      messageId: "message_1",
-      text: "Choose one",
-      clarificationItem: {
-        prompt: "Choose one",
-        selectionMode: "single",
-        answerChoices: ["A", "B"],
-        response: { text: "A", answers: ["A"], responseTurnId: "turn_2" },
-      },
-    }),
-  ];
-  let request = 0;
-  const baseUrl = await serve((_request, response) => {
-    writeEvents(response, [invalid[request++]]);
+const completedAt = "2026-10-28T00:00:01Z";
+const finalReceipt = (overrides = {}) =>
+  receipt({
+    appliedAt: "2026-10-28T00:00:00Z",
+    result: { status: "succeeded", completedAt },
+    ...overrides,
   });
+const savedTurn = (overrides = {}) => ({
+  id: "turn_1",
+  sessionId: "session_1",
+  status: "succeeded",
+  billingTag: null,
+  userMessage: {
+    id: "user_1",
+    role: "user",
+    content: "Hello",
+    sessionId: "session_1",
+    turnId: "turn_1",
+    createdAt: "2026-10-28T00:00:00Z",
+  },
+  operations: [],
+  assistantMessage: {
+    id: "assistant_1",
+    role: "assistant",
+    content: "Done",
+    sessionId: "session_1",
+    turnId: "turn_1",
+    createdAt: completedAt,
+  },
+  createdAt: "2026-10-28T00:00:00Z",
+  completedAt,
+  ...overrides,
+});
 
-  for (let attempt = 0; attempt < invalid.length; attempt += 1) {
+test("waiting polls the original interaction until incorporation and terminal success before reading the saved answer", async () => {
+  const calls = [];
+  let polls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls.push([req.method, req.url]);
+    if (req.url.endsWith("/turns/turn_1"))
+      return json(res, { turn: savedTurn() });
+    polls++;
+    json(res, { interaction: polls === 1 ? receipt() : finalReceipt() });
+  });
+  const result = await sessionFor(baseUrl).waitForResult("input_1", {
+    pollIntervalMs: 1,
+  });
+  assert.equal(result.type, "answer");
+  assert.equal(result.text, "Done");
+  assert.equal(result.inputId, "input_1");
+  assert.equal(result.sessionId, "session_1");
+  assert.deepEqual(result.interaction, finalReceipt());
+  assert.deepEqual(calls, [
+    ["GET", "/api/v1/user/sessions/session_1/interactions/input_1"],
+    ["GET", "/api/v1/user/sessions/session_1/interactions/input_1"],
+    ["GET", "/api/v1/user/sessions/session_1/turns/turn_1"],
+  ]);
+});
+
+test("uncertain submissions preserve both identities and never automatically repeat a POST", async () => {
+  for (const mode of ["disconnect", "empty", "mismatched", "server", "eof"]) {
+    let posts = 0;
+    const baseUrl = await serve((req, res) => {
+      posts++;
+      if (mode === "disconnect") return res.destroy();
+      if (mode === "empty") return json(res, {});
+      if (mode === "mismatched")
+        return json(res, { interaction: receipt({ inputId: "other" }) });
+      if (mode === "server")
+        return json(
+          res,
+          { error: { code: "server_error", message: "uncertain" } },
+          503,
+        );
+      res.writeHead(202, { "content-type": "application/x-ndjson" }).end("");
+    });
     await assert.rejects(
-      async () => {
-        for await (const _item of sessionFor(baseUrl).streamTurn({ text: "Hello" })) {
-          // consume
-        }
-      },
-      InvalidTurnEventError,
+      sessionFor(baseUrl).submitMessage({
+        clientEventId: "input_1",
+        text: "Hello",
+        requestId: "http_1",
+      }),
+      (e) =>
+        e instanceof OutcomeUnknownError &&
+        e.sessionId === "session_1" &&
+        e.inputId === "input_1" &&
+        e.requestId === "http_1",
+    );
+    assert.equal(posts, 1, mode);
+  }
+});
+
+test("local timeout and abort keep the original identity without cancellation or resubmission", async () => {
+  const requests = [];
+  const baseUrl = await serve((req, res) => {
+    requests.push([req.method, req.url]);
+    json(res, { interaction: receipt() });
+  });
+  const session = sessionFor(baseUrl);
+  for (const mode of ["timeout", "abort"]) {
+    const abort = new AbortController();
+    const timer =
+      mode === "abort"
+        ? setTimeout(() => abort.abort("stop local waiting"), 15)
+        : undefined;
+    try {
+      await assert.rejects(
+        session.waitForResult("input_1", {
+          timeoutMs: mode === "timeout" ? 15 : 500,
+          requestId: "http_wait",
+          pollIntervalMs: 2,
+          signal: abort.signal,
+        }),
+        (e) =>
+          e instanceof OutcomeUnknownError &&
+          e.inputId === "input_1" &&
+          e.sessionId === "session_1" &&
+          e.requestId === "http_wait" &&
+          (mode !== "timeout" || e.name === "TurnWaitTimeoutError"),
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  assert(requests.length > 0);
+  assert(
+    requests.every(
+      ([method, url]) =>
+        method === "GET" && url.endsWith("/interactions/input_1"),
+    ),
+  );
+});
+
+test("failed and interrupted receipts retain the original outcome after a later execution changes the Turn", async () => {
+  const { TurnFailedError, TurnInterruptedError } =
+    await import("../dist/index.js");
+  for (const [status, ErrorClass] of [
+    ["failed", TurnFailedError],
+    ["interrupted", TurnInterruptedError],
+  ]) {
+    const calls = [];
+    const baseUrl = await serve((req, res) => {
+      calls.push(req.url);
+      if (req.url.endsWith("/turns/turn_1"))
+        return json(res, { turn: savedTurn() });
+      json(res, {
+        interaction: finalReceipt({ result: { status, completedAt } }),
+      });
+    });
+    await assert.rejects(
+      sessionFor(baseUrl).waitForResult("input_1"),
+      (e) =>
+        e instanceof ErrorClass &&
+        e.inputId === "input_1" &&
+        e.sessionId === "session_1" &&
+        e.turnId === "turn_1",
+    );
+    assert.equal(calls.length, 1);
+  }
+});
+
+test("a succeeded Turn cannot establish that an unapplied or refused message succeeded", async () => {
+  const { InputNotAppliedError } = await import("../dist/index.js");
+  for (const overrides of [
+    { mode: "steered", appliedAt: null },
+    { mode: "rejected", rejection: { code: "interaction_admission_closed" } },
+  ]) {
+    let reads = 0;
+    const baseUrl = await serve((req, res) => {
+      reads++;
+      json(res, { interaction: finalReceipt(overrides) });
+    });
+    await assert.rejects(
+      sessionFor(baseUrl).waitForResult("input_1"),
+      InputNotAppliedError,
+    );
+    assert.equal(reads, 1);
+  }
+});
+
+test("a final answer must belong to the original execution and cannot be substituted by a newer or malformed Turn", async () => {
+  for (const overrides of [
+    { completedAt: "2026-10-28T00:02:00Z" },
+    { status: "running" },
+    { id: "other" },
+    { assistantMessage: null },
+    { assistantMessage: { ...savedTurn().assistantMessage, turnId: "other" } },
+  ]) {
+    const baseUrl = await serve((req, res) =>
+      json(
+        res,
+        req.url.endsWith("/turns/turn_1")
+          ? { turn: savedTurn(overrides) }
+          : { interaction: finalReceipt() },
+      ),
+    );
+    await assert.rejects(
+      sessionFor(baseUrl).waitForResult("input_1"),
+      OutcomeUnknownError,
     );
   }
 });
 
-test("linked Clarification inputs preserve canonical single and ordered multiple answers", async () => {
-  const bodies = [];
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    bodies.push(JSON.parse(body));
-    writeEvents(response, [
-      event("turn_started", 0, {}),
-      event("assistant_message", 1, { messageId: "message_1", text: "Continued" }),
-      event("turn_finished", 2, { status: "succeeded" }),
-    ]);
+test("linked clarification inputs and saved clarification answers retain their structured values", async () => {
+  const received = [];
+  const clarification = {
+    prompt: "Choose",
+    selectionMode: "multiple",
+    answerChoices: ["A", "B"],
+    response: { answers: ["B", "custom"], responseTurnId: "turn_2" },
+  };
+  const baseUrl = await serve(async (req, res) => {
+    if (req.method === "POST") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      received.push(JSON.parse(body));
+      return json(res, { interaction: finalReceipt() }, 202);
+    }
+    json(
+      res,
+      req.url.endsWith("/turns/turn_1")
+        ? { turn: savedTurn({ clarificationItem: clarification }) }
+        : { interaction: finalReceipt() },
+    );
   });
-  const session = sessionFor(baseUrl);
-
-  await session.turn({ text: "A", clarificationSourceTurnId: "turn_source" });
-  await session.turn({ text: ["A"], clarificationSourceTurnId: "turn_source" });
-  await session.turn({
-    text: ["A", "B", "Custom"],
-    clarificationSourceTurnId: "turn_source",
-  });
-
-  assert.deepEqual(
-    bodies.map(({ input, clarificationSourceTurnId }) => ({ input, clarificationSourceTurnId })),
-    [
-      {
-        input: { type: "text", text: "A" },
-        clarificationSourceTurnId: "turn_source",
-      },
-      {
-        input: { type: "text", text: ["A"] },
-        clarificationSourceTurnId: "turn_source",
-      },
-      {
-        input: { type: "text", text: ["A", "B", "Custom"] },
-        clarificationSourceTurnId: "turn_source",
-      },
-    ],
-  );
+  for (const text of ["A", ["A"], ["B", "custom"]]) {
+    const result = await sessionFor(baseUrl).turn({
+      clientEventId: "input_1",
+      text,
+      clarificationSourceTurnId: "source",
+      billingTag: null,
+      userFileIds: ["file_1"],
+    });
+    assert.equal(result.type, "clarification");
+    assert.deepEqual(result.clarification, clarification);
+    assert.deepEqual(received.at(-1).data, {
+      text,
+      clarificationSourceTurnId: "source",
+      billingTag: null,
+      userFileIds: ["file_1"],
+    });
+  }
 });
 
-test("removed structured Turn output is rejected instead of ignored", async () => {
+test("missing command identities and unsupported options fail before dispatch", async () => {
+  const session = sessionFor("http://127.0.0.1:1");
+  for (const input of [
+    { text: "Hello" },
+    { clientEventId: "invalid key", text: "Hello" },
+    { clientEventId: "input_1", text: "Hello", outputSchema: {} },
+    { clientEventId: "input_1", text: [] },
+    { clientEventId: "input_1", text: "Hello", retry: "safe" },
+  ])
+    await assert.rejects(session.submitMessage(input), TypeError);
+});
+
+test("invalid local wait settings cannot dispatch a message", async () => {
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    json(res, { interaction: receipt() }, 202);
+  });
+  for (const options of [
+    { timeoutMs: -1 },
+    { pollIntervalMs: 0 },
+    { retry: "safe" },
+  ])
+    await assert.rejects(
+      sessionFor(baseUrl).turn(
+        { clientEventId: "input_1", text: "Hello" },
+        options,
+      ),
+      TypeError,
+    );
+  assert.equal(calls, 0);
+});
+
+test("aborting a dispatched submission retains its recoverable command identity", async () => {
+  const abort = new AbortController();
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    abort.abort("stop request");
+    res.destroy();
+  });
   await assert.rejects(
-    sessionFor("https://agent.example.com").streamTurn({
+    sessionFor(baseUrl).submitMessage({
+      clientEventId: "input_1",
       text: "Hello",
-      outputSchema: { type: "object" },
-    }).next(),
-    /outputSchema is not supported/,
+      requestId: "http_1",
+      signal: abort.signal,
+    }),
+    (e) =>
+      e instanceof OutcomeUnknownError &&
+      e.inputId === "input_1" &&
+      e.sessionId === "session_1" &&
+      e.requestId === "http_1",
   );
+  assert.equal(calls, 1);
 });
 
-test("a stream ending without a terminal event is outcome unknown and is not replayed", async () => {
-  let requests = 0;
-  const baseUrl = await serve((_request, response) => {
-    requests += 1;
-    writeEvents(response, [event("turn_started", 0, {})]);
+test("the wait deadline also interrupts a response whose body never completes", async () => {
+  const baseUrl = await serve((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.write('{"interaction":');
   });
-
   await assert.rejects(
-    async () => {
-      for await (const _item of sessionFor(baseUrl).streamTurn({ text: "Hello" })) {
-        // consume
-      }
-    },
-    (error) => {
-      assert(error instanceof OutcomeUnknownError);
-      assert.equal(error.turnId, "turn_1");
-      assert.match(error.requestId, /^[0-9a-f-]{36}$/);
-      return true;
-    },
+    sessionFor(baseUrl).waitForResult("input_1", { timeoutMs: 20 }),
+    (e) => e.name === "TurnWaitTimeoutError" && e.inputId === "input_1",
   );
-  assert.equal(requests, 1);
-});
-
-test("the collected Turn API returns answers and structured clarifications", async () => {
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    const input = JSON.parse(body);
-    const clarification = input.input.text === "clarify";
-    writeEvents(response, [
-      event("turn_started", 0, {}),
-      event("assistant_message", 1, {
-        messageId: "message_1",
-        text: clarification ? "Choose one" : "Final answer",
-        ...(clarification
-          ? {
-              clarificationItem: {
-                prompt: "Choose one",
-                selectionMode: "single",
-                answerChoices: ["A", "B"],
-              },
-            }
-          : {}),
-      }),
-      event("turn_finished", 2, { status: "succeeded" }),
-    ]);
-  });
-  const session = sessionFor(baseUrl);
-
-  assert.deepEqual(await session.turn({ text: "answer" }), {
-    type: "answer",
-    turnId: "turn_1",
-    messageId: "message_1",
-    text: "Final answer",
-  });
-  assert.deepEqual(await session.turn({ text: "clarify" }), {
-    type: "clarification",
-    turnId: "turn_1",
-    messageId: "message_1",
-    text: "Choose one",
-    clarification: {
-      prompt: "Choose one",
-      selectionMode: "single",
-      answerChoices: ["A", "B"],
-    },
-  });
-});
-
-test("known failed and interrupted Turns use distinct errors", async () => {
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    const status = JSON.parse(body).input.text;
-    writeEvents(response, [
-      event("turn_started", 0, {}),
-      event("turn_error", 1, { code: `${status}_code`, message: `${status} message` }),
-      event("turn_finished", 2, { status }),
-    ]);
-  });
-  const session = sessionFor(baseUrl);
-
-  await assert.rejects(session.turn({ text: "failed" }), (error) => {
-    assert(error instanceof TurnFailedError);
-    assert.equal(error.code, "failed_code");
-    assert.equal(error.turnId, "turn_1");
-    return true;
-  });
-  await assert.rejects(session.turn({ text: "interrupted" }), TurnInterruptedError);
-});
-
-test("AbortSignal stops local Turn waiting", async () => {
-  const sockets = new Set();
-  const baseUrl = await serve((_request, response) => {
-    sockets.add(response.socket);
-    response.socket.once("close", () => sockets.delete(response.socket));
-    response.writeHead(201, { "content-type": "application/x-ndjson" });
-    response.write(`${JSON.stringify(event("turn_started", 0, {}))}\n`);
-  });
-  const controller = new AbortController();
-  const waiting = sessionFor(baseUrl).turn({ text: "wait", signal: controller.signal });
-  setTimeout(() => controller.abort(new Error("stop waiting")), 10);
-
-  await assert.rejects(waiting, /stop waiting/);
-  for (const socket of sockets) socket.destroy();
 });

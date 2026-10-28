@@ -58,11 +58,6 @@ export interface HttpResult<T> {
   requestId: string;
 }
 
-export interface HttpStream {
-  response: Response;
-  requestId: string;
-}
-
 export const requireEtag = <T>(result: HttpResult<T>): string => {
   if (!result.etag) {
     throw new TiDBLinkError("TiDB Link response omitted a required ETag", {
@@ -75,7 +70,10 @@ export const requireEtag = <T>(result: HttpResult<T>): string => {
 const requestId = (): string => crypto.randomUUID();
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 
-const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => {
+export const sleep = (
+  milliseconds: number,
+  signal?: AbortSignal,
+): Promise<void> => {
   if (signal?.aborted) return Promise.reject(signal.reason);
   return new Promise((resolve, reject) => {
     const onAbort = () => {
@@ -288,62 +286,6 @@ export class HttpClient {
     options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
   ): Promise<T> {
     return this.request(path, { ...options, method: "DELETE" });
-  }
-
-  async openStream(
-    path: string,
-    body: unknown,
-    options?: Pick<RequestOptions, "requestId" | "signal">,
-  ): Promise<HttpStream> {
-    const stableRequestId = options?.requestId ?? requestId();
-    if (!REQUEST_ID.test(stableRequestId)) {
-      throw new TypeError("requestId must be 1-64 safe characters");
-    }
-    const requestOptions: RequestOptions = {
-      method: "POST",
-      body,
-      ...(options?.signal ? { signal: options.signal } : {}),
-    };
-    let response: Response;
-    try {
-      response = await fetch(`${this.#baseUrl}${path}`, {
-        method: "POST",
-        redirect: "error",
-        headers: {
-          ...this.#headers(requestOptions, stableRequestId),
-          accept: "application/x-ndjson",
-        },
-        body: JSON.stringify(body),
-        ...(options?.signal ? { signal: options.signal } : {}),
-      });
-    } catch (cause) {
-      if (options?.signal?.aborted) throw options.signal.reason ?? cause;
-      throw new OutcomeUnknownError(
-        "Turn request outcome is unknown; the request was not replayed",
-        { requestId: stableRequestId, cause },
-      );
-    }
-    if (!response.ok) {
-      const input = await errorInput(response, stableRequestId);
-      throw input.status === 409 || input.status === 412
-        ? new ConflictError(input)
-        : new TiDBLinkApiError(input);
-    }
-    if (
-      !response.body ||
-      !response.headers.get("content-type")?.includes("application/x-ndjson")
-    ) {
-      throw new OutcomeUnknownError(
-        "TiDB Link returned an invalid Turn stream",
-        {
-          requestId: response.headers.get("x-request-id") ?? stableRequestId,
-        },
-      );
-    }
-    return {
-      response,
-      requestId: response.headers.get("x-request-id") ?? stableRequestId,
-    };
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {

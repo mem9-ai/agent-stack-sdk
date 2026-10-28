@@ -174,46 +174,6 @@ test("a Session updates the model with its retained ETag and never overwrites a 
   );
 });
 
-test("a reconstructed Session reads ordered history and one known Turn", async () => {
-  const turn = {
-    id: "turn_1",
-    sessionId: "session_1",
-    status: "succeeded",
-    billingTag: null,
-    userMessage: {
-      id: "message_1",
-      sessionId: "session_1",
-      turnId: "turn_1",
-      role: "user",
-      content: "Hello",
-      createdAt: "2026-08-25T00:00:00.000Z",
-    },
-    operations: [],
-    assistantMessage: {
-      id: "message_2",
-      sessionId: "session_1",
-      turnId: "turn_1",
-      role: "assistant",
-      content: "Hi",
-      createdAt: "2026-08-25T00:00:01.000Z",
-    },
-    createdAt: "2026-08-25T00:00:00.000Z",
-    completedAt: "2026-08-25T00:00:01.000Z",
-  };
-  const baseUrl = await serve((request, response) => {
-    response.setHeader("content-type", "application/json");
-    response.end(
-      request.url?.endsWith("/turn_1")
-        ? JSON.stringify({ turn })
-        : JSON.stringify({ turns: [turn] }),
-    );
-  });
-  const session = clientFor(baseUrl).session("session_1");
-
-  assert.deepEqual(await session.history(), [turn]);
-  assert.deepEqual(await session.getTurn("turn_1"), turn);
-});
-
 test("Session metadata updates keep the independent model token and do not replay uncertain effects", async () => {
   const calls = [];
   const baseUrl = await serve(async (request, response) => {

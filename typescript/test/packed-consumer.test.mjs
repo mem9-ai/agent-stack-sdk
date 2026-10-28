@@ -30,6 +30,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/provision-user.mjs"));
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
+  assert(files.includes("examples/send-message.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -40,6 +41,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/provision-user.mjs" ||
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
+        file === "examples/send-message.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -79,6 +81,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       RealtimeModelSelection,
       OpenRealtimeConnectionResult,
       TurnResult,
+      CreateTurnInput,
+      SessionInteraction,
+      SessionInteractionPage,
+      SessionTimelinePage,
+      TurnPage,
+      WaitForResultOptions,
     } from "@mem9/tidb-link";
     import {
       TIDB_LINK_API_VERSION,
@@ -86,6 +94,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TIDB_LINK_PROVISIONING_REVISION,
       TIDB_LINK_REALTIME_REVISION,
       TIDB_LINK_LIFECYCLE_REVISION,
+      TIDB_LINK_TEXT_REVISION,
+      OutcomeUnknownError,
+      TurnWaitTimeoutError,
+      TurnFailedError,
+      TurnInterruptedError,
+      InputNotAppliedError,
       TiDBLinkApiError,
       TiDBLinkError,
       OrganizationClient,
@@ -165,7 +179,33 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     declare const session: Session;
     session.setModel("deployment.model");
     // @ts-expect-error Structured Turn output is not supported.
-    session.turn({ text: "Hello", outputSchema: { type: "object" } });
+    session.turn({ clientEventId:"input_1", text: "Hello", outputSchema: { type: "object" } });
+    async function textWorkflow(session: Session): Promise<TurnResult> {
+      const input: CreateTurnInput = {clientEventId:"input_1",text:"Hello"};
+      const accepted: SessionInteraction = await session.submitMessage(input);
+      const recovered: SessionInteraction | null = await session.reconcileInteraction(input.clientEventId);
+      const interactions: SessionInteractionPage = await session.listInteractions({limit:1});
+      const turns: TurnPage = await session.history({cursor:"opaque"});
+      const timeline: SessionTimelinePage = await session.timeline({limit:1});
+      for(const turn of turns.turns) {
+        if(turn.executor === "realtime_model") { const id: string = turn.realtime.connectionId; void id; }
+      }
+      const options: WaitForResultOptions = {timeoutMs:1000,pollIntervalMs:50};
+      void accepted; void recovered; void interactions; void timeline;
+      // @ts-expect-error A caller-persisted input identity is required.
+      session.turn({text:"Hello"});
+      // @ts-expect-error The obsolete response-owned Turn stream is removed.
+      session.streamTurn(input);
+      return session.waitForResult(input.clientEventId,options);
+    }
+    function recover(error: unknown) {
+      if(error instanceof OutcomeUnknownError || error instanceof TurnWaitTimeoutError || error instanceof TurnFailedError || error instanceof TurnInterruptedError || error instanceof InputNotAppliedError) {
+        const inputId: string | undefined = error.inputId;
+        const sessionId: string | undefined = error.sessionId;
+        void inputId; void sessionId;
+      }
+    }
+    void textWorkflow; void recover; void TIDB_LINK_TEXT_REVISION;
     void TIDB_LINK_API_VERSION;
     void TIDB_LINK_REVISION;
     void TIDB_LINK_PROVISIONING_REVISION;
@@ -218,7 +258,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87",
+    "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
   );
   assert.equal(
     installedPackage.tidbLinkProvisioningRevision,
@@ -276,6 +316,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
+    const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
+    assert.equal(typeof sendMessageWorkflow,"function");
+    assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "b59a0a584eb2632b8d9c6d0808b8ea26081b1474");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof provisionUser, "function");

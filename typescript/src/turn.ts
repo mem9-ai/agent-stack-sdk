@@ -1,50 +1,29 @@
 import {
-  TiDBLinkError,
-  InvalidTurnEventError,
   OutcomeUnknownError,
+  TiDBLinkApiError,
+  TiDBLinkError,
   TurnFailedError,
   TurnInterruptedError,
+  TurnWaitTimeoutError,
+  InputNotAppliedError,
 } from "./errors.js";
-import { HttpClient, requireKnownKeys } from "./http.js";
-import type { BillingTag, ClarificationItem, SessionModel } from "./session.js";
-
-type TurnEvent<Event extends string, Payload> = {
-  event: Event;
-  turnId: string;
-  sessionId: string;
-  agentRunId?: string;
-  seq: number;
-  createdAt: string;
-  payload: Payload;
-};
-
-export type TurnStreamEvent =
-  | TurnEvent<
-      "turn_started",
-      {
-        execution?: {
-          model: SessionModel;
-        };
-      }
-    >
-  | TurnEvent<"progress", { text: string }>
-  | TurnEvent<"assistant_draft", { text: string }>
-  | TurnEvent<
-      "operation_step",
-      {
-        operationId: string;
-        status: "running" | "succeeded" | "failed" | "interrupted" | "unknown_result";
-        label: string;
-      }
-    >
-  | TurnEvent<
-      "assistant_message",
-      { messageId: string; text: string; clarificationItem?: ClarificationItem }
-    >
-  | TurnEvent<"turn_error", { code: string; message: string }>
-  | TurnEvent<"turn_finished", { status: "succeeded" | "failed" | "interrupted" }>;
+import {
+  HttpClient,
+  sleep,
+  requireCreationKey,
+  requireKnownKeys,
+} from "./http.js";
+import {
+  getInteraction,
+  getTurn,
+  requireInteraction,
+  type SessionInteraction,
+} from "./history.js";
+import type { BillingTag, ClarificationItem } from "./session.js";
 
 export interface CreateTurnInput {
+  /** Persist this Session-local command identity before dispatch. */
+  clientEventId: string;
   text: string | [string, ...string[]];
   userFileIds?: string[];
   clarificationSourceTurnId?: string;
@@ -53,286 +32,265 @@ export interface CreateTurnInput {
   signal?: AbortSignal;
 }
 
-export type TurnResult =
-  | { type: "answer"; turnId: string; messageId: string; text: string }
-  | {
-      type: "clarification";
-      turnId: string;
-      messageId: string;
-      text: string;
-      clarification: ClarificationItem;
-    };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const strings = (value: unknown, minimum = 0, maximum = Infinity): value is string[] =>
-  Array.isArray(value) &&
-  value.length >= minimum &&
-  value.length <= maximum &&
-  value.every((item) => typeof item === "string" && item.length > 0);
-
-const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): value is T =>
-  typeof value === "string" && allowed.includes(value as T);
-
-const clarification = (value: unknown): value is ClarificationItem => {
-  if (
-    !isRecord(value) ||
-    typeof value.prompt !== "string" ||
-    value.prompt.length === 0 ||
-    !oneOf(value.selectionMode, ["single", "multiple"]) ||
-    !strings(value.answerChoices, 2, value.selectionMode === "single" ? 3 : 8)
-  ) {
-    return false;
-  }
-  if (value.response === undefined) return true;
-  return (
-    isRecord(value.response) &&
-    Object.keys(value.response).sort().join(",") === "answers,responseTurnId" &&
-    typeof value.response.responseTurnId === "string" &&
-    strings(value.response.answers, 1, value.selectionMode === "single" ? 1 : 9)
-  );
-};
-
-const validPayload = (event: string, payload: Record<string, unknown>): boolean => {
-  switch (event) {
-    case "turn_started": {
-      if (payload.execution === undefined) return true;
-      const execution = payload.execution;
-      return (
-        isRecord(execution) &&
-        Object.keys(execution).length === 1 &&
-        oneOf(execution.model, [
-          "gpt-6-astra",
-          "gpt-5.6-sol",
-          "gpt-5.6-terra",
-          "gpt-5.6-luna",
-          "claude-haiku-4-5",
-          "claude-sonnet-5",
-          "claude-opus-5",
-          "DeepSeek-V4-Flash",
-          "gpt-5.4",
-        ])
-      );
-    }
-    case "progress":
-    case "assistant_draft":
-      return typeof payload.text === "string";
-    case "operation_step":
-      return (
-        typeof payload.operationId === "string" &&
-        payload.operationId.length > 0 &&
-        oneOf(payload.status, ["running", "succeeded", "failed", "interrupted", "unknown_result"]) &&
-        typeof payload.label === "string"
-      );
-    case "assistant_message":
-      return (
-        typeof payload.messageId === "string" &&
-        payload.messageId.length > 0 &&
-        typeof payload.text === "string" &&
-        (payload.clarificationItem === undefined || clarification(payload.clarificationItem))
-      );
-    case "turn_error":
-      return (
-        typeof payload.code === "string" &&
-        payload.code.length > 0 &&
-        typeof payload.message === "string"
-      );
-    case "turn_finished":
-      return (
-        payload.status === "succeeded" ||
-        payload.status === "failed" ||
-        payload.status === "interrupted"
-      );
-    default:
-      return false;
-  }
-};
-
-const parseEvent = (
-  line: string,
-  expectedSessionId: string,
-  expectedSeq: number,
-  expectedTurnId: string | undefined,
-  requestId: string,
-): TurnStreamEvent => {
-  let value: unknown;
-  try {
-    value = JSON.parse(line);
-  } catch (cause) {
-    throw new InvalidTurnEventError("TiDB Link returned malformed NDJSON", {
-      requestId,
-      ...(expectedTurnId ? { turnId: expectedTurnId } : {}),
-      cause,
-    });
-  }
-  if (
-    !isRecord(value) ||
-    typeof value.event !== "string" ||
-    typeof value.turnId !== "string" ||
-    value.turnId.length === 0 ||
-    value.sessionId !== expectedSessionId ||
-    (expectedTurnId !== undefined && value.turnId !== expectedTurnId) ||
-    value.seq !== expectedSeq ||
-    typeof value.createdAt !== "string" ||
-    (value.agentRunId !== undefined && typeof value.agentRunId !== "string") ||
-    !isRecord(value.payload) ||
-    !validPayload(value.event, value.payload)
-  ) {
-    throw new InvalidTurnEventError("TiDB Link returned an invalid Turn event", {
-      requestId,
-      ...(expectedTurnId ? { turnId: expectedTurnId } : {}),
-    });
-  }
-  return value as TurnStreamEvent;
-};
-
-const bodyFor = (input: CreateTurnInput): Record<string, unknown> => {
-  requireKnownKeys(
-    input,
-    ["text", "userFileIds", "clarificationSourceTurnId", "billingTag", "requestId", "signal"],
-    "Turn input",
-  );
-  const textIsValid =
-    (typeof input.text === "string" && input.text.length > 0) || strings(input.text, 1, 9);
-  if (!textIsValid) throw new TypeError("text must contain 1-9 non-empty values");
-  if (
-    input.userFileIds !== undefined &&
-    (!strings(input.userFileIds, 0, 20) || input.userFileIds.some((id) => id.length > 64))
-  ) {
-    throw new TypeError("userFileIds must contain at most 20 non-empty ids");
-  }
-  if (
-    input.clarificationSourceTurnId !== undefined &&
-    (typeof input.clarificationSourceTurnId !== "string" ||
-      input.clarificationSourceTurnId.length === 0 ||
-      input.clarificationSourceTurnId.length > 64)
-  ) {
-    throw new TypeError("clarificationSourceTurnId must contain 1-64 characters");
-  }
-  return {
-    input: {
-      type: "text",
-      text: input.text,
-      ...(input.userFileIds === undefined ? {} : { userFileIds: input.userFileIds }),
-    },
-    ...(input.clarificationSourceTurnId === undefined
-      ? {}
-      : { clarificationSourceTurnId: input.clarificationSourceTurnId }),
-    ...(input.billingTag === undefined ? {} : { billingTag: input.billingTag }),
-  };
-};
-
-export async function* streamTurn(
-  http: HttpClient,
-  sessionId: string,
-  input: CreateTurnInput,
-): AsyncGenerator<TurnStreamEvent> {
-  const opened = await http.openStream(
-    `/api/sessions/${encodeURIComponent(sessionId)}/turns`,
-    bodyFor(input),
-    {
-      ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
-      ...(input.signal ? { signal: input.signal } : {}),
-    },
-  );
-  const reader = opened.response.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let expectedSeq = 0;
-  let turnId: string | undefined;
-  let sourceDone = false;
-
-  const lineEvent = (line: string): TurnStreamEvent => {
-    const parsed = parseEvent(line, sessionId, expectedSeq, turnId, opened.requestId);
-    turnId ??= parsed.turnId;
-    expectedSeq += 1;
-    return parsed;
-  };
-
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) {
-        sourceDone = true;
-        buffer += decoder.decode();
-        if (buffer.trim()) {
-          const parsed = lineEvent(buffer.trim());
-          yield parsed;
-          if (parsed.event === "turn_finished") return;
-        }
-        throw new OutcomeUnknownError("Turn stream ended without a terminal event", {
-          requestId: opened.requestId,
-          ...(turnId ? { turnId } : {}),
-        });
-      }
-      buffer += decoder.decode(chunk.value, { stream: true });
-      let newline = buffer.indexOf("\n");
-      while (newline !== -1) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (line) {
-          const parsed = lineEvent(line);
-          yield parsed;
-          if (parsed.event === "turn_finished") return;
-        }
-        newline = buffer.indexOf("\n");
-      }
-    }
-  } catch (cause) {
-    if (input.signal?.aborted) throw input.signal.reason ?? cause;
-    if (cause instanceof TiDBLinkError) throw cause;
-    throw new OutcomeUnknownError("Turn stream was interrupted before its terminal event", {
-      requestId: opened.requestId,
-      ...(turnId ? { turnId } : {}),
-      cause,
-    });
-  } finally {
-    if (!sourceDone) await reader.cancel().catch(() => undefined);
-    reader.releaseLock();
-  }
+export interface WaitForResultOptions {
+  /** Local deadline only; default 60 seconds. Never cancels execution. */
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  requestId?: string;
+  signal?: AbortSignal;
 }
 
-export const collectTurn = async (
+type ResultIdentity = {
+  sessionId: string;
+  inputId: string;
+  turnId: string;
+  messageId: string;
+  text: string;
+  interaction: SessionInteraction;
+};
+export type TurnResult = ResultIdentity &
+  (
+    | { type: "answer" }
+    | { type: "clarification"; clarification: ClarificationItem }
+  );
+
+export const submitMessage = async (
   http: HttpClient,
   sessionId: string,
   input: CreateTurnInput,
-): Promise<TurnResult> => {
-  let message:
-    | Extract<TurnStreamEvent, { event: "assistant_message" }>["payload"]
-    | undefined;
-  let knownError: Extract<TurnStreamEvent, { event: "turn_error" }>["payload"] | undefined;
-  for await (const event of streamTurn(http, sessionId, input)) {
-    if (event.event === "assistant_message") message = event.payload;
-    if (event.event === "turn_error") knownError = event.payload;
-    if (event.event !== "turn_finished") continue;
-    if (event.payload.status === "failed") {
-      throw new TurnFailedError({
-        turnId: event.turnId,
-        code: knownError?.code ?? "turn_failed",
-        message: knownError?.message ?? "Turn failed",
-      });
+): Promise<SessionInteraction> => {
+  requireKnownKeys(
+    input,
+    [
+      "clientEventId",
+      "text",
+      "userFileIds",
+      "clarificationSourceTurnId",
+      "billingTag",
+      "requestId",
+      "signal",
+    ],
+    "Message input",
+  );
+  requireCreationKey(input.clientEventId);
+  const { clientEventId, requestId, signal, ...data } = input;
+  const texts = typeof data.text === "string" ? [data.text] : data.text;
+  if (
+    !Array.isArray(texts) ||
+    texts.length < 1 ||
+    texts.length > 9 ||
+    texts.some((t) => typeof t !== "string" || !t)
+  )
+    throw new TypeError("text must contain 1-9 non-empty values");
+  if (
+    data.userFileIds !== undefined &&
+    (!Array.isArray(data.userFileIds) ||
+      data.userFileIds.length > 20 ||
+      data.userFileIds.some(
+        (id) => typeof id !== "string" || !id || id.length > 64,
+      ))
+  )
+    throw new TypeError("userFileIds must contain at most 20 non-empty IDs");
+  if (
+    data.clarificationSourceTurnId !== undefined &&
+    (typeof data.clarificationSourceTurnId !== "string" ||
+      !data.clarificationSourceTurnId ||
+      data.clarificationSourceTurnId.length > 64)
+  )
+    throw new TypeError(
+      "clarificationSourceTurnId must contain 1-64 characters",
+    );
+  signal?.throwIfAborted();
+  try {
+    const result = await http.postResponse<{ interaction?: unknown }>(
+      `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/events`,
+      { type: "agent.session.input.message", clientEventId, data },
+      {
+        ...(requestId ? { requestId } : {}),
+        ...(signal ? { signal } : {}),
+        outcomeUnknown: true,
+      },
+    );
+    try {
+      const receipt = requireInteraction(
+        result.data?.interaction,
+        clientEventId,
+        result.requestId,
+      );
+      if (
+        receipt.kind !== "message" ||
+        !receipt.message ||
+        receipt.message.role !== "user"
+      )
+        throw new TiDBLinkError(
+          "Message submission returned a different command receipt",
+        );
+      return receipt;
+    } catch (cause) {
+      throw new OutcomeUnknownError(
+        "Message submission returned no usable receipt; query the original input",
+        { requestId: result.requestId, cause },
+      );
     }
-    if (event.payload.status === "interrupted") {
-      throw new TurnInterruptedError(event.turnId, knownError?.message);
-    }
-    if (!message) {
-      throw new InvalidTurnEventError("Successful Turn omitted its assistant message");
-    }
-    return message.clarificationItem
-      ? {
-          type: "clarification",
-          turnId: event.turnId,
-          messageId: message.messageId,
-          text: message.text,
-          clarification: message.clarificationItem,
-        }
-      : {
-          type: "answer",
-          turnId: event.turnId,
-          messageId: message.messageId,
-          text: message.text,
-        };
+  } catch (cause) {
+    if (!(cause instanceof OutcomeUnknownError)) throw cause;
+    throw new OutcomeUnknownError(cause.message, {
+      sessionId,
+      inputId: clientEventId,
+      ...(cause.requestId ? { requestId: cause.requestId } : {}),
+      cause,
+    });
   }
-  throw new Error("unreachable");
+};
+
+export const validateWaitOptions = (
+  options: WaitForResultOptions = {},
+): { timeoutMs: number; pollIntervalMs: number } => {
+  requireKnownKeys(
+    options,
+    ["timeoutMs", "pollIntervalMs", "requestId", "signal"],
+    "Wait options",
+  );
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const pollIntervalMs = options.pollIntervalMs ?? 250;
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 0 ||
+    timeoutMs > 2_147_483_647
+  )
+    throw new TypeError(
+      "timeoutMs must be an integer between 0 and 2147483647",
+    );
+  if (
+    !Number.isSafeInteger(pollIntervalMs) ||
+    pollIntervalMs < 1 ||
+    pollIntervalMs > 2_147_483_647
+  )
+    throw new TypeError(
+      "pollIntervalMs must be an integer between 1 and 2147483647",
+    );
+  return { timeoutMs, pollIntervalMs };
+};
+
+export const waitForResult = async (
+  http: HttpClient,
+  sessionId: string,
+  inputId: string,
+  options: WaitForResultOptions = {},
+): Promise<TurnResult> => {
+  const { timeoutMs, pollIntervalMs } = validateWaitOptions(options);
+  requireCreationKey(inputId);
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), timeoutMs);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline.signal])
+    : deadline.signal;
+  let turnId: string | undefined;
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const interaction = await getInteraction(http, sessionId, inputId, {
+        signal,
+        ...(options.requestId ? { requestId: options.requestId } : {}),
+      });
+      turnId = interaction.turnId;
+      if (
+        interaction.kind !== "message" ||
+        !interaction.message ||
+        interaction.message.role !== "user"
+      )
+        throw new TiDBLinkError(
+          "Waiting for a text result requires a message receipt",
+        );
+      if (interaction.rejection || interaction.mode === "rejected")
+        throw new InputNotAppliedError(sessionId, inputId, turnId);
+      if (
+        interaction.result.status !== "running" &&
+        !interaction.result.completedAt
+      )
+        throw new TiDBLinkError(
+          "Original terminal receipt omitted its completion time",
+        );
+      if (interaction.result.status === "failed")
+        throw new TurnFailedError({
+          code: "turn_failed",
+          message: "The original Turn execution failed",
+          turnId,
+          sessionId,
+          inputId,
+        });
+      if (interaction.result.status === "interrupted")
+        throw new TurnInterruptedError(turnId, undefined, sessionId, inputId);
+      if (interaction.result.status === "succeeded") {
+        if (!interaction.appliedAt)
+          throw new InputNotAppliedError(sessionId, inputId, turnId);
+        const turn = await getTurn(http, sessionId, turnId, {
+          signal,
+          ...(options.requestId ? { requestId: options.requestId } : {}),
+        });
+        const message = turn.assistantMessage;
+        if (
+          turn.executor === "realtime_model" ||
+          turn.status !== "succeeded" ||
+          !interaction.result.completedAt ||
+          turn.completedAt !== interaction.result.completedAt ||
+          !message ||
+          message.role !== "assistant" ||
+          !message.id ||
+          typeof message.content !== "string" ||
+          message.turnId !== turnId ||
+          message.sessionId !== sessionId
+        )
+          throw new TiDBLinkError(
+            "Saved Turn does not match the original successful execution",
+          );
+        const identity = {
+          sessionId,
+          inputId,
+          turnId,
+          messageId: message.id,
+          text: message.content,
+          interaction,
+        };
+        return turn.clarificationItem
+          ? {
+              ...identity,
+              type: "clarification",
+              clarification: turn.clarificationItem,
+            }
+          : { ...identity, type: "answer" };
+      }
+      await sleep(pollIntervalMs, signal);
+    }
+  } catch (cause) {
+    if (
+      cause instanceof TurnFailedError ||
+      cause instanceof TurnInterruptedError ||
+      cause instanceof InputNotAppliedError ||
+      cause instanceof TiDBLinkApiError
+    )
+      throw cause;
+    const ErrorClass =
+      deadline.signal.aborted && !options.signal?.aborted
+        ? TurnWaitTimeoutError
+        : OutcomeUnknownError;
+    throw new ErrorClass(
+      ErrorClass === TurnWaitTimeoutError
+        ? "Local wait timed out; query or wait for the original input"
+        : "Local wait stopped before the original result was established",
+      {
+        sessionId,
+        inputId,
+        ...(turnId ? { turnId } : {}),
+        ...(cause instanceof TiDBLinkError && cause.requestId
+          ? { requestId: cause.requestId }
+          : options.requestId
+            ? { requestId: options.requestId }
+            : {}),
+        cause,
+      },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 };

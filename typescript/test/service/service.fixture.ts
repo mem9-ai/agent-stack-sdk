@@ -103,10 +103,16 @@ beforeAll(async () => {
   await expect(
     app.get(AppTestingPersistenceFixture).hasActiveServiceRelease(),
   ).resolves.toBe(true);
-  // Control only the external model transport; real naming admission and persistence still run.
-  const remote: StreamFn = async (model, _context, options) => {
+  // Control only the external model transport; dispatch, Runtime and persistence stay real.
+  const remote: StreamFn = async (model, context, options) => {
+    const prompt = JSON.stringify(context.messages);
+    const fail = prompt.includes("SDK_FIXTURE_FAIL");
+    const pause = prompt.includes("SDK_FIXTURE_PAUSE");
     await options?.onResponse?.(
-      { status: 200, headers: { "request-id": "fictional-sdk-title" } },
+      {
+        status: 200,
+        headers: { "request-id": `fictional-sdk-${randomUUID()}` },
+      },
       model,
     );
     const message = {
@@ -114,8 +120,16 @@ beforeAll(async () => {
       api: model.api,
       provider: model.provider,
       model: model.id,
-      content: [{ type: "text", text: "Trip planning" }],
-      stopReason: "stop",
+      content: [
+        {
+          type: "text",
+          text: prompt.includes("SDK_FIXTURE")
+            ? "SDK final answer."
+            : "Trip planning",
+        },
+      ],
+      stopReason: fail ? "error" : "stop",
+      ...(fail ? { errorMessage: "Controlled SDK provider failure" } : {}),
       timestamp: 0,
       usage: {
         input: 1,
@@ -128,7 +142,21 @@ beforeAll(async () => {
     } as AssistantMessage;
     return {
       async *[Symbol.asyncIterator]() {
-        yield { type: "done", reason: "stop", message } as const;
+        if (pause) {
+          await new Promise<void>((resolve) => {
+            const finish = () => {
+              clearTimeout(timer);
+              options?.signal?.removeEventListener("abort", finish);
+              resolve();
+            };
+            const timer = setTimeout(finish, 2000);
+            options?.signal?.addEventListener("abort", finish, { once: true });
+            if (options?.signal?.aborted) finish();
+          });
+        }
+        if (fail)
+          yield { type: "error", reason: "error", error: message } as const;
+        else yield { type: "done", reason: "stop", message } as const;
       },
       result: async () => message,
     } as unknown as Awaited<ReturnType<StreamFn>>;
@@ -256,6 +284,33 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
     disabledAgent.agentId,
   );
 
+  const textSessionId = await createSession(
+    ownerKey.token,
+    enabledAgent.agentId,
+  );
+  await fixture.recordRealtimeExchange({
+    organizationId: DEFAULT_ORG_ID,
+    sessionId: textSessionId,
+    voiceTurnId: `vt_${randomUUID().replaceAll("-", "")}`,
+    createdAt: new Date("2026-10-27T00:00:00.000Z"),
+    facts: [
+      {
+        type: "input_transcript",
+        text: "Saved spoken question",
+        turnId: null,
+        startsTurn: false,
+      },
+      {
+        type: "response",
+        text: "Saved spoken answer",
+        turnId: null,
+        kind: "chat",
+        responseId: "sdk_response",
+        interrupted: true,
+      },
+    ],
+  });
+
   temporary = await mkdtemp(path.join(tmpdir(), "agent-stack-sdk-service-"));
   const packed = JSON.parse(
     (
@@ -306,6 +361,7 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
           SDK_ORGANIZATION_KEY: own.token,
           SDK_FOREIGN_ORGANIZATION_KEY: foreign.token,
           SDK_USER_KEY: ownerKey.token,
+          SDK_TEXT_SESSION_ID: textSessionId,
           SDK_FOREIGN_USER_KEY: strangerKey.token,
           SDK_REALTIME_SESSION_ID: enabledSessionId,
           SDK_TEMPLATE_ID: enabledTemplateId,

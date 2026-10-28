@@ -20,12 +20,27 @@ import {
   type RealtimeSessionSelectionFields,
 } from "./realtime.js";
 import {
-  collectTurn,
+  submitMessage,
+  waitForResult,
+  validateWaitOptions,
   type CreateTurnInput,
-  streamTurn,
   type TurnResult,
-  type TurnStreamEvent,
+  type WaitForResultOptions,
 } from "./turn.js";
+import {
+  getInteraction,
+  reconcileInteraction,
+  listInteractions,
+  history,
+  getTurn,
+  timeline,
+  type SessionInteraction,
+  type SessionInteractionPage,
+  type TurnRecord,
+  type TurnPage,
+  type SessionTimelinePage,
+} from "./history.js";
+import type { ListOptions } from "./http.js";
 
 /** Model IDs come from the deployment catalog, including newly published models. */
 export type SelectableSessionModel = string;
@@ -82,15 +97,6 @@ export interface SessionRecord {
   deletedAt: string | null;
 }
 
-export interface MessageRecord {
-  id: string;
-  sessionId: string;
-  turnId: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: string;
-}
-
 export type ClarificationItem =
   | {
       prompt: string;
@@ -104,21 +110,6 @@ export type ClarificationItem =
       answerChoices: [string, string, ...string[]];
       response?: { answers: [string, ...string[]]; responseTurnId: string };
     };
-
-export interface TurnRecord {
-  id: string;
-  sessionId: string;
-  status: "running" | "succeeded" | "failed" | "interrupted";
-  billingTag: BillingTag | null;
-  userMessage: MessageRecord;
-  userFiles?: unknown[];
-  operations: unknown[];
-  assistantMessage: MessageRecord | null;
-  clarificationItem?: ClarificationItem;
-  createdAt: string;
-  completedAt?: string;
-  sourceFireId?: string | null;
-}
 
 export class Session {
   readonly #http: HttpClient;
@@ -326,31 +317,57 @@ export class Session {
     );
   }
 
-  async history(options?: { signal?: AbortSignal }): Promise<TurnRecord[]> {
-    const response = await this.#http.get<{ turns: TurnRecord[] }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/turns`,
-      options,
-    );
-    return response.turns;
+  history(options?: ListOptions): Promise<TurnPage> {
+    return history(this.#http, this.id, options);
   }
 
-  async getTurn(
-    turnId: string,
-    options?: { signal?: AbortSignal },
-  ): Promise<TurnRecord> {
-    const response = await this.#http.get<{ turn: TurnRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/turns/${encodeURIComponent(turnId)}`,
-      options,
-    );
-    return response.turn;
+  getTurn(turnId: string, options?: RequestOptions): Promise<TurnRecord> {
+    return getTurn(this.#http, this.id, turnId, options);
   }
 
-  streamTurn(input: CreateTurnInput): AsyncGenerator<TurnStreamEvent> {
-    return streamTurn(this.#http, this.id, input);
+  timeline(options?: ListOptions): Promise<SessionTimelinePage> {
+    return timeline(this.#http, this.id, options);
   }
 
-  turn(input: CreateTurnInput): Promise<TurnResult> {
-    return collectTurn(this.#http, this.id, input);
+  listInteractions(options?: ListOptions): Promise<SessionInteractionPage> {
+    return listInteractions(this.#http, this.id, options);
+  }
+
+  getInteraction(
+    inputId: string,
+    options?: RequestOptions,
+  ): Promise<SessionInteraction> {
+    return getInteraction(this.#http, this.id, inputId, options);
+  }
+
+  reconcileInteraction(
+    clientEventId: string,
+    options?: RequestOptions,
+  ): Promise<SessionInteraction | null> {
+    return reconcileInteraction(this.#http, this.id, clientEventId, options);
+  }
+
+  submitMessage(input: CreateTurnInput): Promise<SessionInteraction> {
+    return submitMessage(this.#http, this.id, input);
+  }
+
+  waitForResult(
+    inputId: string,
+    options?: WaitForResultOptions,
+  ): Promise<TurnResult> {
+    return waitForResult(this.#http, this.id, inputId, options);
+  }
+
+  async turn(
+    input: CreateTurnInput,
+    options?: WaitForResultOptions,
+  ): Promise<TurnResult> {
+    validateWaitOptions(options);
+    await this.submitMessage(input);
+    return this.waitForResult(input.clientEventId, {
+      ...(input.signal ? { signal: input.signal } : {}),
+      ...options,
+    });
   }
 }
 

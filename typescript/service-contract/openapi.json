@@ -1,0 +1,4393 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TiDB Link Customer API",
+    "version": "0.0.1",
+    "description": "Customer integration API at /api/v1. Operations declare End User API Key, Organization API Key or ticket authorization. Old customer addresses have been removed without aliases; existing SDKs and external callers require a separate migration."
+  },
+  "paths": {
+    "/api/v1/user/sessions/{id}/events": {
+      "post": {
+        "operationId": "SessionsController_submitEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionEventOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "An idempotent replay of an already accepted command.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionInteractionResponseOpenApiDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionEventRetryResponseOpenApiDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The command was accepted. Message and cancellation commands return durable interaction receipts; retry commands return a retrying event receipt. Execution progress is delivered separately by GET /events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionInteractionResponseOpenApiDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SessionEventRetryResponseOpenApiDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The command envelope or command data is invalid, or an idle text Turn admission exceeds the combined Session-client and Hardware tool limit after model projection (64 tools or 64 KiB; validation_failed). Admission saves no input or Turn on this overflow. New checkpoint retries are disabled by default and return checkpoint_runtime_unavailable when disabled or unavailable; previously accepted retry commands still recover their receipts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active End User principal is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The Session is unavailable or authorization-hidden, or a client_tool_output references an unknown, foreign or Hardware call (client_tool_call_unavailable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The command identity was already used with a different body or target state, or a new message or retry targets a read-only Session (session_read_only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "New Turn admission is temporarily closed for deployment maintenance or recovery (turn_admission_closed), or the deployment lacks the Sandbox or Drive9 service a new Turn needs (service_configuration_unavailable; details.reason names it). This refusal happens before the command is saved, so the same clientEventId can be sent again once the service is set up. If the configuration changes after that check, the command is accepted instead and its Turn fails with the same code and reason in turn_error. A model the deployment does not configure keeps its 409 model_provider_unconfigured refusal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "turn_admission_closed",
+                    "message": "New Turns are temporarily unavailable"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/interactions": {
+      "get": {
+        "operationId": "SessionsController_listInteractions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque Session-bound continuation cursor.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "clientEventId",
+            "required": false,
+            "in": "query",
+            "description": "Read only the original command receipt, including checkpoint retry. Cannot be combined with limit or cursor; a missing key returns an empty page. No execution is started.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved commands in ascending Session-local sequence, or the exact original command-key receipt without executing again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInteractionsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit or malformed, negative or different-Session continuation cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unavailable owning Session or unsupported, invalid or unavailable credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/interactions/{receiptId}": {
+      "get": {
+        "operationId": "SessionsController_getInteraction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "receiptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original input receipt and original-generation outcome, including saved refusals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInteractionResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unrecorded input or unavailable owning Session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unsupported, invalid or unavailable caller credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/turns": {
+      "get": {
+        "operationId": "SessionsController_listTurns",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque owning User and Session continuation cursor; chronological creation order with Turn ID as tie breaker.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full Agent and Realtime Turns in creation-time order. Late Realtime writes before an already consumed cursor require a full refresh; use /timeline for durable event-sequence replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnsResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query or cursor, including another owner, Session or list kind.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error",
+            "description": "Unavailable owning Session or unsupported, invalid or unavailable credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/turns/{turnId}": {
+      "get": {
+        "operationId": "SessionsController_getTurn",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          },
+          {
+            "$ref": "#/components/parameters/TurnIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One Full Agent or user-input Realtime Turn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable Session, unknown Turn or narration-only Realtime Turn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/user/sessions/{id}/timeline": {
+      "get": {
+        "operationId": "SessionsController_timeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque owning User and Session continuation cursor from nextCursor.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded page of the Session timeline. Each entry is a complete Turn (messages with inputContext, Operations with category and skill, Artifact publications) or one Realtime fact: a final user transcript or a completed Realtime model response. Realtime facts follow their durable write order. A Turn started by a Realtime utterance (a task or a clarification answer) is placed directly after that utterance; every other Turn, including one a Realtime utterance only steered, sits where its first event was saved. Because that utterance is saved after the Turn starts, a client that paged past such a Turn in the meantime can see it again on a later page; nothing is skipped. Key entries by Turn id and Realtime fact id, replace an entry that arrives again, and group Realtime facts by their turnId. A running Turn is a snapshot of its progress so far; read it again or follow GET /events for later changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTimelineResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit, or a malformed, foreign or unknown continuation cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error",
+            "description": "Unavailable owning Session or unsupported, invalid or unavailable credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "UserApiKey": []
+          }
+        ],
+        "tags": ["Sessions"],
+        "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "UserApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      }
+    },
+    "schemas": {
+      "SessionEventOpenApiDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "InputMessageEvent",
+                  "agent.session.input.message"
+                ]
+              },
+              "clientEventId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "content": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["text"]
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "text"],
+                              "additionalProperties": false
+                            }
+                          }
+                        ]
+                      },
+                      "text": {
+                        "description": "Ordinary Turns require readable string text. A linked single-select clarification accepts a string or one-element string array; a linked multi-select clarification requires a non-empty string array.",
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 9,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        ]
+                      },
+                      "userFileIds": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "clarificationSourceTurnId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "billingTag": {
+                        "nullable": true,
+                        "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/BillingTag"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["content"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "content": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["text"]
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "text"],
+                              "additionalProperties": false
+                            }
+                          }
+                        ]
+                      },
+                      "text": {
+                        "description": "Ordinary Turns require readable string text. A linked single-select clarification accepts a string or one-element string array; a linked multi-select clarification requires a non-empty string array.",
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 9,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        ]
+                      },
+                      "userFileIds": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "clarificationSourceTurnId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "billingTag": {
+                        "nullable": true,
+                        "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/BillingTag"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["text"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": ["type", "clientEventId", "data"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "cancel",
+                  "InputCancelEvent",
+                  "agent.session.input.cancel"
+                ]
+              },
+              "clientEventId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "clientEventId", "data"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retry",
+                  "InputRetryEvent",
+                  "agent.session.input.retry"
+                ]
+              },
+              "clientEventId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["turnId"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "clientEventId", "data"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["agent.session.input.client_tool_output"]
+              },
+              "clientEventId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "data": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "callId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "output": {
+                        "type": "string",
+                        "maxLength": 65536
+                      }
+                    },
+                    "required": ["turnId", "callId", "output"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "callId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "error": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                          }
+                        },
+                        "required": ["message"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["turnId", "callId", "error"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": ["type", "clientEventId", "data"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "BillingTag": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "value"],
+        "description": "A non-secret attribution label. The pair is matched exactly and is not an authorization boundary.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "description": "Case-sensitive key: a lowercase ASCII letter followed by up to 63 lowercase ASCII letters, digits, underscores, dots, or hyphens."
+          },
+          "value": {
+            "type": "string",
+            "description": "Case-sensitive value normalized to NFC and limited to 1–128 bytes in UTF-8. Leading or trailing Unicode whitespace and Unicode control or format characters are rejected."
+          }
+        }
+      },
+      "SessionInteractionResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "interaction": {
+            "type": "object",
+            "properties": {
+              "inputId": {
+                "type": "string"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["message", "cancel", "retry", "client_tool_output"]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "started",
+                  "steered",
+                  "cancelled",
+                  "accepted",
+                  "rejected"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["user"]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": ["id", "role", "content", "createdAt"],
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "appliedAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "rejection": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "interaction_admission_closed",
+                      "interaction_target_conflict",
+                      "client_tool_call_unavailable",
+                      "client_tool_call_settled"
+                    ]
+                  }
+                },
+                "required": ["code"],
+                "nullable": true
+              },
+              "result": {
+                "description": "Original execution-generation settlement. Immutable after terminal publication, including across explicit checkpoint retry.",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["running", "succeeded", "failed", "interrupted"]
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": ["status", "completedAt"]
+              }
+            },
+            "required": [
+              "inputId",
+              "sequence",
+              "kind",
+              "mode",
+              "turnId",
+              "message",
+              "createdAt",
+              "appliedAt",
+              "rejection",
+              "result"
+            ]
+          }
+        },
+        "required": ["interaction"]
+      },
+      "SessionEventRetryResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {
+              "clientEventId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string",
+                "enum": ["retrying"]
+              }
+            },
+            "required": ["clientEventId", "sessionId", "turnId", "disposition"]
+          }
+        },
+        "required": ["event"]
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent_instructions_too_large",
+                  "hardware_connection_unavailable",
+                  "websocket_required",
+                  "hardware_binding_unavailable",
+                  "hardware_registration_unavailable",
+                  "binding_commit_unknown",
+                  "hardware_credential_unavailable",
+                  "hardware_command_closed",
+                  "hardware_command_outcome_unknown",
+                  "binding_receipt_integrity",
+                  "validation_error",
+                  "template_test_busy",
+                  "template_test_closed",
+                  "template_test_expired",
+                  "template_test_dependency_unavailable",
+                  "template_test_model_unavailable",
+                  "template_test_authority_lost",
+                  "invalid_organization_context",
+                  "authentication_required",
+                  "organization_owner_required",
+                  "organization_last_owner",
+                  "organization_already_joined",
+                  "resource_not_found",
+                  "invalid_cursor",
+                  "console_temporarily_unavailable",
+                  "service_configuration_unavailable",
+                  "human_principal_required",
+                  "user_api_key_required",
+                  "organization_membership_required",
+                  "admin_required",
+                  "org_admin_required",
+                  "agent_not_found",
+                  "agent_template_creation_conflict",
+                  "agent_template_apply_busy",
+                  "agent_template_recall_acknowledgment_required",
+                  "requires_explicit_agent_creation",
+                  "agent_template_application_conflict",
+                  "agent_template_dependency_conflict",
+                  "agent_template_unavailable",
+                  "session_agent_required",
+                  "session_agent_unavailable",
+                  "session_model_not_allowed",
+                  "session_execution_dependency_unavailable",
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "sandbox_validation_pending",
+                  "sandbox_scope_incompatible",
+                  "sandbox_configuration_incompatible",
+                  "sandbox_unavailable",
+                  "vision_model_unsupported",
+                  "vision_image_count_exceeded",
+                  "vision_image_unsupported",
+                  "vision_image_source_too_large",
+                  "vision_image_invalid",
+                  "vision_image_decode_limit_exceeded",
+                  "vision_image_payload_too_large",
+                  "vision_image_processing_unavailable",
+                  "organization_default_agent_unconfigured",
+                  "user_default_agent_mapping_invalid",
+                  "session_not_found",
+                  "session_read_only",
+                  "provider_unavailable",
+                  "realtime_connection_not_found",
+                  "realtime_connection_live",
+                  "realtime_model_conflict",
+                  "realtime_model_unavailable",
+                  "realtime_not_enabled",
+                  "realtime_language_unsupported",
+                  "realtime_language_unavailable",
+                  "realtime_connection_ended",
+                  "audio_format_unsupported",
+                  "admission_unavailable",
+                  "turn_not_found",
+                  "checkpoint_runtime_unavailable",
+                  "artifact_not_found",
+                  "chat_image_not_found",
+                  "artifact_cursor_invalid",
+                  "artifact_idempotency_conflict",
+                  "artifact_quota_exceeded",
+                  "artifact_not_writable",
+                  "artifact_revision_conflict",
+                  "artifact_source_not_found",
+                  "artifact_source_not_file",
+                  "artifact_source_changed",
+                  "artifact_storage_contract_unavailable",
+                  "artifact_publish_failed",
+                  "artifact_bytes_need_repair",
+                  "drive_file_not_found",
+                  "drive_path_too_long",
+                  "drive_download_rate_limited",
+                  "llm_spend_limit_exhausted",
+                  "drive_download_provider_error",
+                  "drive_download_unavailable",
+                  "invalid_idempotency_key",
+                  "idempotency_key_required",
+                  "session_creation_conflict",
+                  "agent_creation_conflict",
+                  "interaction_input_conflict",
+                  "interaction_not_found",
+                  "interaction_admission_closed",
+                  "interaction_target_conflict",
+                  "client_tool_call_unavailable",
+                  "client_tool_call_settled",
+                  "idempotency_key_reused",
+                  "identity_conversion_command_retired",
+                  "idempotency_in_progress",
+                  "idempotency_key_expired",
+                  "secret_delivery_expired",
+                  "idempotency_completion_failed",
+                  "idempotency_witness_invalid",
+                  "skill_name_conflict",
+                  "skill_delete_blocked",
+                  "invalid_skill_package",
+                  "skill_ingestion_not_found",
+                  "skill_import_job_not_found",
+                  "skill_import_state_conflict",
+                  "skill_ingestion_expired",
+                  "precondition_required",
+                  "precondition_failed",
+                  "resource_conflict",
+                  "hardware_model_conflict",
+                  "hardware_model_in_use",
+                  "agent_template_profile_unavailable",
+                  "agent_template_dependency_unavailable",
+                  "agent_template_archived",
+                  "agent_template_conflict",
+                  "agent_template_list_changed",
+                  "skill_not_found",
+                  "skill_version_not_found",
+                  "skill_file_not_found",
+                  "skill_package_file_rejected",
+                  "skill_package_store_unavailable",
+                  "skill_head_required",
+                  "skill_canonical_name_conflict",
+                  "skill_already_installed",
+                  "skill_installation_not_found",
+                  "skill_upgrade_not_forward",
+                  "unsupported_media_type",
+                  "raw_upload_too_large",
+                  "upload_too_large",
+                  "upload_ticket_invalid",
+                  "upload_failed",
+                  "upload_expired",
+                  "upload_incomplete",
+                  "upload_integrity_failed",
+                  "upload_requires_multipart",
+                  "upload_temporarily_unavailable",
+                  "skill_authoring_forbidden",
+                  "skill_read_forbidden",
+                  "restore_requires_historical_version",
+                  "private_skill_required",
+                  "publication_head_required",
+                  "open_publication_request_exists",
+                  "publication_target_changed",
+                  "publication_conflict",
+                  "publication_request_not_found",
+                  "publication_request_already_decided",
+                  "publication_request_invalidated",
+                  "publication_request_conflict",
+                  "publication_snapshot_not_found",
+                  "scheduler_not_found",
+                  "asr_disabled",
+                  "asr_failed",
+                  "turn_admission_closed",
+                  "session_has_active_turn",
+                  "clarification_source_conflict",
+                  "configuration_unavailable",
+                  "organization_api_key_rotation_conflict",
+                  "auth_kind_forbidden",
+                  "billing_target_not_found",
+                  "invalid_billing_usage_query",
+                  "invalid_billing_usage_cursor",
+                  "billing_audit_unavailable",
+                  "session_observation_audit_unavailable",
+                  "drive9_provision_config_conflict",
+                  "runtime_error",
+                  "invalid_credentials",
+                  "invalid_current_password",
+                  "account_already_exists",
+                  "account_not_found",
+                  "password_not_configured",
+                  "password_already_configured",
+                  "google_identity_already_linked",
+                  "verification_not_found",
+                  "verification_code_invalid",
+                  "verification_replaced",
+                  "verification_already_completed",
+                  "verification_expired",
+                  "verification_attempts_exhausted",
+                  "verification_rate_limited",
+                  "login_rate_limited",
+                  "password_rate_limited",
+                  "auth_temporarily_unavailable",
+                  "auth_outcome_unknown",
+                  "password_changed",
+                  "invalid_origin",
+                  "platform_operator_required",
+                  "personal_organization_eligibility_concurrent_change",
+                  "personal_organization_eligibility_unavailable",
+                  "personal_organization_eligibility_outcome_unknown",
+                  "personal_organization_creation_unavailable",
+                  "onboarding_temporarily_unavailable",
+                  "onboarding_outcome_unknown",
+                  "organization_destination_not_available",
+                  "invitation_not_available",
+                  "invitation_not_actionable",
+                  "invite_delivery_failed",
+                  "access_request_not_available",
+                  "access_requests_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "SessionInteractionsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "interactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "inputId": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["message", "cancel", "retry", "client_tool_output"]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "started",
+                    "steered",
+                    "cancelled",
+                    "accepted",
+                    "rejected"
+                  ]
+                },
+                "turnId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["user"]
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "role", "content", "createdAt"],
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "appliedAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "rejection": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "interaction_admission_closed",
+                        "interaction_target_conflict",
+                        "client_tool_call_unavailable",
+                        "client_tool_call_settled"
+                      ]
+                    }
+                  },
+                  "required": ["code"],
+                  "nullable": true
+                },
+                "result": {
+                  "description": "Original execution-generation settlement. Immutable after terminal publication, including across explicit checkpoint retry.",
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["running", "succeeded", "failed", "interrupted"]
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["status", "completedAt"]
+                }
+              },
+              "required": [
+                "inputId",
+                "sequence",
+                "kind",
+                "mode",
+                "turnId",
+                "message",
+                "createdAt",
+                "appliedAt",
+                "rejection",
+                "result"
+              ]
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["interactions", "hasMore", "nextCursor"]
+      },
+      "TurnsResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "executor": {
+                  "type": "string",
+                  "enum": ["full_agent", "realtime_model"]
+                },
+                "realtime": {
+                  "type": "object",
+                  "properties": {
+                    "connectionId": {
+                      "type": "string"
+                    },
+                    "linkedTurnIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["connectionId", "linkedTurnIds"]
+                },
+                "realtimeResponses": {
+                  "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "turnId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": ["user", "assistant"]
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "inputContext": {
+                        "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["text"]
+                              }
+                            },
+                            "required": ["channel"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["audio"]
+                              },
+                              "utterance": {
+                                "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8000
+                              },
+                              "emotion": {
+                                "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "confidence": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": false,
+                                    "maximum": 1,
+                                    "exclusiveMaximum": false
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "enum": ["realtime_model"]
+                                  }
+                                },
+                                "required": ["label", "confidence", "source"]
+                              },
+                              "realtimeSummary": {
+                                "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8000
+                              }
+                            },
+                            "required": ["channel"]
+                          },
+                          {
+                            "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["standing_task"]
+                              }
+                            },
+                            "required": ["channel"]
+                          }
+                        ]
+                      },
+                      "realtime": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "startsTurn": {
+                                "type": "boolean"
+                              },
+                              "linkedTurnId": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["startsTurn", "linkedTurnId"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "chat",
+                                  "task_ack",
+                                  "task_progress",
+                                  "task_result",
+                                  "clarify",
+                                  "device_ack"
+                                ]
+                              },
+                              "interrupted": {
+                                "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                "type": "boolean"
+                              },
+                              "responseId": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "linkedTurnId": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "interrupted",
+                              "responseId",
+                              "linkedTurnId"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "sessionId",
+                      "turnId",
+                      "role",
+                      "content",
+                      "createdAt"
+                    ]
+                  }
+                },
+                "id": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["running", "succeeded", "failed", "interrupted"]
+                },
+                "billingTag": {
+                  "nullable": true,
+                  "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BillingTag"
+                    }
+                  ]
+                },
+                "userMessage": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "turnId": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["user", "assistant"]
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "inputContext": {
+                      "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["text"]
+                            }
+                          },
+                          "required": ["channel"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["audio"]
+                            },
+                            "utterance": {
+                              "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8000
+                            },
+                            "emotion": {
+                              "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "confidence": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "exclusiveMinimum": false,
+                                  "maximum": 1,
+                                  "exclusiveMaximum": false
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": ["realtime_model"]
+                                }
+                              },
+                              "required": ["label", "confidence", "source"]
+                            },
+                            "realtimeSummary": {
+                              "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8000
+                            }
+                          },
+                          "required": ["channel"]
+                        },
+                        {
+                          "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["standing_task"]
+                            }
+                          },
+                          "required": ["channel"]
+                        }
+                      ]
+                    },
+                    "realtime": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "startsTurn": {
+                              "type": "boolean"
+                            },
+                            "linkedTurnId": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["startsTurn", "linkedTurnId"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "chat",
+                                "task_ack",
+                                "task_progress",
+                                "task_result",
+                                "clarify",
+                                "device_ack"
+                              ]
+                            },
+                            "interrupted": {
+                              "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                              "type": "boolean"
+                            },
+                            "responseId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "linkedTurnId": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "interrupted",
+                            "responseId",
+                            "linkedTurnId"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sessionId",
+                    "turnId",
+                    "role",
+                    "content",
+                    "createdAt"
+                  ]
+                },
+                "userMessages": {
+                  "description": "Canonical admitted user Messages in input order; includes accepted inputs interrupted before incorporation.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "turnId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": ["user", "assistant"]
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "inputContext": {
+                        "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["text"]
+                              }
+                            },
+                            "required": ["channel"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["audio"]
+                              },
+                              "utterance": {
+                                "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8000
+                              },
+                              "emotion": {
+                                "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "confidence": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": false,
+                                    "maximum": 1,
+                                    "exclusiveMaximum": false
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "enum": ["realtime_model"]
+                                  }
+                                },
+                                "required": ["label", "confidence", "source"]
+                              },
+                              "realtimeSummary": {
+                                "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8000
+                              }
+                            },
+                            "required": ["channel"]
+                          },
+                          {
+                            "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                            "type": "object",
+                            "properties": {
+                              "channel": {
+                                "type": "string",
+                                "enum": ["standing_task"]
+                              }
+                            },
+                            "required": ["channel"]
+                          }
+                        ]
+                      },
+                      "realtime": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "startsTurn": {
+                                "type": "boolean"
+                              },
+                              "linkedTurnId": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["startsTurn", "linkedTurnId"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "chat",
+                                  "task_ack",
+                                  "task_progress",
+                                  "task_result",
+                                  "clarify",
+                                  "device_ack"
+                                ]
+                              },
+                              "interrupted": {
+                                "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                "type": "boolean"
+                              },
+                              "responseId": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "linkedTurnId": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "interrupted",
+                              "responseId",
+                              "linkedTurnId"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "sessionId",
+                      "turnId",
+                      "role",
+                      "content",
+                      "createdAt"
+                    ]
+                  }
+                },
+                "userFiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "organizationId": {
+                        "type": "string"
+                      },
+                      "userFileId": {
+                        "type": "string"
+                      },
+                      "ordinal": {
+                        "type": "integer"
+                      },
+                      "originalName": {
+                        "type": "string"
+                      },
+                      "safeName": {
+                        "type": "string"
+                      },
+                      "drivePath": {
+                        "type": "string"
+                      },
+                      "byteSize": {
+                        "type": "integer"
+                      },
+                      "sha256": {
+                        "type": "string"
+                      },
+                      "checksumVerification": {
+                        "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part.",
+                        "type": "string",
+                        "enum": ["whole", "part_only"],
+                        "nullable": true
+                      },
+                      "contentType": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "turnId",
+                      "sessionId",
+                      "organizationId",
+                      "userFileId",
+                      "ordinal",
+                      "originalName",
+                      "safeName",
+                      "drivePath",
+                      "byteSize",
+                      "sha256",
+                      "checksumVerification",
+                      "contentType",
+                      "createdAt"
+                    ]
+                  }
+                },
+                "operations": {
+                  "description": "Operations performed by the Turn. drive.commit is recorded only after a workspace tool attempt.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "turnId": {
+                        "type": "string"
+                      },
+                      "scope": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "backend": {
+                        "type": "string"
+                      },
+                      "targetKind": {
+                        "type": "string"
+                      },
+                      "mediator": {
+                        "type": "string",
+                        "enum": ["aos"]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "running",
+                          "succeeded",
+                          "failed",
+                          "interrupted",
+                          "unknown_result"
+                        ]
+                      },
+                      "category": {
+                        "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations.",
+                        "type": "string",
+                        "enum": ["tool_call", "skill_read"]
+                      },
+                      "skill": {
+                        "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
+                        "type": "object",
+                        "properties": {
+                          "skillId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["skillId", "name"]
+                      },
+                      "source": {
+                        "description": "Client Tool source. Hardware exposes only requirement and original method; private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": ["session_client"]
+                              }
+                            },
+                            "required": ["type"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": ["hardware"]
+                              },
+                              "hardwareRequirementId": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+                              },
+                              "method": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "hardwareRequirementId",
+                              "method"
+                            ]
+                          }
+                        ]
+                      },
+                      "label": {
+                        "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                        "type": "string",
+                        "maxLength": 322
+                      },
+                      "input": {
+                        "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                      },
+                      "output": {
+                        "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                      },
+                      "resultPointer": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "completedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "sessionId",
+                      "turnId",
+                      "scope",
+                      "kind",
+                      "backend",
+                      "targetKind",
+                      "mediator",
+                      "status",
+                      "input",
+                      "resultPointer",
+                      "createdAt"
+                    ]
+                  }
+                },
+                "assistantMessage": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "turnId": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["user", "assistant"]
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "inputContext": {
+                      "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["text"]
+                            }
+                          },
+                          "required": ["channel"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["audio"]
+                            },
+                            "utterance": {
+                              "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8000
+                            },
+                            "emotion": {
+                              "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "confidence": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "exclusiveMinimum": false,
+                                  "maximum": 1,
+                                  "exclusiveMaximum": false
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": ["realtime_model"]
+                                }
+                              },
+                              "required": ["label", "confidence", "source"]
+                            },
+                            "realtimeSummary": {
+                              "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8000
+                            }
+                          },
+                          "required": ["channel"]
+                        },
+                        {
+                          "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": ["standing_task"]
+                            }
+                          },
+                          "required": ["channel"]
+                        }
+                      ]
+                    },
+                    "realtime": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "startsTurn": {
+                              "type": "boolean"
+                            },
+                            "linkedTurnId": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["startsTurn", "linkedTurnId"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "chat",
+                                "task_ack",
+                                "task_progress",
+                                "task_result",
+                                "clarify",
+                                "device_ack"
+                              ]
+                            },
+                            "interrupted": {
+                              "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                              "type": "boolean"
+                            },
+                            "responseId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "linkedTurnId": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "interrupted",
+                            "responseId",
+                            "linkedTurnId"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sessionId",
+                    "turnId",
+                    "role",
+                    "content",
+                    "createdAt"
+                  ],
+                  "nullable": true
+                },
+                "clarificationItem": {
+                  "description": "A structured blocking question and its optional persisted response.",
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "selectionMode": {
+                          "description": "Requires exactly one answer and two or three mutually exclusive candidates.",
+                          "type": "string",
+                          "enum": ["single"]
+                        },
+                        "answerChoices": {
+                          "description": "Candidate display order is also the canonical structured-answer order.",
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 3,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "response": {
+                          "type": "object",
+                          "properties": {
+                            "responseTurnId": {
+                              "type": "string"
+                            },
+                            "answers": {
+                              "description": "The single structured answer.",
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "required": ["responseTurnId", "answers"]
+                        }
+                      },
+                      "required": ["prompt", "selectionMode", "answerChoices"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "selectionMode": {
+                          "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates.",
+                          "type": "string",
+                          "enum": ["multiple"]
+                        },
+                        "answerChoices": {
+                          "description": "Candidate display order is also the canonical structured-answer order.",
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 8,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "response": {
+                          "type": "object",
+                          "properties": {
+                            "responseTurnId": {
+                              "type": "string"
+                            },
+                            "answers": {
+                              "description": "Distinct structured values in candidate display order, followed by at most one user-supplied answer.",
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 9,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "required": ["responseTurnId", "answers"]
+                        }
+                      },
+                      "required": ["prompt", "selectionMode", "answerChoices"]
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "completedAt": {
+                  "type": "string"
+                },
+                "sourceFireId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "failure": {
+                  "description": "A failed Turn's saved turn_error payload, identical to its turn_error event.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "description": "service_configuration_unavailable, model_provider_failed, runtime_error or another stable failure code.",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "Fixed text for the code; never supplier or internal error text.",
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "reason": {
+                          "description": "With service_configuration_unavailable: the missing service.",
+                          "type": "string",
+                          "enum": [
+                            "model_provider_unconfigured",
+                            "sandbox_unconfigured",
+                            "drive9_unconfigured",
+                            "drive9_disabled_for_organization"
+                          ]
+                        },
+                        "provider": {
+                          "description": "With model_provider_failed: the failure category, supplier HTTP status and supplier error type and code. Never supplier message text, request paths or credentials.",
+                          "type": "object",
+                          "properties": {
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "authentication",
+                                "supplier_error",
+                                "supplier_unavailable",
+                                "network",
+                                "provider_stream_error"
+                              ]
+                            },
+                            "httpStatus": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "errorType": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "errorCode": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "category",
+                            "httpStatus",
+                            "errorType",
+                            "errorCode"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              },
+              "required": [
+                "executor",
+                "id",
+                "sessionId",
+                "status",
+                "billingTag",
+                "userMessage",
+                "userMessages",
+                "operations",
+                "assistantMessage",
+                "createdAt"
+              ]
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["turns", "hasMore", "nextCursor"]
+      },
+      "TurnResponse": {
+        "type": "object",
+        "required": ["turn"],
+        "properties": {
+          "turn": {
+            "$ref": "#/components/schemas/Turn"
+          }
+        }
+      },
+      "Turn": {
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "status",
+          "userMessage",
+          "userMessages",
+          "operations",
+          "assistantMessage",
+          "createdAt",
+          "billingTag"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "succeeded", "failed", "interrupted"]
+          },
+          "userMessage": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "userMessages": {
+            "type": "array",
+            "description": "Canonical admitted user Messages in input order; includes accepted inputs interrupted before incorporation.",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "userFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TurnUserFile"
+            }
+          },
+          "operations": {
+            "description": "Operations performed by the Turn. drive.commit is recorded only after a workspace tool attempt.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "assistantMessage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              }
+            ],
+            "nullable": true
+          },
+          "clarificationItem": {
+            "$ref": "#/components/schemas/ClarificationItem"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceFireId": {
+            "type": "string",
+            "nullable": true
+          },
+          "billingTag": {
+            "nullable": true,
+            "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BillingTag"
+              }
+            ]
+          },
+          "failure": {
+            "description": "Present only on a failed Turn that saved a turn_error event; identical to that event's payload. Older failed Turns without one omit it.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TurnFailure"
+              }
+            ]
+          },
+          "executor": {
+            "type": "string",
+            "enum": ["full_agent", "realtime_model"]
+          },
+          "realtime": {
+            "type": "object",
+            "properties": {
+              "connectionId": {
+                "type": "string"
+              },
+              "linkedTurnIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["connectionId", "linkedTurnIds"]
+          },
+          "realtimeResponses": {
+            "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["user", "assistant"]
+                },
+                "content": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "inputContext": {
+                  "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "channel": {
+                          "type": "string",
+                          "enum": ["text"]
+                        }
+                      },
+                      "required": ["channel"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "channel": {
+                          "type": "string",
+                          "enum": ["audio"]
+                        },
+                        "utterance": {
+                          "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        },
+                        "emotion": {
+                          "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": false,
+                              "maximum": 1,
+                              "exclusiveMaximum": false
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": ["realtime_model"]
+                            }
+                          },
+                          "required": ["label", "confidence", "source"]
+                        },
+                        "realtimeSummary": {
+                          "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": ["channel"]
+                    },
+                    {
+                      "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                      "type": "object",
+                      "properties": {
+                        "channel": {
+                          "type": "string",
+                          "enum": ["standing_task"]
+                        }
+                      },
+                      "required": ["channel"]
+                    }
+                  ]
+                },
+                "realtime": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "startsTurn": {
+                          "type": "boolean"
+                        },
+                        "linkedTurnId": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["startsTurn", "linkedTurnId"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "chat",
+                            "task_ack",
+                            "task_progress",
+                            "task_result",
+                            "clarify",
+                            "device_ack"
+                          ]
+                        },
+                        "interrupted": {
+                          "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                          "type": "boolean"
+                        },
+                        "responseId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "linkedTurnId": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "interrupted",
+                        "responseId",
+                        "linkedTurnId"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "sessionId",
+                "turnId",
+                "role",
+                "content",
+                "createdAt"
+              ]
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "turnId",
+          "role",
+          "content",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "turnId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant"]
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inputContext": {
+            "$ref": "#/components/schemas/MessageInputContext"
+          },
+          "realtime": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "startsTurn": {
+                    "type": "boolean"
+                  },
+                  "linkedTurnId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": ["startsTurn", "linkedTurnId"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "chat",
+                      "task_ack",
+                      "task_progress",
+                      "task_result",
+                      "clarify",
+                      "device_ack"
+                    ]
+                  },
+                  "interrupted": {
+                    "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                    "type": "boolean"
+                  },
+                  "responseId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "linkedTurnId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "kind",
+                  "interrupted",
+                  "responseId",
+                  "linkedTurnId"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "MessageInputContext": {
+        "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["channel"],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": ["text"]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["channel"],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": ["audio"]
+              },
+              "utterance": {
+                "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000
+              },
+              "emotion": {
+                "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                "type": "object",
+                "required": ["label", "confidence", "source"],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["realtime_model"]
+                  }
+                }
+              },
+              "realtimeSummary": {
+                "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000
+              }
+            }
+          },
+          {
+            "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+            "type": "object",
+            "required": ["channel"],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": ["standing_task"]
+              }
+            }
+          }
+        ]
+      },
+      "TurnUserFile": {
+        "type": "object",
+        "properties": {
+          "turnId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "userFileId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer"
+          },
+          "originalName": {
+            "type": "string"
+          },
+          "safeName": {
+            "type": "string"
+          },
+          "drivePath": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "checksumVerification": {
+            "type": "string",
+            "enum": ["whole", "part_only"],
+            "nullable": true
+          },
+          "contentType": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "turnId",
+          "sessionId",
+          "organizationId",
+          "userFileId",
+          "ordinal",
+          "originalName",
+          "safeName",
+          "drivePath",
+          "byteSize",
+          "sha256",
+          "checksumVerification",
+          "contentType",
+          "createdAt"
+        ]
+      },
+      "Operation": {
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "turnId",
+          "scope",
+          "kind",
+          "backend",
+          "targetKind",
+          "mediator",
+          "status",
+          "input",
+          "resultPointer",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "turnId": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "kind": {
+            "type": "string",
+            "description": "Historical long-term Memory Operations remain records only."
+          },
+          "backend": {
+            "type": "string",
+            "description": "Historical long-term Memory Operations may retain the `mem9` backend value."
+          },
+          "targetKind": {
+            "type": "string",
+            "description": "Historical long-term Memory Operations may retain the `memory` target kind."
+          },
+          "mediator": {
+            "type": "string",
+            "enum": ["aos"]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed",
+              "interrupted",
+              "unknown_result"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": ["tool_call", "skill_read"],
+            "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations."
+          },
+          "skill": {
+            "$ref": "#/components/schemas/OperationSkill"
+          },
+          "input": {
+            "description": "Kind-specific input. Hardware Client Tool Operations expose only toolName, callId and mode, omitting device arguments."
+          },
+          "output": {
+            "description": "Hardware Client Tool Operations omit output in every status. Kind-specific result. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+          },
+          "resultPointer": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ClientToolOperationSource"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 322,
+            "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations."
+          }
+        }
+      },
+      "OperationSkill": {
+        "type": "object",
+        "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
+        "required": ["skillId", "name"],
+        "properties": {
+          "skillId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientToolOperationSource": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["session_client"]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "hardwareRequirementId", "method"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["hardware"]
+              },
+              "hardwareRequirementId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+              }
+            }
+          }
+        ],
+        "description": "Client Tool source; only safe requirement and original method are exposed for Hardware. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source."
+      },
+      "ClarificationItem": {
+        "description": "A structured blocking question and its optional canonical persisted response. The linked user Message remains the readable conversation projection.",
+        "discriminator": {
+          "propertyName": "selectionMode"
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["prompt", "selectionMode", "answerChoices"],
+            "properties": {
+              "prompt": {
+                "type": "string"
+              },
+              "selectionMode": {
+                "type": "string",
+                "enum": ["single"],
+                "description": "Requires exactly one answer and two or three mutually exclusive candidates."
+              },
+              "answerChoices": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "description": "Candidate display order is also the canonical structured-answer order.",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "response": {
+                "type": "object",
+                "required": ["answers", "responseTurnId"],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "description": "The single structured answer.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "responseTurnId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["prompt", "selectionMode", "answerChoices"],
+            "properties": {
+              "prompt": {
+                "type": "string"
+              },
+              "selectionMode": {
+                "type": "string",
+                "enum": ["multiple"],
+                "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates."
+              },
+              "answerChoices": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 8,
+                "description": "Candidate display order is also the canonical structured-answer order.",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "response": {
+                "type": "object",
+                "required": ["answers", "responseTurnId"],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 9,
+                    "description": "Distinct structured values in candidate display order, followed by at most one user-supplied answer.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "responseTurnId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TurnFailure": {
+        "type": "object",
+        "description": "A failed Turn's public error, as carried by its turn_error event and Turn.failure. The message is fixed text for the code and never contains supplier or internal error text.",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "service_configuration_unavailable (details.reason names the missing service), model_provider_failed (details.provider carries bounded supplier facts), runtime_error, interrupted, or another stable failure code."
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "description": "Present only with code service_configuration_unavailable, when the Turn failed because the deployment or Organization lacks a service it needs. The reason and message match the service_configuration_unavailable error response.",
+                "type": "string",
+                "enum": [
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "drive9_unconfigured",
+                  "drive9_disabled_for_organization"
+                ]
+              },
+              "provider": {
+                "description": "Present only with code model_provider_failed. The failure category, the HTTP status the supplier returned and the supplier's own error type and code, each null when unknown. A supplier redirect is never followed and reads as supplier_error with the 3xx status and errorType redirect. Never supplier message text, request paths or credentials.",
+                "type": "object",
+                "required": [
+                  "category",
+                  "httpStatus",
+                  "errorType",
+                  "errorCode"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "authentication",
+                      "supplier_error",
+                      "supplier_unavailable",
+                      "network",
+                      "provider_stream_error"
+                    ]
+                  },
+                  "httpStatus": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "errorType": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "errorCode": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SessionTimelineResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["turn"]
+                    },
+                    "turn": {
+                      "type": "object",
+                      "properties": {
+                        "executor": {
+                          "description": "Always returned by /turns list and detail; older Turn surfaces may omit it.",
+                          "type": "string",
+                          "enum": ["full_agent", "realtime_model"]
+                        },
+                        "realtime": {
+                          "type": "object",
+                          "properties": {
+                            "connectionId": {
+                              "type": "string"
+                            },
+                            "linkedTurnIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["connectionId", "linkedTurnIds"]
+                        },
+                        "realtimeResponses": {
+                          "description": "Narration-only Realtime responses about this Full Agent Turn, in Session sequence order.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "sessionId": {
+                                "type": "string"
+                              },
+                              "turnId": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": ["user", "assistant"]
+                              },
+                              "content": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "inputContext": {
+                                "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["text"]
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["audio"]
+                                      },
+                                      "utterance": {
+                                        "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8000
+                                      },
+                                      "emotion": {
+                                        "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                        "type": "object",
+                                        "properties": {
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "confidence": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "exclusiveMinimum": false,
+                                            "maximum": 1,
+                                            "exclusiveMaximum": false
+                                          },
+                                          "source": {
+                                            "type": "string",
+                                            "enum": ["realtime_model"]
+                                          }
+                                        },
+                                        "required": [
+                                          "label",
+                                          "confidence",
+                                          "source"
+                                        ]
+                                      },
+                                      "realtimeSummary": {
+                                        "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8000
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  },
+                                  {
+                                    "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["standing_task"]
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  }
+                                ]
+                              },
+                              "realtime": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "startsTurn": {
+                                        "type": "boolean"
+                                      },
+                                      "linkedTurnId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": ["startsTurn", "linkedTurnId"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "chat",
+                                          "task_ack",
+                                          "task_progress",
+                                          "task_result",
+                                          "clarify",
+                                          "device_ack"
+                                        ]
+                                      },
+                                      "interrupted": {
+                                        "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                        "type": "boolean"
+                                      },
+                                      "responseId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "linkedTurnId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "interrupted",
+                                      "responseId",
+                                      "linkedTurnId"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sessionId",
+                              "turnId",
+                              "role",
+                              "content",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "succeeded",
+                            "failed",
+                            "interrupted"
+                          ]
+                        },
+                        "billingTag": {
+                          "nullable": true,
+                          "description": "One immutable Billing Tag snapshot for this resource. Null means untagged; request fields may be omitted only where the operation documents inheritance.",
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/BillingTag"
+                            }
+                          ]
+                        },
+                        "userMessage": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "sessionId": {
+                              "type": "string"
+                            },
+                            "turnId": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": ["user", "assistant"]
+                            },
+                            "content": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "inputContext": {
+                              "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["text"]
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["audio"]
+                                    },
+                                    "utterance": {
+                                      "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 8000
+                                    },
+                                    "emotion": {
+                                      "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 64
+                                        },
+                                        "confidence": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "exclusiveMinimum": false,
+                                          "maximum": 1,
+                                          "exclusiveMaximum": false
+                                        },
+                                        "source": {
+                                          "type": "string",
+                                          "enum": ["realtime_model"]
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "confidence",
+                                        "source"
+                                      ]
+                                    },
+                                    "realtimeSummary": {
+                                      "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 8000
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                },
+                                {
+                                  "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["standing_task"]
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                }
+                              ]
+                            },
+                            "realtime": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "startsTurn": {
+                                      "type": "boolean"
+                                    },
+                                    "linkedTurnId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": ["startsTurn", "linkedTurnId"]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "chat",
+                                        "task_ack",
+                                        "task_progress",
+                                        "task_result",
+                                        "clarify",
+                                        "device_ack"
+                                      ]
+                                    },
+                                    "interrupted": {
+                                      "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                      "type": "boolean"
+                                    },
+                                    "responseId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "linkedTurnId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "interrupted",
+                                    "responseId",
+                                    "linkedTurnId"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "sessionId",
+                            "turnId",
+                            "role",
+                            "content",
+                            "createdAt"
+                          ]
+                        },
+                        "userMessages": {
+                          "description": "Canonical admitted user Messages in input order; includes accepted inputs interrupted before incorporation.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "sessionId": {
+                                "type": "string"
+                              },
+                              "turnId": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": ["user", "assistant"]
+                              },
+                              "content": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "inputContext": {
+                                "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["text"]
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["audio"]
+                                      },
+                                      "utterance": {
+                                        "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8000
+                                      },
+                                      "emotion": {
+                                        "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                        "type": "object",
+                                        "properties": {
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "confidence": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "exclusiveMinimum": false,
+                                            "maximum": 1,
+                                            "exclusiveMaximum": false
+                                          },
+                                          "source": {
+                                            "type": "string",
+                                            "enum": ["realtime_model"]
+                                          }
+                                        },
+                                        "required": [
+                                          "label",
+                                          "confidence",
+                                          "source"
+                                        ]
+                                      },
+                                      "realtimeSummary": {
+                                        "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 8000
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  },
+                                  {
+                                    "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                                    "type": "object",
+                                    "properties": {
+                                      "channel": {
+                                        "type": "string",
+                                        "enum": ["standing_task"]
+                                      }
+                                    },
+                                    "required": ["channel"]
+                                  }
+                                ]
+                              },
+                              "realtime": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "startsTurn": {
+                                        "type": "boolean"
+                                      },
+                                      "linkedTurnId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": ["startsTurn", "linkedTurnId"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "chat",
+                                          "task_ack",
+                                          "task_progress",
+                                          "task_result",
+                                          "clarify",
+                                          "device_ack"
+                                        ]
+                                      },
+                                      "interrupted": {
+                                        "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                        "type": "boolean"
+                                      },
+                                      "responseId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "linkedTurnId": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "interrupted",
+                                      "responseId",
+                                      "linkedTurnId"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sessionId",
+                              "turnId",
+                              "role",
+                              "content",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "userFiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "turnId": {
+                                "type": "string"
+                              },
+                              "sessionId": {
+                                "type": "string"
+                              },
+                              "organizationId": {
+                                "type": "string"
+                              },
+                              "userFileId": {
+                                "type": "string"
+                              },
+                              "ordinal": {
+                                "type": "integer"
+                              },
+                              "originalName": {
+                                "type": "string"
+                              },
+                              "safeName": {
+                                "type": "string"
+                              },
+                              "drivePath": {
+                                "type": "string"
+                              },
+                              "byteSize": {
+                                "type": "integer"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              },
+                              "checksumVerification": {
+                                "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part.",
+                                "type": "string",
+                                "enum": ["whole", "part_only"],
+                                "nullable": true
+                              },
+                              "contentType": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "turnId",
+                              "sessionId",
+                              "organizationId",
+                              "userFileId",
+                              "ordinal",
+                              "originalName",
+                              "safeName",
+                              "drivePath",
+                              "byteSize",
+                              "sha256",
+                              "checksumVerification",
+                              "contentType",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "operations": {
+                          "description": "Operations performed by the Turn. drive.commit is recorded only after a workspace tool attempt.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "sessionId": {
+                                "type": "string"
+                              },
+                              "turnId": {
+                                "type": "string"
+                              },
+                              "scope": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "backend": {
+                                "type": "string"
+                              },
+                              "targetKind": {
+                                "type": "string"
+                              },
+                              "mediator": {
+                                "type": "string",
+                                "enum": ["aos"]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "running",
+                                  "succeeded",
+                                  "failed",
+                                  "interrupted",
+                                  "unknown_result"
+                                ]
+                              },
+                              "category": {
+                                "description": "How to group a tool Operation: skill_read when it reads a file inside one of its AgentRun's frozen Skill packages, whether Runtime loaded the Skill instructions or the model read a package file; tool_call for every other tool Operation. Absent on non-tool Operations such as llm.complete and on metadata-only Operations.",
+                                "type": "string",
+                                "enum": ["tool_call", "skill_read"]
+                              },
+                              "skill": {
+                                "description": "The Skill a skill_read Operation read from; present only with category skill_read.",
+                                "type": "object",
+                                "properties": {
+                                  "skillId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["skillId", "name"]
+                              },
+                              "source": {
+                                "description": "Client Tool source. Hardware exposes only requirement and original method; private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["session_client"]
+                                      }
+                                    },
+                                    "required": ["type"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["hardware"]
+                                      },
+                                      "hardwareRequirementId": {
+                                        "type": "string",
+                                        "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+                                      },
+                                      "method": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "hardwareRequirementId",
+                                      "method"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "label": {
+                                "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                                "type": "string",
+                                "maxLength": 322
+                              },
+                              "input": {
+                                "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                              },
+                              "output": {
+                                "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                              },
+                              "resultPointer": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "completedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sessionId",
+                              "turnId",
+                              "scope",
+                              "kind",
+                              "backend",
+                              "targetKind",
+                              "mediator",
+                              "status",
+                              "input",
+                              "resultPointer",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "assistantMessage": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "sessionId": {
+                              "type": "string"
+                            },
+                            "turnId": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": ["user", "assistant"]
+                            },
+                            "content": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "inputContext": {
+                              "description": "Server-recorded channel of a user input; clients cannot set it. Present on user Messages except Scheduler-triggered Turns and Messages saved before it existed; absent on assistant Messages. Tolerate channel values added later.",
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["text"]
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["audio"]
+                                    },
+                                    "utterance": {
+                                      "description": "Transcript of the user's own speech when the Message content is a task delegated from it.",
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 8000
+                                    },
+                                    "emotion": {
+                                      "description": "Emotion the Realtime model perceived in the speech; not a verified fact.",
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 64
+                                        },
+                                        "confidence": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "exclusiveMinimum": false,
+                                          "maximum": 1,
+                                          "exclusiveMaximum": false
+                                        },
+                                        "source": {
+                                          "type": "string",
+                                          "enum": ["realtime_model"]
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "confidence",
+                                        "source"
+                                      ]
+                                    },
+                                    "realtimeSummary": {
+                                      "description": "Legacy field on Messages saved by earlier releases; new Messages omit it. The Realtime model's own summary of the preceding voice conversation; model-written, not a durable transcript.",
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 8000
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                },
+                                {
+                                  "description": "A Realtime Standing Task cycle: the platform started this Turn with the Template's standing goal while a Realtime Connection was live; nobody typed or spoke it.",
+                                  "type": "object",
+                                  "properties": {
+                                    "channel": {
+                                      "type": "string",
+                                      "enum": ["standing_task"]
+                                    }
+                                  },
+                                  "required": ["channel"]
+                                }
+                              ]
+                            },
+                            "realtime": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "startsTurn": {
+                                      "type": "boolean"
+                                    },
+                                    "linkedTurnId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": ["startsTurn", "linkedTurnId"]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "chat",
+                                        "task_ack",
+                                        "task_progress",
+                                        "task_result",
+                                        "clarify",
+                                        "device_ack"
+                                      ]
+                                    },
+                                    "interrupted": {
+                                      "description": "The reply was interrupted; its transcript may include speech the user did not hear.",
+                                      "type": "boolean"
+                                    },
+                                    "responseId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "linkedTurnId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "interrupted",
+                                    "responseId",
+                                    "linkedTurnId"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "sessionId",
+                            "turnId",
+                            "role",
+                            "content",
+                            "createdAt"
+                          ],
+                          "nullable": true
+                        },
+                        "clarificationItem": {
+                          "description": "A structured blocking question and its optional persisted response.",
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "prompt": {
+                                  "type": "string"
+                                },
+                                "selectionMode": {
+                                  "description": "Requires exactly one answer and two or three mutually exclusive candidates.",
+                                  "type": "string",
+                                  "enum": ["single"]
+                                },
+                                "answerChoices": {
+                                  "description": "Candidate display order is also the canonical structured-answer order.",
+                                  "type": "array",
+                                  "minItems": 2,
+                                  "maxItems": 3,
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "response": {
+                                  "type": "object",
+                                  "properties": {
+                                    "responseTurnId": {
+                                      "type": "string"
+                                    },
+                                    "answers": {
+                                      "description": "The single structured answer.",
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    }
+                                  },
+                                  "required": ["responseTurnId", "answers"]
+                                }
+                              },
+                              "required": [
+                                "prompt",
+                                "selectionMode",
+                                "answerChoices"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "prompt": {
+                                  "type": "string"
+                                },
+                                "selectionMode": {
+                                  "description": "Accepts a non-empty selection containing candidate values and/or at most one user-supplied value, with two through eight compatible candidates.",
+                                  "type": "string",
+                                  "enum": ["multiple"]
+                                },
+                                "answerChoices": {
+                                  "description": "Candidate display order is also the canonical structured-answer order.",
+                                  "type": "array",
+                                  "minItems": 2,
+                                  "maxItems": 8,
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "response": {
+                                  "type": "object",
+                                  "properties": {
+                                    "responseTurnId": {
+                                      "type": "string"
+                                    },
+                                    "answers": {
+                                      "description": "Distinct structured values in candidate display order, followed by at most one user-supplied answer.",
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 9,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    }
+                                  },
+                                  "required": ["responseTurnId", "answers"]
+                                }
+                              },
+                              "required": [
+                                "prompt",
+                                "selectionMode",
+                                "answerChoices"
+                              ]
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "completedAt": {
+                          "type": "string"
+                        },
+                        "sourceFireId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "failure": {
+                          "description": "A failed Turn's saved turn_error payload, identical to its turn_error event.",
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "description": "service_configuration_unavailable, model_provider_failed, runtime_error or another stable failure code.",
+                              "type": "string"
+                            },
+                            "message": {
+                              "description": "Fixed text for the code; never supplier or internal error text.",
+                              "type": "string"
+                            },
+                            "details": {
+                              "type": "object",
+                              "properties": {
+                                "reason": {
+                                  "description": "With service_configuration_unavailable: the missing service.",
+                                  "type": "string",
+                                  "enum": [
+                                    "model_provider_unconfigured",
+                                    "sandbox_unconfigured",
+                                    "drive9_unconfigured",
+                                    "drive9_disabled_for_organization"
+                                  ]
+                                },
+                                "provider": {
+                                  "description": "With model_provider_failed: the failure category, supplier HTTP status and supplier error type and code. Never supplier message text, request paths or credentials.",
+                                  "type": "object",
+                                  "properties": {
+                                    "category": {
+                                      "type": "string",
+                                      "enum": [
+                                        "authentication",
+                                        "supplier_error",
+                                        "supplier_unavailable",
+                                        "network",
+                                        "provider_stream_error"
+                                      ]
+                                    },
+                                    "httpStatus": {
+                                      "type": "integer",
+                                      "nullable": true
+                                    },
+                                    "errorType": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "errorCode": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "category",
+                                    "httpStatus",
+                                    "errorType",
+                                    "errorCode"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "required": ["code", "message"]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sessionId",
+                        "status",
+                        "billingTag",
+                        "userMessage",
+                        "userMessages",
+                        "operations",
+                        "assistantMessage",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": ["type", "turn"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["realtime"]
+                    },
+                    "realtime": {
+                      "description": "A durable Realtime fact of the Session timeline. It is never a Turn, Message or task result.",
+                      "oneOf": [
+                        {
+                          "description": "A final user transcript received through a Realtime connection.",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": ["input_transcript"]
+                            },
+                            "realtimeConnectionId": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "turnId": {
+                              "description": "The Turn this utterance started or steered; null when the Realtime model answered it alone.",
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "type",
+                            "realtimeConnectionId",
+                            "text",
+                            "turnId",
+                            "createdAt"
+                          ]
+                        },
+                        {
+                          "description": "One completed Realtime model response.",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": ["response"]
+                            },
+                            "realtimeConnectionId": {
+                              "type": "string"
+                            },
+                            "responseId": {
+                              "description": "The realtime protocol response_id when audio was produced, to replace live partial transcripts.",
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "chat",
+                                "task_ack",
+                                "task_progress",
+                                "task_result",
+                                "clarify",
+                                "device_ack"
+                              ]
+                            },
+                            "text": {
+                              "description": "The transcript of the Realtime model output.",
+                              "type": "string"
+                            },
+                            "turnId": {
+                              "description": "The Turn this response speaks about: set for task_ack, task_progress, task_result and clarify.",
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "interrupted": {
+                              "description": "The response was cut off; its text may include speech the user did not hear.",
+                              "type": "boolean"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "type",
+                            "realtimeConnectionId",
+                            "responseId",
+                            "kind",
+                            "text",
+                            "turnId",
+                            "interrupted",
+                            "createdAt"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["type", "realtime"]
+                }
+              ]
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["entries", "hasMore", "nextCursor"]
+      }
+    },
+    "parameters": {
+      "IdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "TurnIdPath": {
+        "name": "turnId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Standard Agent Service error envelope.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  }
+}

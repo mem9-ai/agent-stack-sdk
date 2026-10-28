@@ -7,14 +7,16 @@ declarations and no runtime dependencies.
 
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
-and Realtime Model/Connection preparation for [service revision
+text submission, original-result waiting and conversation history, and
+Realtime Model/Connection preparation for [service revision
 b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
 
-Turn execution and history exports remain for subsequent refresh slices; they
-are **not verified or supported against this baseline**. Template version
-application, Memory configuration, default Agents and general Agent overrides
-are removed. This package remains a selective Node.js client; browser, MSP,
-management and device APIs are outside this refresh.
+Text commands return durable receipts independently of execution. Waiting reads the
+original command's outcome. Template version application, Memory configuration,
+default Agents and general Agent overrides are removed. Continuous progress,
+explicit steering/cancellation/retry helpers, Client Tools, files, Schedulers and
+usage remain subsequent slices. Browser, MSP, management and device APIs are
+outside this refresh.
 
 ## Quick start
 
@@ -187,8 +189,7 @@ const archived = await organization.unlinkAgent(user.userId, agent.id);
 
 The returned association is archived. Unlinking retains existing Session
 ownership, binding, configuration and history; it does not grant the Organization
-access to the User's private Session content. The SDK's history methods remain
-outside this slice's supported surface.
+access to the User's private Session content. The User retains access to its saved history.
 
 The packaged example completes discovery and creation without message execution:
 
@@ -211,6 +212,115 @@ Select and persist the Template ID, optional model and both keys before calling.
 The example also returns the current Template page and model catalog. If no model
 was requested, it preserves omission so the service can recover the original
 creation even after the deployment default changes.
+
+## Text messages and original results
+
+Persist the Session ID, command identity and complete input before dispatch.
+`clientEventId` is required, Session-local, and contains 1–128 safe characters
+(letters, digits, `_`, `.`, `:`, `-`, starting with a letter or digit). It is
+separate from the diagnostic HTTP `requestId`.
+
+```ts
+const session = customer.session(savedSessionId);
+const input = { clientEventId: savedCommandId, text: "Plan the trip" };
+const receipt = await session.submitMessage(input);
+// Accepted does not mean incorporated or completed.
+const result = await session.waitForResult(receipt.inputId, {
+  timeoutMs: 60_000,
+  pollIntervalMs: 250,
+});
+console.log(result.text);
+// Or submit once and wait: await session.turn(input, { timeoutMs: 60_000 });
+```
+
+`submitMessage` returns the service's `SessionInteraction`. `mode` distinguishes
+started or steered work from refused inputs; `appliedAt` records actual
+incorporation. `result.status` and `result.completedAt` belong to the original
+execution generation, even after an explicit retry. A running Turn can accept
+another message; each message needs its own identity and incorporation status.
+The same identity and input recover its original receipt. A conflicting reuse
+raises `ConflictError` with `interaction_input_conflict`.
+
+Text accepts a string or a nonempty ordered array of up to nine strings for
+clarification answers. `clarificationSourceTurnId` links a saved Clarification
+Item. Optional `billingTag` (including null) and ready `userFileIds` are passed
+through; this slice does not implement file upload. Successful `TurnResult`
+contains the original `inputId`, `sessionId`, `turnId`, saved `messageId`, `text`
+and `interaction`; a clarification additionally contains `clarification`.
+Drafts, Session idleness, EOF and acceptance never establish success.
+
+`waitForResult` reads receipts and the matching saved successful Turn. Its default
+local deadline is 60 seconds; `pollIntervalMs` defaults to 250 milliseconds.
+`TurnWaitTimeoutError` and an aborted wait (`OutcomeUnknownError`) retain
+`sessionId`, `inputId`, any known `turnId`, and the HTTP request ID when available.
+Neither cancels, resubmits or changes the command. `TurnFailedError` and
+`TurnInterruptedError` retain the original command and Turn identity; failure
+uses `turn_failed`, since a later Turn read could describe a different generation.
+A refused or successful-but-unincorporated message raises `InputNotAppliedError`.
+Read its receipt to inspect the original fact.
+
+A disconnect, malformed success response, HTTP 408 or server failure during
+submission raises `OutcomeUnknownError` with the original recoverable identity.
+The SDK never automatically repeats text submission. Reconcile explicitly:
+
+```ts
+const original = await session.reconcileInteraction(savedCommandId);
+// null means no receipt was visible at this read; an in-flight request may still arrive.
+if (original) {
+  const result = await session.waitForResult(savedCommandId);
+}
+// getInteraction(savedCommandId) returns the receipt, or interaction_not_found (404).
+```
+
+Keep the original input identity when deliberately repeating a submission; the
+service deduplicates it. Generating another identity can execute the effects
+again. `AbortSignal` before dispatch stops submission; after dispatch it cannot
+establish whether the command was accepted.
+
+The packaged example uses an existing owned Session and a caller-retained input:
+
+```js
+import { sendMessageWorkflow } from "@mem9/tidb-link/examples/send-message.mjs";
+const result = await sendMessageWorkflow({
+  baseUrl: process.env.AGENT_SERVICE_URL,
+  userApiKey: process.env.USER_API_KEY,
+  sessionId: process.env.SESSION_ID,
+  clientEventId: process.env.CLIENT_EVENT_ID,
+  text: process.env.MESSAGE_TEXT,
+});
+```
+
+Set those five environment variables to run the installed example directly:
+`node node_modules/@mem9/tidb-link/examples/send-message.mjs`. It prints only the
+final answer. Preserve the input across invocations; each new command identity
+can start new work. This slice replaces the obsolete response-owned NDJSON
+`streamTurn` API. Continuous progress observation belongs to a subsequent slice.
+
+## Saved conversation history
+
+```ts
+const interactions = await session.listInteractions({ limit: 20 });
+const turns = await session.history({ limit: 20 });
+const turn = await session.getTurn(result.turnId);
+const timeline = await session.timeline({ limit: 20 });
+```
+
+Each list returns its named array (`interactions`, `turns`, or `entries`) and
+`hasMore` / `nextCursor`. Limits are 1–200, default 50. Continue with the opaque
+cursor in the same User, Session and list; the SDK does not silently flatten or
+refetch pages. Interactions are in ascending Session-local sequence. Turns are
+in creation-time order and preserve Full Agent and user-input Realtime
+projections, including input context, saved multiple user Messages, Operations,
+failure details and interrupted speech metadata. Narration-only Realtime facts
+remain in Timeline and associated `realtimeResponses` rather than independent
+public Turns.
+
+Timeline combines Turn snapshots and durable Realtime facts in event order. A
+Turn moved behind the Realtime input that started it can appear again after a
+cursor; replace entries by Turn ID or Realtime fact ID. Late Realtime facts can
+precede an already consumed Turn-list cursor; refresh Turn history or use
+Timeline for durable ordering. History is readable content, not authority for an
+original request's result: use its interaction receipt for that outcome.
 
 ## Realtime connection preparation
 
@@ -271,7 +381,7 @@ directly. `REALTIME_MODEL_ID` is optional.
 
 ## Errors and uncertain outcomes
 
-Organization and refreshed Agent/Session lifecycle methods accept
+Organization, text/history and refreshed Agent/Session lifecycle methods accept
 `{ requestId?, signal? }` options; creation and list options include these fields.
 `TiDBLinkApiError` preserves status, service code, request identity and details;
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
@@ -306,23 +416,18 @@ new token after reconciling the connection state.
 
 ## Compatibility and verification
 
-`TIDB_LINK_PROVISIONING_REVISION` / `tidbLinkProvisioningRevision`,
-`TIDB_LINK_LIFECYCLE_REVISION` / `tidbLinkLifecycleRevision` and
-`TIDB_LINK_REALTIME_REVISION` / `tidbLinkRealtimeRevision` identify the exact
-service revision above for their named slices. The matching
-`tidbLinkProvisioningOpenApiSha256`, `tidbLinkLifecycleOpenApiSha256` and
-`tidbLinkRealtimeOpenApiSha256` fields pin
-that revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
-version string alone does not establish compatibility. The verified scope is the
-provisioning, Template/Agent/Session management and Realtime preparation described
-here, not every retained export
-or every public API.
+`TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
+revision. The provisioning, lifecycle, Realtime and text constants and package
+fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
+`tidbLinkTextRevision` covers text commands, original results and history;
+`tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
+`TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
+compatibility. This is a selective surface, not coverage of every service API.
 
-`TIDB_LINK_REVISION` / `tidbLinkRevision` retain revision
-`49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed Turn/history
-APIs. The existing immutable contract checks preserve evidence for that historical
-surface; they do not certify it against the provisioning baseline. Run them with
-`TIDB_LINK_CONTRACT=/path/to/contract npm run test:service-contract`, using the immutable artifact selected by this repository's CI workflow. It contains `openapi.json` and `metadata.json`.
+`npm run test:service-contract` checks a frozen text/history OpenAPI subset from
+that exact revision. The committed snapshot and metadata retain the source
+fingerprint and immutable contract evidence; no live synchronization is required.
+The snapshot alone does not certify service behavior.
 
 `npm test` covers the simulated HTTP failure boundary and installs the actual
 packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
@@ -342,7 +447,11 @@ all rows in the selected test database before and after the run. It uses the
 service's existing AppModule test fixture, genuine credentials, real TiDB and
 controlled model dependencies. Fixtures prepare identities, Templates and eligible
 Realtime Sessions; public SDK methods perform Template-to-Agent-to-Session
-creation, ownership checks, lifecycle updates and Realtime operations.
+creation, ownership checks, lifecycle updates and Realtime operations. Text cases
+exercise actual acceptance, final success/failure/interruption, local timeout and
+abandoned-wait recovery, response-loss reconciliation, and paginated mixed
+history through public SDK methods. A forwarding proxy drops only an actual
+service response to prove uncertain-submission recovery.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

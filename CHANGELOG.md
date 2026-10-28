@@ -7,8 +7,7 @@
 - Replace the obsolete ServiceUser handle with explicit Organization operations;
   preserve uncertain creation/issuance and one-time credential delivery.
 - Verify the packed SDK and provisioning, Session creation and Realtime examples against
-  the actual service and TiDB. Retain the earlier contract evidence for APIs
-  awaiting their refresh.
+  the actual service and TiDB.
 - Discover Realtime Models, conditionally select the next connection's model,
   and prepare/read/end Session Realtime Connections with one-time connect tokens.
 
@@ -24,7 +23,18 @@
 - Explicitly unlink a target User's Agent with Organization authority while
   retaining Session ownership and configuration.
 - Remove retired Template version/application, Memory, default-Agent and general
-  Agent configuration exports. Turn execution and history remain awaiting refresh.
+  Agent configuration exports.
+
+- Submit text commands with caller-retained identities, distinguish acceptance,
+  incorporation and final results, and reconcile uncertain submissions without
+  automatic execution replay.
+- Wait for original-generation outcomes with recoverable local timeout/abort;
+  read paginated interactions, Full Agent/Realtime Turns and Session Timeline.
+- Replace obsolete NDJSON Turn streaming with the current receipt-based text
+  interface. Continuous progress remains a subsequent slice.
+- Verify the text/history slice against exact service revision `b59a0a58`, with
+  actual-service outcomes and response loss, a packaged runnable example and an
+  independent packed TypeScript consumer; refresh the frozen contract evidence.
 
 ## 0.2.0
 

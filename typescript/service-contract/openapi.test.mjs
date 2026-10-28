@@ -1,54 +1,39 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 
-const expectedServiceRevision = "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87";
-
-const contractRoot = process.env.TIDB_LINK_CONTRACT;
-if (!contractRoot) throw new Error("TIDB_LINK_CONTRACT is required");
-
-const openApiBytes = await readFile(path.join(contractRoot, "openapi.json"));
+const expectedRevision = "b59a0a584eb2632b8d9c6d0808b8ea26081b1474";
+const expectedSourceSha256 =
+  "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc";
+const openApiBytes = await readFile(new URL("openapi.json", import.meta.url));
 const document = JSON.parse(openApiBytes);
 const metadata = JSON.parse(
-  await readFile(path.join(contractRoot, "metadata.json"), "utf8"),
+  await readFile(new URL("metadata.json", import.meta.url), "utf8"),
 );
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
-
+const sessionPath = "/api/v1/user/sessions/{id}";
 const schema = (name) => {
-  const value = document.components?.schemas?.[name];
+  const value = document.components.schemas[name];
   assert(value, `missing schema ${name}`);
   return value;
 };
-
 const properties = (value) => {
   if (value.$ref) return properties(schema(value.$ref.split("/").at(-1)));
   return value.properties ?? {};
 };
 
-const propertyNames = (value, names = new Set()) => {
-  if (!value || typeof value !== "object") return names;
-  if (value.properties) {
-    for (const [name, nested] of Object.entries(value.properties)) {
-      names.add(name);
-      propertyNames(nested, names);
-    }
-  }
-  for (const key of ["allOf", "anyOf", "oneOf"]) {
-    for (const nested of value[key] ?? []) propertyNames(nested, names);
-  }
-  if (value.items) propertyNames(value.items, names);
-  if (value.$ref) propertyNames(schema(value.$ref.split("/").at(-1)), names);
-  return names;
-};
-
-test("retained Turn APIs keep their historical immutable contract evidence", () => {
-  assert.equal(metadata.tidbLinkRevision, expectedServiceRevision);
+test("text and history keep the selected immutable service contract", () => {
+  assert.equal(metadata.tidbLinkRevision, expectedRevision);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
-  assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
+  assert.equal(metadata.sourceOpenApiSha256, expectedSourceSha256);
+  assert.equal(packageJson.tidbLinkTextRevision, metadata.tidbLinkRevision);
+  assert.equal(
+    packageJson.tidbLinkTextOpenApiSha256,
+    metadata.sourceOpenApiSha256,
+  );
   assert.equal(packageJson.tidbLinkApiVersion, metadata.tidbLinkApiVersion);
   assert.equal(
     createHash("sha256").update(openApiBytes).digest("hex"),
@@ -56,77 +41,136 @@ test("retained Turn APIs keep their historical immutable contract evidence", () 
   );
 });
 
-test("the historical contract records retained Turn/history workflows", () => {
-  for (const route of [
-    "/api/sessions/{id}/turns",
-    "/api/sessions/{id}/turns/{turnId}",
-  ]) {
-    assert(document.paths[route], `missing ${route}`);
-  }
-
-  assert.equal(document.info.title, "TiDB Link API");
-  const securitySchemes = document.components.securitySchemes;
-  assert.equal(securitySchemes.TiDBLinkSession.type, "apiKey");
-  assert.equal(securitySchemes.TiDBLinkSession.in, "cookie");
-  assert.equal(securitySchemes.Agent9Session, undefined);
-  for (const name of ["OrganizationApiKey", "UserApiKey"]) {
-    assert.equal(securitySchemes[name].type, "http");
-    assert.equal(securitySchemes[name].scheme, "bearer");
-    assert.notEqual(securitySchemes[name].bearerFormat, "JWT");
-  }
-  const userSecurity = document.paths["/api/sessions/{id}/turns"].get.security;
-  assert(userSecurity.some((item) => "UserApiKey" in item));
-});
-
-test("the declared request and response schemas contain only retained SDK capabilities", () => {
-  const retained = ["CreateTurnOpenApiDto", "TurnStreamEvent"];
-  const removed = [
-    "agentDefinitionId",
-    "authId",
-    "e2bTemplate",
-    "modelReasoningEffort",
-    "outputSchema",
-    "projectId",
-    "runtime",
-    "workspaceId",
+test("the selected commands and history reads require User authority", () => {
+  const operations = [
+    ["/events", "post"],
+    ["/interactions", "get"],
+    ["/interactions/{receiptId}", "get"],
+    ["/turns", "get"],
+    ["/turns/{turnId}", "get"],
+    ["/timeline", "get"],
   ];
-  for (const name of retained) {
-    const actual = propertyNames(schema(name));
-    for (const field of removed)
-      assert(!actual.has(field), `${name} exposes ${field}`);
-  }
-
-  const createTurn = properties(schema("CreateTurnOpenApiDto"));
-  assert(createTurn.clarificationSourceTurnId);
-  const turn = schema("Turn");
-  assert(turn.required.includes("billingTag"));
-  assert.equal(turn.properties.billingTag.nullable, true);
-  assert.deepEqual(turn.properties.billingTag.allOf, [
-    { $ref: "#/components/schemas/BillingTag" },
-  ]);
-  const clarification = schema("ClarificationItem");
-  for (const variant of clarification.oneOf) {
-    const response = properties(variant).response;
-    assert(response);
-    assert.deepEqual(Object.keys(properties(response)).sort(), [
-      "answers",
-      "responseTurnId",
-    ]);
-  }
-
-  const started = schema("TurnStreamEvent").oneOf.find(
-    (variant) => properties(variant).event?.enum?.[0] === "turn_started",
+  assert.deepEqual(
+    Object.keys(document.paths).sort(),
+    operations.map(([route]) => `${sessionPath}${route}`).sort(),
   );
-  const execution = properties(properties(started).payload).execution;
-  assert.deepEqual(Object.keys(properties(execution)), ["model"]);
+  for (const [route, method] of operations) {
+    const operation = document.paths[`${sessionPath}${route}`][method];
+    assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+  }
+  const credential = document.components.securitySchemes.UserApiKey;
+  assert.equal(credential.type, "http");
+  assert.equal(credential.scheme, "bearer");
+  const submission = document.paths[`${sessionPath}/events`].post;
+  assert.equal(
+    submission.requestBody.content["application/json"].schema.$ref,
+    "#/components/schemas/SessionEventOpenApiDto",
+  );
+  for (const status of ["200", "202"])
+    assert(
+      submission.responses[status].content[
+        "application/json"
+      ].schema.oneOf.some(
+        (variant) =>
+          variant.$ref ===
+          "#/components/schemas/SessionInteractionResponseOpenApiDto",
+      ),
+    );
 });
 
-test("the declared contract has no dedicated route for removed product areas", () => {
-  const paths = Object.keys(document.paths);
-  for (const fragment of ["/auths", "codex", "scheduler-webhook"]) {
-    assert(
-      !paths.some((route) => route.includes(fragment)),
-      `removed route contains ${fragment}`,
+test("message identities, incorporation and original outcomes remain distinct", () => {
+  const command = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
+    properties(variant).type.enum.includes("agent.session.input.message"),
+  );
+  assert.deepEqual(command.required, ["type", "clientEventId", "data"]);
+  assert.equal(command.additionalProperties, false);
+  assert.equal(
+    properties(command).clientEventId.pattern,
+    "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+  );
+  const input = properties(command).data.anyOf.find((variant) =>
+    variant.required.includes("text"),
+  );
+  assert.deepEqual(Object.keys(properties(input)).sort(), [
+    "billingTag",
+    "clarificationSourceTurnId",
+    "content",
+    "text",
+    "userFileIds",
+  ]);
+  assert.equal(properties(input).text.oneOf[1].maxItems, 9);
+  assert.equal(properties(input).billingTag.nullable, true);
+  const receipt = properties(
+    schema("SessionInteractionResponseOpenApiDto"),
+  ).interaction;
+  assert.deepEqual(receipt.required, [
+    "inputId",
+    "sequence",
+    "kind",
+    "mode",
+    "turnId",
+    "message",
+    "createdAt",
+    "appliedAt",
+    "rejection",
+    "result",
+  ]);
+  const fields = properties(receipt);
+  assert.equal(fields.appliedAt.nullable, true);
+  assert.equal(fields.message.nullable, true);
+  assert.equal(fields.rejection.nullable, true);
+  assert.deepEqual(properties(fields.result).status.enum, [
+    "running",
+    "succeeded",
+    "failed",
+    "interrupted",
+  ]);
+  assert.equal(properties(fields.result).completedAt.nullable, true);
+  const lookup = document.paths[
+    `${sessionPath}/interactions`
+  ].get.parameters.find(({ name }) => name === "clientEventId");
+  assert(lookup);
+});
+
+test("history pages preserve Full Agent and Realtime projections", () => {
+  for (const [route, responseName, collection] of [
+    ["/interactions", "SessionInteractionsResponseOpenApiDto", "interactions"],
+    ["/turns", "TurnsResponseOpenApiDto", "turns"],
+    ["/timeline", "SessionTimelineResponseOpenApiDto", "entries"],
+  ]) {
+    const page = properties(schema(responseName));
+    assert.equal(page[collection].type, "array");
+    assert.equal(page.hasMore.type, "boolean");
+    assert.equal(page.nextCursor.nullable, true);
+    const parameters = document.paths[`${sessionPath}${route}`].get.parameters;
+    assert(parameters.some(({ name }) => name === "cursor"));
+    assert.equal(
+      parameters.find(({ name }) => name === "limit").schema.maximum,
+      200,
     );
   }
+  const turn = properties(schema("Turn"));
+  assert.deepEqual(turn.executor.enum, ["full_agent", "realtime_model"]);
+  assert.equal(turn.userMessages.type, "array");
+  assert.equal(turn.realtimeResponses.type, "array");
+  assert.deepEqual(properties(turn.realtime).linkedTurnIds.items, {
+    type: "string",
+  });
+  const message = properties(schema("Message"));
+  assert(message.inputContext);
+  assert(message.realtime);
+  const entries = properties(schema("SessionTimelineResponseOpenApiDto"))
+    .entries.items.oneOf;
+  assert.deepEqual(
+    entries.map((variant) => properties(variant).type.enum[0]),
+    ["turn", "realtime"],
+  );
+  const facts = properties(entries[1]).realtime.oneOf;
+  assert.deepEqual(
+    facts.map((variant) => properties(variant).type.enum[0]),
+    ["input_transcript", "response"],
+  );
+  assert.equal(properties(facts[1]).turnId.nullable, true);
+  assert.equal(properties(facts[1]).responseId.nullable, true);
+  assert.equal(properties(facts[1]).interrupted.type, "boolean");
 });

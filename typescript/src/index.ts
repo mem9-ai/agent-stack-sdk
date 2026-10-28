@@ -1,8 +1,8 @@
 /** TiDB Link OpenAPI version supported by this SDK release. */
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
-/** Historical service baseline for retained Turn/history APIs awaiting refresh. */
+/** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87" as const;
+  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
 /** Exact service revision verified for Organization, End User and User Key provisioning. */
 export const TIDB_LINK_PROVISIONING_REVISION =
@@ -16,12 +16,17 @@ export const TIDB_LINK_REALTIME_REVISION =
 export const TIDB_LINK_LIFECYCLE_REVISION =
   "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
+/** Exact service revision verified for text commands, original results and history. */
+export const TIDB_LINK_TEXT_REVISION =
+  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+
 export {
   TiDBLinkApiError,
   TiDBLinkError,
   ConflictError,
   ConnectionError,
-  InvalidTurnEventError,
+  TurnWaitTimeoutError,
+  InputNotAppliedError,
   OutcomeUnknownError,
   TurnFailedError,
   TurnInterruptedError,
@@ -54,11 +59,9 @@ export type {
   CreateSessionOptions,
   SuggestSessionNameInput,
   ClarificationItem,
-  MessageRecord,
   SelectableSessionModel,
   SessionModel,
   SessionRecord,
-  TurnRecord,
 } from "./session.js";
 export type {
   OpenRealtimeConnectionInput,
@@ -76,4 +79,29 @@ export type {
   RealtimePcm16AudioFormat,
   RealtimeVoiceSetting,
 } from "./realtime.js";
-export type { CreateTurnInput, TurnResult, TurnStreamEvent } from "./turn.js";
+export type {
+  CreateTurnInput,
+  TurnResult,
+  WaitForResultOptions,
+} from "./turn.js";
+export type {
+  MessageRecord,
+  MessageInputContext,
+  RealtimeMessageMetadata,
+  TurnRecord,
+  FullAgentTurnRecord,
+  RealtimeTurnRecord,
+  TurnPage,
+  TurnStatus,
+  TurnUserFile,
+  TurnFailure,
+  OperationRecord,
+  OperationStatus,
+  OperationResultPointer,
+  SessionInteraction,
+  SessionInteractionPage,
+  SessionRealtimeEvent,
+  RealtimeResponseKind,
+  SessionTimelineEntry,
+  SessionTimelinePage,
+} from "./history.js";

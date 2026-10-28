@@ -8,7 +8,7 @@
     "node": ">=22.12"
   },
   "tidbLinkApiVersion": "0.0.1",
-  "tidbLinkRevision": "49f2bb3b7d194ada614cf9caa0a79f24e7aeba87",
+  "tidbLinkRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -16,14 +16,16 @@
     },
     "./examples/provision-user.mjs": "./examples/provision-user.mjs",
     "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs",
-    "./examples/create-session.mjs": "./examples/create-session.mjs"
+    "./examples/create-session.mjs": "./examples/create-session.mjs",
+    "./examples/send-message.mjs": "./examples/send-message.mjs"
   },
   "files": [
     "dist",
     "README.md",
     "examples/provision-user.mjs",
     "examples/prepare-realtime-connection.mjs",
-    "examples/create-session.mjs"
+    "examples/create-session.mjs",
+    "examples/send-message.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
@@ -50,5 +52,7 @@
   "tidbLinkRealtimeRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
   "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
   "tidbLinkLifecycleRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
-  "tidbLinkLifecycleOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
+  "tidbLinkLifecycleOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "tidbLinkTextRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkTextOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
 }

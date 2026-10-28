@@ -8,14 +8,14 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, conversation history, file attachments, Schedulers, and
-Realtime Model/Connection preparation for [service revision
+continuous progress, conversation history, file attachments, Schedulers,
+Realtime Model/Connection preparation and User usage reads for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Client Tools and
-usage remain subsequent slices. Browser, MSP, management and device APIs are
+default Agents and general Agent overrides are removed. Client Tools remain
+a subsequent slice. Browser, MSP, management and device APIs are
 outside this refresh.
 
 ## Quick start
@@ -666,6 +666,54 @@ uncertain connection open or end, inspect the newest connection. An uncertain
 connect-token response cannot recover that plaintext token; deliberately mint a
 new token after reconciling the connection state.
 
+## User usage
+
+A User client reads its own usage. An Organization client must name a target User
+in that Organization. These are distinct response projections and date contracts:
+
+| Read | User client | Organization client |
+| --- | --- | --- |
+| Summary | `getUsage(options)` | `getUserUsage(userId, options)` |
+| Details | `getUsageDetails(options)` | `getUserUsageDetails(userId, options)` |
+| Range | Optional inclusive UTC dates, `YYYY-MM-DD`; at most 370 days | Required exact UTC timestamps with milliseconds, inclusive `from` and exclusive `to`; at most 31 days |
+| Buckets | `period: "day"` or `"week"` chooses the default range; series remains daily | `interval: "hour"`, `"day"`, `"week"` or `"month"` |
+| Detail limits | Separate `llm`, `sandbox` and `webSearch` arrays; `limit` applies per kind, with no cursor | Globally ordered `items`; optional `kind`, `limit` and opaque `cursor`; `nextCursor: null` ends the stream |
+
+Both support an exact `tagKey`/`tagValue` pair. Send both or neither. Values retain
+case sensitivity and the service's normalization rules. Preserve the original
+range, kind and tag filters when following an Organization cursor. Details accept
+limits from 1 to 500. The User detail endpoint cannot retrieve older rows beyond
+its limit through a fabricated continuation; Organization details support paging.
+
+```ts
+const own = await user.getUsage({
+  from: "2030-01-02", to: "2030-01-02", period: "day",
+});
+const page = await organization.getUserUsageDetails(targetUserId, {
+  from: "2030-01-02T00:00:00.000Z",
+  to: "2030-01-03T00:00:00.000Z",
+  limit: 100,
+});
+```
+
+The SDK returns the service's values unchanged. `costMicros: null`,
+`pricingStatus: "unknown"`, `valuationStatus: "unpriced"`, and incomplete fact or
+valuation counts retain different meanings. A stored numeric cost does not make
+an unpriced fact billable. Priced totals exclude unpriced facts. Scalar cost totals describe platform-borne
+costs; `costByBearer` preserves the separate platform, customer and unknown
+categories. Public-list estimates are not supplier invoices or known final charges. Fact completeness and
+valuation completeness are independent. Do not display missing costs as zero or
+infer a balance from these reads. Organization projections intentionally omit
+some details available in the User's own projection.
+
+The installed example `@mem9/tidb-link/examples/read-usage.mjs` exports
+`readOwnUsage` and `readUserUsage`, each returning a summary and the first detail
+page. The CLI requires `AGENT_SERVICE_URL` and `USAGE_AUTHORITY=user` with
+`USER_API_KEY`, or `USAGE_AUTHORITY=organization` with `ORGANIZATION_API_KEY` and
+`END_USER_ID`. Supply `USAGE_FROM`/`USAGE_TO` in the corresponding date format;
+`TAG_KEY`/`TAG_VALUE` are optional. It performs reads only and does not claim that
+a first detail page is complete history.
+
 ## Compatibility and verification
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
@@ -676,7 +724,7 @@ fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks frozen text/progress/history, file-transfer and Scheduler OpenAPI subsets from
+`npm run test:service-contract` checks frozen selected SDK OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -721,5 +769,7 @@ The public Session projection exposes the frozen Template digest but hides store
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
+Usage cases seed controlled facts and verify both public projections, exact filters,
+paging and authority without executing messages to manufacture billing data.
 No production supplier credentials or WebSocket redemption are needed. A
 mismatch or unavailable service fails this check instead of silently skipping it.

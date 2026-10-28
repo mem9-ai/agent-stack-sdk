@@ -2,6 +2,10 @@
 
 ## Unreleased (0.3.0)
 
+- Add User self-usage and Organization target-User usage summaries and details,
+  preserving separate date/paging contracts and unknown, unpriced or incomplete
+  facts. Include the installed usage example and actual-service verification.
+
 - Create and manage one-time and recurring Schedulers with stable creation keys,
   explicit conditional writes, paginated reads and immutable fire results.
 - Preserve service retry hints and verify SDK-created schedules through the real

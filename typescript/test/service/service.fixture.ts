@@ -1,3 +1,12 @@
+import { BillingUsageStore } from "../src/billing/billing-usage-store";
+import {
+  buildMissingLlmRequestUsage,
+  billingUsageReservation,
+} from "../src/billing/billing-usage-fact";
+import {
+  buildWebSearchUsage,
+  unpricedNonLlmValuation,
+} from "../src/billing/non-llm-billing";
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -254,6 +263,135 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
     userId: stranger.userId,
     name: "SDK Realtime stranger",
   });
+  const billing = app.get(BillingUsageStore);
+  const usageAt = "2030-01-02T10:00:00.000Z";
+  const billingTag = { key: "cost_center", value: "Café/QA" };
+  const attribution = {
+    organizationId: DEFAULT_ORG_ID,
+    sessionId: "sdk_usage_session",
+    turnId: "sdk_usage_turn",
+    agentRunId: null,
+    agentId: null,
+    ownerUserId: owner.userId,
+    authKind: "user-api-key" as const,
+    principalBucket: "user_api_key" as const,
+    billingTag,
+  };
+  const missingUsage = buildMissingLlmRequestUsage({
+    llmRequestUsageId: "sdk_usage_unknown",
+    requestPurpose: "agent_turn",
+    attribution,
+    provider: "openai",
+    requestModel: "unknown-model",
+    requestOutcome: "failed",
+    unknownReason: "provider_usage_missing",
+    createdAt: usageAt,
+  });
+  await billing.saveLlmRequestUsage(missingUsage);
+  await billing.saveLlmRequestUsage({
+    ...missingUsage,
+    llmRequestUsageId: "sdk_usage_priced",
+    requestModel: "gpt-5.4",
+    model: "gpt-5.4",
+    billingCredentialScope: "deployment",
+    requestOutcome: "succeeded",
+    usageEvidenceStatus: "complete",
+    inputTokens: 100,
+    promptTokensTotal: 100,
+    uncachedInputTokens: 100,
+    outputTokens: 20,
+    inputCostMicros: 800,
+    outputCostMicros: 200,
+    costMicros: 1000,
+    pricingStatus: "estimated",
+    unknownReason: null,
+    estimateBasis: "public_list_placeholder",
+    estimateLabel: "public-list estimate",
+    createdAt: "2030-01-02T11:00:00.000Z",
+  });
+  await billing.saveLlmRequestUsage({
+    ...missingUsage,
+    llmRequestUsageId: "sdk_usage_stale_cost",
+    costMicros: 99000,
+    createdAt: "2030-01-02T12:00:00.000Z",
+  });
+  await billing.saveLlmRequestUsage({
+    ...missingUsage,
+    llmRequestUsageId: "sdk_usage_other",
+    ownerUserId: stranger.userId,
+    billingCredentialScope: "deployment",
+    promptTokensTotal: 0,
+    costMicros: 3333,
+    pricingStatus: "estimated",
+    unknownReason: null,
+  });
+  await billing.saveLlmRequestUsage({
+    ...missingUsage,
+    llmRequestUsageId: "sdk_usage_untagged",
+    billingTag: null,
+    billingCredentialScope: "deployment",
+    promptTokensTotal: 0,
+    costMicros: 9000,
+    pricingStatus: "estimated",
+    unknownReason: null,
+  });
+  await billing.saveSandboxUsage({
+    ...attribution,
+    attributionKind: "user_level",
+    sandboxUsageId: "sdk_usage_sandbox",
+    provider: "e2b",
+    sandboxId: "sdk_usage_sandbox_instance",
+    profileId: "standard-v1",
+    contractDigest: "a".repeat(64),
+    artifactKind: "e2b_template",
+    artifactIdentity: "sdk_usage_template",
+    specKey: "sdk_usage_spec",
+    startedAt: usageAt,
+    lastSeenAt: usageAt,
+    endedAt: null,
+    durationSeconds: null,
+    status: "running",
+    closeReason: null,
+    lastError: null,
+    ...unpricedNonLlmValuation(usageAt),
+    createdAt: usageAt,
+    updatedAt: usageAt,
+  });
+  await billing.saveWebSearchUsage(
+    buildWebSearchUsage({
+      webSearchUsageId: "sdk_usage_search",
+      operationId: "sdk_usage_search_operation",
+      attribution,
+      requestedResultCount: 3,
+      returnedResultCount: null,
+      submittedAt: usageAt,
+      acceptedAt: usageAt,
+      requestOutcome: "failed",
+      usageEvidenceStatus: "missing",
+      createdAt: usageAt,
+    }),
+  );
+  const reserved = billingUsageReservation({
+    usageId: "sdk_usage_unsettled",
+    metadata: {
+      kind: "llm",
+      attribution,
+      requestPurpose: "agent_turn",
+      billingCredentialScope: "deployment",
+      provider: "openai",
+      requestModel: "gpt-5.4",
+      reconciliation: "none",
+    },
+    createdAt: usageAt,
+  });
+  await billing.reserveBillingUsageIntent(reserved);
+  await billing.markBillingUsageIntentSubmitted(reserved, usageAt);
+  await billing.markBillingUsageIntentIndeterminate(
+    reserved,
+    usageAt,
+    "controlled unknown supplier outcome",
+  );
+
   const ports = getAppPersistencePorts(app);
   const enabledTemplateId = `template_${randomUUID().replaceAll("-", "")}`;
   await ports.agentStore.createAgentTemplate({
@@ -385,6 +523,8 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
           SDK_ORGANIZATION_KEY: own.token,
           SDK_FOREIGN_ORGANIZATION_KEY: foreign.token,
           SDK_USER_KEY: ownerKey.token,
+          SDK_USAGE_USER_ID: owner.userId,
+          SDK_USAGE_STRANGER_ID: stranger.userId,
           SDK_TEXT_SESSION_ID: textSessionId,
           SDK_FOREIGN_USER_KEY: strangerKey.token,
           SDK_REALTIME_SESSION_ID: enabledSessionId,

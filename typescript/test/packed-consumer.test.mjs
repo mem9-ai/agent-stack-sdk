@@ -31,6 +31,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
+  assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/schedule-task.mjs"));
@@ -46,6 +47,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
+        file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/schedule-task.mjs" ||
@@ -98,6 +100,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionTimelinePage,
       TurnPage,
       WaitForResultOptions,
+      UserUsageSummary, UserUsageDetails, UserUsageOptions,
+      OrganizationUserUsageSummary, OrganizationUserUsageDetails,
+      OrganizationUserUsageOptions, OrganizationUserUsageDetailsOptions,
       TurnCommandInput,
       RetryReceipt,
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
@@ -195,6 +200,23 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const stopped = new ObservationStoppedError("Stopped", {sessionId: session.id, inputId: "original-input", cursor: "saved-position"});
       const cursor: string | undefined = stopped.cursor;
       void cursor;
+    }
+    async function usageWorkflow() {
+      const user = new UserClient({baseUrl, apiKey: userApiKey});
+      const options: UserUsageOptions = {from:"2030-01-02",to:"2030-01-02"};
+      const own: UserUsageSummary = await user.getUsage(options);
+      const details: UserUsageDetails = await user.getUsageDetails({...options,limit:1});
+      const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour"};
+      const target: OrganizationUserUsageSummary = await organization.getUserUsage("user_1",range);
+      const pageOptions: OrganizationUserUsageDetailsOptions = {from:range.from,to:range.to,kind:"llm",limit:1};
+      const page: OrganizationUserUsageDetails = await organization.getUserUsageDetails("user_1",pageOptions);
+      const cost: number | null | undefined = page.items[0]?.costMicros;
+      const cursor: string | null = page.nextCursor;
+      // @ts-expect-error User usage has no other User selector or cursor.
+      await user.getUsageDetails({userId:"other",cursor:"unsupported"});
+      // @ts-expect-error Organization aggregate requires an explicit target User.
+      await organization.getUserUsage(range);
+      void own;void details;void target;void cost;void cursor;
     }
     async function lifecycleWorkflow(): Promise<Session> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
@@ -384,6 +406,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
+    const { readOwnUsage, readUserUsage } = await import("@mem9/tidb-link/examples/read-usage.mjs");
+    assert.equal(typeof readOwnUsage,"function");
+    assert.equal(typeof readUserUsage,"function");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
     const { uploadFileWorkflow } = await import("@mem9/tidb-link/examples/upload-file.mjs");

@@ -17,8 +17,9 @@ release declares its service baselines and supported scope. The current refresh
 covers Organization/End User/Key provisioning, Template discovery, personal Agent
 and Session management, text commands with recoverable final results and continuous
 progress, explicit cancellation and checkpoint retry, conversation history, verified
-file attachments and downloads, Schedulers, and Realtime Model/Connection preparation against one
-exact service revision. See the TypeScript README for the supported boundaries
+file attachments and downloads, Schedulers, Realtime Model/Connection preparation
+and User usage reads against one exact service revision. See the TypeScript
+README for the supported boundaries
 and the remaining capabilities reserved for later slices.
 
 ## Development

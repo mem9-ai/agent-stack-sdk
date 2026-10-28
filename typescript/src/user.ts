@@ -1,3 +1,10 @@
+import {
+  usageQuery,
+  type UserUsageOptions,
+  type UserUsageDetailsOptions,
+  type UserUsageSummary,
+  type UserUsageDetails,
+} from "./usage.js";
 import { UserSchedulers } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
@@ -197,6 +204,22 @@ export class UserClient {
       },
     );
     return new Agent(this.#http, agentReceipt(result.data, result.requestId));
+  }
+
+  getUsage(options: UserUsageOptions = {}): Promise<UserUsageSummary> {
+    return this.#http.get(
+      `/api/v1/billing/usage${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue"])}`,
+      options,
+    );
+  }
+
+  getUsageDetails(
+    options: UserUsageDetailsOptions = {},
+  ): Promise<UserUsageDetails> {
+    return this.#http.get(
+      `/api/v1/billing/usage/details${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue", "limit"])}`,
+      options,
+    );
   }
 
   async getAgent(id: string, options?: RequestOptions): Promise<Agent> {

@@ -19,8 +19,9 @@
     "./examples/create-session.mjs": "./examples/create-session.mjs",
     "./examples/send-message.mjs": "./examples/send-message.mjs",
     "./examples/control-turn.mjs": "./examples/control-turn.mjs",
-    "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/observe-message.mjs": "./examples/observe-message.mjs",
+    "./examples/read-usage.mjs": "./examples/read-usage.mjs",
+    "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/schedule-task.mjs": "./examples/schedule-task.mjs"
   },
   "files": [
@@ -31,8 +32,9 @@
     "examples/create-session.mjs",
     "examples/send-message.mjs",
     "examples/control-turn.mjs",
-    "examples/upload-file.mjs",
     "examples/observe-message.mjs",
+    "examples/read-usage.mjs",
+    "examples/upload-file.mjs",
     "examples/schedule-task.mjs"
   ],
   "scripts": {

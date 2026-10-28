@@ -90,52 +90,75 @@ assert.equal(
   "Agent Service OpenAPI does not match the SDK text baseline",
 );
 const serviceCaseDirectory = fileURLToPath(new URL(".", import.meta.url));
-const serviceCases = (await readdir(serviceCaseDirectory, { recursive: true }))
-  .filter((name) => name.endsWith(".cases.mjs"))
-  .sort()
-  .map((name) => ({ source: path.join(serviceCaseDirectory, name), name }));
-assert(serviceCases.length > 0, "No SDK service cases were discovered");
+const entries = await readdir(serviceCaseDirectory, { recursive: true });
+const fixtures = entries.filter((name) => name.endsWith(".fixture.ts")).sort();
+assert(fixtures.length > 0, "No SDK service fixtures were discovered");
+const fixtureDirectories = fixtures.map((name) => path.dirname(name));
+assert.equal(
+  new Set(fixtureDirectories).size,
+  fixtures.length,
+  "Only one service fixture may own each case directory",
+);
+for (const name of entries.filter((name) => name.endsWith(".cases.mjs")))
+  assert(
+    fixtureDirectories.includes(path.dirname(name)),
+    `No neighboring service fixture owns ${name}`,
+  );
 
 await mkdir(path.join(serviceRoot, ".agent9"), { recursive: true });
-const temporary = await mkdtemp(
-  path.join(serviceRoot, ".agent9", "sdk-service-"),
-);
-try {
-  // Existing service setup supplies real persistence and guards the destructive test reset.
-  await writeFile(
-    path.join(temporary, "provisioning.e2e-spec.ts"),
-    (await readFile(new URL("service.fixture.ts", import.meta.url), "utf8"))
-      .replaceAll('"../test/', '"../../test/')
-      .replaceAll('"../src/', '"../../src/'),
+// Each fixture owns a distinct dependency lifecycle and its neighboring cases.
+for (const fixtureName of fixtures) {
+  const serviceCases = entries
+    .filter(
+      (name) =>
+        name.endsWith(".cases.mjs") &&
+        path.dirname(name) === path.dirname(fixtureName),
+    )
+    .sort()
+    .map((name) => ({ source: path.join(serviceCaseDirectory, name), name }));
+  assert(serviceCases.length > 0, `No SDK service cases for ${fixtureName}`);
+  const temporary = await mkdtemp(
+    path.join(serviceRoot, ".agent9", "sdk-service-"),
   );
-  const config = path.join(temporary, "vitest.config.mjs");
-  await writeFile(
-    config,
-    `import base from "../../vitest.config.ts";\nexport default { ...base, test: { ...base.test, include: [${JSON.stringify(path.relative(serviceRoot, path.join(temporary, "provisioning.e2e-spec.ts")))}] } };\n`,
-  );
-  const exitCode = await new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      ["node_modules/vitest/vitest.mjs", "run", "--config", config],
-      {
-        cwd: serviceRoot,
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          DATABASE_URL: process.env.TEST_TIDB_DATABASE_URL,
-          CUSTOMER_HTTP_EVIDENCE_PATH: path.join(
-            temporary,
-            "customer-http-outcomes.json",
-          ),
-          SDK_PACKAGE_ROOT: fileURLToPath(new URL("../..", import.meta.url)),
-          SDK_SERVICE_CASES: JSON.stringify(serviceCases),
-        },
-      },
+  try {
+    await writeFile(
+      path.join(temporary, "sdk.e2e-spec.ts"),
+      (await readFile(path.join(serviceCaseDirectory, fixtureName), "utf8"))
+        .replaceAll('"../test/', '"../../test/')
+        .replaceAll('"../src/', '"../../src/'),
     );
-    child.once("error", reject);
-    child.once("exit", (code) => resolve(code ?? 1));
-  });
-  process.exitCode = exitCode;
-} finally {
-  await rm(temporary, { recursive: true, force: true });
+    const config = path.join(temporary, "vitest.config.mjs");
+    await writeFile(
+      config,
+      `import base from "../../vitest.config.ts";\nexport default { ...base, test: { ...base.test, include: [${JSON.stringify(path.relative(serviceRoot, path.join(temporary, "sdk.e2e-spec.ts")))}] } };\n`,
+    );
+    const exitCode = await new Promise((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        ["node_modules/vitest/vitest.mjs", "run", "--config", config],
+        {
+          cwd: serviceRoot,
+          stdio: "inherit",
+          env: {
+            ...process.env,
+            DATABASE_URL: process.env.TEST_TIDB_DATABASE_URL,
+            CUSTOMER_HTTP_EVIDENCE_PATH: path.join(
+              temporary,
+              "customer-http-outcomes.json",
+            ),
+            SDK_PACKAGE_ROOT: fileURLToPath(new URL("../..", import.meta.url)),
+            SDK_SERVICE_CASES: JSON.stringify(serviceCases),
+          },
+        },
+      );
+      child.once("error", reject);
+      child.once("exit", (code) => resolve(code ?? 1));
+    });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+      break;
+    }
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 }

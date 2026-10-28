@@ -185,7 +185,9 @@ export async function* observeTurn(
         event.data.event === "turn_finished" ||
         event.data.event === "turn_error"
       ) {
-        // A terminal event can belong to a newer retry; the original receipt remains authoritative.
+        // Replayed terminal events may belong to another execution of this Turn.
+        const current = await getInteraction(http, sessionId, inputId, request);
+        if (current.result.status === "running") continue;
         yield {
           type: "result",
           result: await waitForResult(http, sessionId, inputId, {

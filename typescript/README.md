@@ -203,7 +203,7 @@ deletion. Name and Billing Tag changes do not change the frozen recipe.
 Organization authority can explicitly unlink an Agent belonging to a target User:
 
 ```ts
-const archived = await organization.unlinkAgent(user.userId, agent.id);
+const archived = await organization.unlinkAgent(provisioned.user.userId, agent.id);
 ```
 
 The returned association is archived. Unlinking retains existing Session
@@ -321,8 +321,10 @@ can start new work. This slice replaces the obsolete response-owned NDJSON
 Submit once with a persisted `clientEventId`, then observe that original receipt:
 
 ```ts
+const savedCommandId = crypto.randomUUID();
+// Persist savedCommandId with this message before dispatch.
 const accepted = await session.submitMessage({
-  clientEventId: crypto.randomUUID(),
+  clientEventId: savedCommandId,
   text: "Summarize the findings",
 });
 let cursor: string | undefined;
@@ -600,6 +602,8 @@ An existing Session can accept a recording through its separate audio entry poin
 The SDK sends multipart bytes and consumes that request's own response:
 
 ```ts
+import { readFile } from "node:fs/promises";
+
 const result = await session.audio({
   bytes: await readFile("recording.wav"),
   filename: "recording.wav",

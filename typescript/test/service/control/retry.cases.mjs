@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { test } from "node:test";
-import { access } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import {
   UserClient,
   TiDBLinkApiError,
@@ -71,8 +71,35 @@ test("an explicit SDK retry produces its own result without rewriting the stoppe
   const retry = await session.retry(command);
   assert.equal(retry.disposition, "retrying");
   assert.equal(retry.turnId, accepted.turnId);
-  const observation = await Array.fromAsync(
-    session.observe(retry.clientEventId, { timeoutMs: 15000 }),
+  const observation = [];
+  let sawOriginalTerminal = false;
+  let sawLiveRetryDraft = false;
+  for await (const update of session.observe(retry.clientEventId, {
+    timeoutMs: 15000,
+  })) {
+    observation.push(update);
+    if (
+      update.type === "event" &&
+      update.event.data.event === "turn_finished" &&
+      update.event.data.payload.status === "interrupted"
+    )
+      sawOriginalTerminal = true;
+    if (update.type === "draft" && update.text === "Retried task ") {
+      assert(
+        sawOriginalTerminal,
+        "The same Turn's original terminal event must be replayed first",
+      );
+      assert.equal(
+        (await session.getInteraction(command.clientEventId)).result.status,
+        "running",
+      );
+      sawLiveRetryDraft = true;
+      await writeFile(process.env.SDK_RETRY_OBSERVED_DRAFT_FILE, "observed");
+    }
+  }
+  assert(
+    sawLiveRetryDraft,
+    "Live retry drafts must survive historical terminal replay",
   );
   assert.equal(observation.at(-1).type, "result");
   const result = observation.at(-1).result;

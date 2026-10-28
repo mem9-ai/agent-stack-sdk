@@ -34,6 +34,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/schedule-task.mjs"));
+  assert(files.includes("examples/submit-audio.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
@@ -49,6 +50,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/schedule-task.mjs" ||
+        file === "examples/submit-audio.mjs" ||
         file === "examples/observe-message.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
@@ -71,6 +73,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   await writeFile(
     path.join(temporary, "consumer.ts"),
     `import type {
+      AudioTurnInput, AudioTurnEvent, AudioTurnResult,
       Scheduler, SchedulerResponse, SchedulerFirePage, SchedulerPage, CreateSchedulerInput,
       UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
       FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
@@ -149,6 +152,16 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const retried: RetryReceipt = await session.retry({ ...input, clientEventId: "retry-command" });
       void cancellation;
       return session.waitForResult(retried.clientEventId);
+    }
+    async function audioWorkflow(session: Session): Promise<AudioTurnResult> {
+      const input: AudioTurnInput = {bytes:new Uint8Array([1]),filename:"voice.wav",contentType:"audio/wav",billingTag:null};
+      for await (const event of session.streamAudio(input)) {
+        const typed: AudioTurnEvent = event;
+        if (typed.event === "turn_finished") { const status: "succeeded" | "failed" | "interrupted" = typed.payload.status; void status; }
+      }
+      // @ts-expect-error Audio does not accept ordinary input identities or promise text replay.
+      session.audio({...input,clientEventId:"text-only"});
+      return session.audio(input);
     }
     async function schedulerWorkflow(user: UserClient): Promise<Scheduler> {
       const input: CreateSchedulerInput = {agentId:"agent-1",title:"Report",prompt:"Summarize",schedule:{kind:"once",after:"1h"},idempotencyKey:"scheduler-1"};
@@ -390,6 +403,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof uploadFileWorkflow,"function");
     const { scheduleTaskWorkflow } = await import("@mem9/tidb-link/examples/schedule-task.mjs");
     assert.equal(typeof scheduleTaskWorkflow,"function");
+    const { submitAudioWorkflow } = await import("@mem9/tidb-link/examples/submit-audio.mjs");
+    assert.equal(typeof submitAudioWorkflow,"function");
     const { observeMessageWorkflow } = await import("@mem9/tidb-link/examples/observe-message.mjs");
     assert.equal(typeof observeMessageWorkflow,"function");
     assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");

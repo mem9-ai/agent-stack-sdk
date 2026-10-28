@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Submit prerecorded audio with multipart bytes and optional JSON Billing Tags;
+  consume its distinct event envelope or wait for the final answer.
+- Preserve audio response interruption and unknown outcomes without text replay
+  promises; verify actual transcription, budget refusal and saved Turn outcomes.
+
 - Create and manage one-time and recurring Schedulers with stable creation keys,
   explicit conditional writes, paginated reads and immutable fire results.
 - Preserve service retry hints and verify SDK-created schedules through the real

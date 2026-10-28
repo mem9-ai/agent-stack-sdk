@@ -54,7 +54,7 @@ export type TurnResult = ResultIdentity &
     | { type: "clarification"; clarification: ClarificationItem }
   );
 
-const validClarification = (value: unknown): value is ClarificationItem => {
+export const validClarification = (value: unknown): value is ClarificationItem => {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
   const item = value as Record<string, unknown>;

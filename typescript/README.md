@@ -8,7 +8,7 @@ declarations and no runtime dependencies.
 This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, conversation history, file attachments, Schedulers, and
+continuous progress, conversation history, file attachments, Schedulers, prerecorded audio, and
 Realtime Model/Connection preparation for [service revision
 0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
@@ -491,6 +491,57 @@ const prepared = await prepareRealtimeConnection({
 Set `AGENT_SERVICE_URL`, `USER_API_KEY`, and `SESSION_ID` to run the example
 directly. `REALTIME_MODEL_ID` is optional.
 
+## Prerecorded audio
+
+An existing Session can accept a recording through its separate audio entry point.
+The SDK sends multipart bytes and consumes that request's own response:
+
+```ts
+const result = await session.audio({
+  bytes: await readFile("recording.wav"),
+  filename: "recording.wav",
+  contentType: "audio/wav",
+  billingTag: null,
+});
+console.log(result.text);
+```
+
+Supported recordings are mp3, mp4, mpeg, mpga, m4a, wav and webm. The request must
+contain nonempty bytes no larger than 25 MiB. Transcription availability, codec
+validity, budget and Session eligibility remain service decisions. Omit
+`billingTag` to inherit the Session default, supply one key/value pair to override,
+or use `null` to clear it for this Turn. The SDK encodes that optional field as
+JSON without changing the file's bytes.
+
+`audio()` returns an `AudioTurnResult` only after the same Turn emits its final
+Message and successful terminal event. It throws `TurnFailedError` or
+`TurnInterruptedError` for those terminal outcomes. `streamAudio()` exposes the
+actual `AudioTurnEvent` sequence: `event`, `sessionId`, `turnId`, `seq`,
+`createdAt`, optional `agentRunId`, and event-specific `payload`. An
+`assistant_draft` contains a complete replacement snapshot, including an empty
+reset; it is separate from `progress` and the final `assistant_message`.
+
+**The audio request owns execution's response.** Breaking its event loop, aborting
+its signal or losing the connection may request interruption. This differs from
+closing a text observation subscription. EOF alone is never reported as success.
+`AudioTurnStoppedError` preserves the Session and any already observed Turn ID;
+inspect `getTurn(turnId)` or saved history before deciding what to submit next.
+Audio accepts no `clientEventId`, has no ordinary text interaction receipt and
+provides no idempotent resubmission or event-position recovery promise. The SDK
+does not resubmit a recording automatically. A transcription refusal may still
+have consumed provider work; it does not imply a refunded charge.
+
+The installed `submit-audio.mjs` example reads an existing file and prints the
+final answer. Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` and
+`AUDIO_FILE_PATH`; `AUDIO_CONTENT_TYPE` is optional:
+
+```sh
+node node_modules/@mem9/tidb-link/examples/submit-audio.mjs
+```
+
+The exported `submitAudioWorkflow()` accepts bytes and an optional abort signal.
+This SDK does not capture, play, encode or bridge audio.
+
 ## File attachments
 
 `user.files` manages owned uploaded files. Upload from a `Uint8Array` (including
@@ -676,7 +727,7 @@ fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
 compatibility. This is a selective surface, not coverage of every service API.
 
-`npm run test:service-contract` checks frozen text/progress/history, file-transfer and Scheduler OpenAPI subsets from
+`npm run test:service-contract` checks frozen text/progress/history, file-transfer, Scheduler and audio OpenAPI subsets from
 that exact revision. The committed snapshot and metadata retain the source
 fingerprint and immutable contract evidence; no live synchronization is required.
 The snapshot alone does not certify service behavior.
@@ -717,6 +768,10 @@ public workflow. Real supplier deployment certification is outside this evidence
 Scheduler cases enable the real background runner and use SDK-created schedules
 to verify successful and failed execution, delivery changes, retained fire
 snapshots and the installed example.
+Audio cases use the real transcription adapter with a controlled HTTP supplier and
+real spend limits. They cover recorded input, malformed/unsupported recordings,
+supplier and budget refusals, model failure, active-response interruption and the
+installed audio example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
 on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not

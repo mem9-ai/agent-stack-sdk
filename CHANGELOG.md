@@ -2,6 +2,11 @@
 
 ## Unreleased (0.3.0)
 
+- Create and manage one-time and recurring Schedulers with stable creation keys,
+  explicit conditional writes, paginated reads and immutable fire results.
+- Preserve service retry hints and verify SDK-created schedules through the real
+  background runner, including failed execution and a packaged runnable example.
+
 - Add explicit exact-Turn cancellation and checkpoint retry with recoverable
   command identities; wait for retry results without replacing earlier outcomes.
 - Verify active-Turn steering through message admission, eventual cancellation,

@@ -1,3 +1,4 @@
+import { UserSchedulers } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
@@ -145,6 +146,11 @@ export interface SessionPage {
 export class UserClient {
   readonly #http: HttpClient;
   readonly #files: UserFiles;
+  readonly #schedulers: UserSchedulers;
+
+  get schedulers(): UserSchedulers {
+    return this.#schedulers;
+  }
 
   get files(): UserFiles {
     return this.#files;
@@ -156,6 +162,7 @@ export class UserClient {
       throw new TypeError("UserClient requires a User API Key");
     this.#http = new HttpClient(options);
     this.#files = new UserFiles(this.#http);
+    this.#schedulers = new UserSchedulers(this.#http);
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {

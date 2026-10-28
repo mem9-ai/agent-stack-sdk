@@ -5,6 +5,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   realpath,
   rm,
   writeFile,
@@ -41,7 +42,12 @@ const revision = execFileSync("git", ["rev-parse", "HEAD"], {
 assert.equal(
   revision,
   manifest.tidbLinkProvisioningRevision,
-  "Agent Service revision does not match the SDK baseline",
+  "Agent Service revision does not match the SDK provisioning baseline",
+);
+assert.equal(
+  revision,
+  manifest.tidbLinkRealtimeRevision,
+  "Agent Service revision does not match the SDK Realtime baseline",
 );
 assert.equal(
   execFileSync("git", ["status", "--porcelain"], {
@@ -52,11 +58,26 @@ assert.equal(
   "Agent Service checkout must be clean for exact-baseline verification",
 );
 const openapi = await readFile(path.join(serviceRoot, "docs/openapi.yaml"));
+const openApiSha256 = createHash("sha256").update(openapi).digest("hex");
 assert.equal(
-  createHash("sha256").update(openapi).digest("hex"),
+  openApiSha256,
   manifest.tidbLinkProvisioningOpenApiSha256,
-  "Agent Service OpenAPI does not match the SDK baseline",
+  "Agent Service OpenAPI does not match the SDK provisioning baseline",
 );
+assert.equal(
+  openApiSha256,
+  manifest.tidbLinkRealtimeOpenApiSha256,
+  "Agent Service OpenAPI does not match the SDK Realtime baseline",
+);
+const serviceCaseDirectory = fileURLToPath(new URL(".", import.meta.url));
+const serviceCases = (
+  await readdir(serviceCaseDirectory, { recursive: true })
+)
+  .filter((name) => name.endsWith(".cases.mjs"))
+  .sort()
+  .map((name) => ({ source: path.join(serviceCaseDirectory, name), name }));
+assert(serviceCases.length > 0, "No SDK service cases were discovered");
+
 await mkdir(path.join(serviceRoot, ".agent9"), { recursive: true });
 const temporary = await mkdtemp(
   path.join(serviceRoot, ".agent9", "sdk-service-"),
@@ -89,9 +110,7 @@ try {
             "customer-http-outcomes.json",
           ),
           SDK_PACKAGE_ROOT: fileURLToPath(new URL("../..", import.meta.url)),
-          SDK_SERVICE_CASES: fileURLToPath(
-            new URL("provisioning.cases.mjs", import.meta.url),
-          ),
+          SDK_SERVICE_CASES: JSON.stringify(serviceCases),
         },
       },
     );

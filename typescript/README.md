@@ -5,12 +5,16 @@ declarations and no runtime dependencies.
 
 ## Current refresh scope
 
-This slice refreshes Organization information, End User provisioning and User API
-Key management for [service revision b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
-It replaces the removed Workspace/Service User provisioning surface. The existing
-Agent, Session and Turn exports are retained for subsequent refresh
-slices; they are **not verified or supported against this baseline**. Do not use
-them as the next step in this provisioning example.
+This refresh supports Organization information, End User provisioning, User API
+Key management, and Realtime Model/Connection preparation for [service revision
+b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
+It replaces the removed Workspace/Service User provisioning surface and adds the
+current User-authorized Realtime routes for an existing owned Session.
+
+The other Agent, general Session and Turn exports are retained for subsequent
+refresh slices; they are **not verified or supported against this baseline**.
+Realtime preparation accepts an existing Session ID and does not depend on those
+retained lifecycle methods.
 
 ## Quick start
 
@@ -94,9 +98,64 @@ disabled targets preserve the service's refusal.
 
 The returned User API Key (`ti_user_…`) authenticates that User's public APIs.
 It grants no Organization management authority; `OrganizationClient` rejects it.
-An Organization key likewise grants no User identity. Until the User client
-refresh is delivered, verify the credential with the service's public User API,
-for example `GET /api/v1/user/agents` using `Authorization: Bearer <token>`.
+An Organization key likewise grants no User identity.
+
+## Realtime connection preparation
+
+A backend can discover the published Realtime Models and prepare an existing
+owned Session for a terminal. The SDK returns the one-time connect token but does
+not open or implement the WebSocket transport.
+
+```ts
+import { UserClient } from "@mem9/tidb-link";
+
+const user = new UserClient({
+  baseUrl: process.env.AGENT_SERVICE_URL!,
+  apiKey: process.env.USER_API_KEY!,
+});
+const catalog = await user.listRealtimeModels();
+const session = user.session(process.env.SESSION_ID!);
+const current = await session.getRealtimeModelSelection();
+const selected = catalog.models.find((model) => model.available);
+if (selected && selected.id !== current.model) {
+  await session.setRealtimeModel(selected.id, { ifMatch: current.etag });
+}
+const prepared = await session.openRealtimeConnection({
+  metadata: { terminal: "kiosk-1" },
+});
+// Hand prepared.websocketUrl, prepared.connectToken and
+// prepared.connectTokenExpiresAt directly to the intended terminal.
+```
+
+`setRealtimeModel` requires the independent ETag returned by
+`getRealtimeModelSelection`; a stale ETag raises `ConflictError` with code
+`realtime_model_conflict`. A selection change applies to the next Realtime
+Connection. A live connection keeps the model and provider identity frozen at
+its admission. Model availability, Session voice eligibility, language support,
+audio support and one-live-connection admission remain service decisions.
+
+Use `getRealtimeConnection()` to inspect the newest connection,
+`createRealtimeConnectToken()` to mint another one-time credential, and
+`endRealtimeConnection()` to terminate it. Connect tokens expire at the returned
+`connectTokenExpiresAt` and cannot be recovered from later reads. The SDK does
+not cache them. Actual media transport, audio capture/playback, codecs, browser
+support and device connections are outside this package slice.
+
+The packaged example accepts an existing Session ID and never prints the token:
+
+```js
+import { prepareRealtimeConnection } from "@mem9/tidb-link/examples/prepare-realtime-connection.mjs";
+
+const prepared = await prepareRealtimeConnection({
+  baseUrl: process.env.AGENT_SERVICE_URL,
+  userApiKey: process.env.USER_API_KEY,
+  sessionId: process.env.SESSION_ID,
+  realtimeModelId: process.env.REALTIME_MODEL_ID,
+});
+```
+
+Set `AGENT_SERVICE_URL`, `USER_API_KEY`, and `SESSION_ID` to run the example
+directly. `REALTIME_MODEL_ID` is optional.
 
 ## Errors and uncertain outcomes
 
@@ -105,27 +164,37 @@ Every Organization method accepts a final `{ requestId?, signal? }` option.
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
 request identity takes precedence over the one sent.
 
-Safe reads use bounded retries with the same request identity. User creation and
-key creation/rotation/revocation are never automatically replayed. Disconnects, unusable
-success responses, HTTP 408 and server failures during these mutations raise
-`OutcomeUnknownError`. For an HTTP failure, its `cause` retains the
-`TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous failure
-still reports an unknown outcome. `AbortSignal` stops the local request; after
-dispatch it does not establish whether a mutation happened. Redirects are refused.
+Safe reads use bounded retries with the same request identity. User creation,
+key creation/rotation/revocation, Realtime Model selection, connection opening,
+connect-token issuance and connection termination are never automatically
+replayed. Disconnects, unusable success responses, HTTP 408 and server failures
+during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
+`cause` retains the `TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous
+failure still reports an unknown outcome. `AbortSignal` stops the local request;
+after dispatch it does not establish whether a mutation happened. Redirects are
+refused.
 
 After uncertain User creation, list and match the original `externalId`.
 After uncertain issuance or rotation, listing keys can confirm metadata but
 **cannot recover the one-time token**. Reconcile metadata and explicitly revoke
-any unwanted key before deciding whether to issue again. The example never
-repeats an uncertain credential operation.
+any unwanted key before deciding whether to issue again. The provisioning
+example never repeats an uncertain credential operation.
+
+After an uncertain Realtime Model update, read the selection again. After an
+uncertain connection open or end, inspect the newest connection. An uncertain
+connect-token response cannot recover that plaintext token; deliberately mint a
+new token after reconciling the connection state.
 
 ## Compatibility and verification
 
-`TIDB_LINK_PROVISIONING_REVISION` and `tidbLinkProvisioningRevision` in the package identify the
-exact service revision above. Package metadata `tidbLinkProvisioningOpenApiSha256` pins the SHA-256 of that
-revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
+`TIDB_LINK_PROVISIONING_REVISION` / `tidbLinkProvisioningRevision` and
+`TIDB_LINK_REALTIME_REVISION` / `tidbLinkRealtimeRevision` identify the exact
+service revision above for their named slices. The matching
+`tidbLinkProvisioningOpenApiSha256` and `tidbLinkRealtimeOpenApiSha256` fields pin
+that revision's `docs/openapi.yaml`. `TIDB_LINK_API_VERSION` remains `0.0.1`; the
 version string alone does not establish compatibility. The verified scope is the
-provisioning slice described here, not every retained export or every public API.
+provisioning and Realtime preparation described here, not every retained export
+or every public API.
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` retain revision
 `49f2bb3b7d194ada614cf9caa0a79f24e7aeba87` for the unrefreshed User/Agent/Session/Turn
@@ -135,7 +204,7 @@ surface; they do not certify it against the provisioning baseline. Run them with
 
 `npm test` covers the simulated HTTP failure boundary and installs the actual
 packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
-example against the real service, use the service's Node.js 26 runtime, install its
+both examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
 [current-schema setup](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/docs/prisma-first-tidb-validation-and-rollout.md).
@@ -148,7 +217,8 @@ TIDB_SSL=off npm run test:service
 
 This command requires a clean service checkout at the exact revision and resets
 all rows in the selected test database before and after the run. It uses the
-service's existing AppModule test fixture, genuine credentials and real TiDB;
-fixtures prepare Organizations and controlled dependencies. No production
-supplier credentials are needed. A mismatch or unavailable service fails this
-check instead of silently skipping it.
+service's existing AppModule test fixture, genuine credentials, real TiDB and a
+controlled Realtime Model catalog. Fixtures prepare eligible Sessions; public SDK
+methods perform discovery, selection and every Realtime Connection operation.
+No production supplier credentials or WebSocket redemption are needed. A
+mismatch or unavailable service fails this check instead of silently skipping it.

@@ -8,6 +8,10 @@ export const TIDB_LINK_REVISION =
 export const TIDB_LINK_PROVISIONING_REVISION =
   "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
 
+/** Exact service revision verified for Realtime Model and Connection preparation. */
+export const TIDB_LINK_REALTIME_REVISION =
+  "b59a0a584eb2632b8d9c6d0808b8ea26081b1474" as const;
+
 export {
   TiDBLinkApiError,
   TiDBLinkError,
@@ -60,4 +64,20 @@ export type {
   SessionRecord,
   TurnRecord,
 } from "./session.js";
+export type {
+  OpenRealtimeConnectionInput,
+  OpenRealtimeConnectionResult,
+  RealtimeAudioFormat,
+  RealtimeAudioFormats,
+  RealtimeConnectGrant,
+  RealtimeConnection,
+  RealtimeEndpointingMode,
+  RealtimeLanguage,
+  RealtimeModel,
+  RealtimeModelCatalog,
+  RealtimeModelSelection,
+  RealtimeOpusAudioFormat,
+  RealtimePcm16AudioFormat,
+  RealtimeVoiceSetting,
+} from "./realtime.js";
 export type { CreateTurnInput, TurnResult, TurnStreamEvent } from "./turn.js";

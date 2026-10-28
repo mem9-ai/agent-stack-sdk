@@ -1,5 +1,6 @@
 import { HttpClient, isApiKey, requireEtag, requireKnownKeys } from "./http.js";
 import { createSessionForAgent, type BillingTag, Session } from "./session.js";
+import type { RealtimeModelCatalog } from "./realtime.js";
 
 export interface UserClientOptions {
   baseUrl: string;
@@ -615,6 +616,15 @@ export class UserClient {
       options,
     );
     return response.agentTemplates;
+  }
+
+  async listRealtimeModels(options?: {
+    signal?: AbortSignal;
+  }): Promise<RealtimeModelCatalog> {
+    return this.#http.get<RealtimeModelCatalog>(
+      "/api/v1/realtime-models",
+      options,
+    );
   }
 
   session(id: string): Session {

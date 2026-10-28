@@ -1,5 +1,18 @@
 import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
 import {
+  realtimeModelSelectionFrom,
+  requireOpenRealtimeConnectionReceipt,
+  requireRealtimeConnectGrantReceipt,
+  requireRealtimeConnectionReceipt,
+  requireRealtimeModelSelectionReceipt,
+  type OpenRealtimeConnectionInput,
+  type OpenRealtimeConnectionResult,
+  type RealtimeConnectGrant,
+  type RealtimeConnection,
+  type RealtimeModelSelection,
+  type RealtimeSessionSelectionFields,
+} from "./realtime.js";
+import {
   collectTurn,
   type CreateTurnInput,
   streamTurn,
@@ -132,6 +145,92 @@ export class Session {
     this.#record = result.data.session;
     this.#etag = requireEtag(result);
     return this;
+  }
+
+  async openRealtimeConnection(
+    input: OpenRealtimeConnectionInput = {},
+    options?: { signal?: AbortSignal },
+  ): Promise<OpenRealtimeConnectionResult> {
+    requireKnownKeys(input, ["audio", "metadata"], "Realtime Connection input");
+    const result = await this.#http.postResponse<unknown>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      input,
+      {
+        outcomeUnknown: true,
+        ...(options?.signal ? { signal: options.signal } : {}),
+      },
+    );
+    return requireOpenRealtimeConnectionReceipt(result.data, result.requestId);
+  }
+
+  async getRealtimeConnection(options?: {
+    signal?: AbortSignal;
+  }): Promise<RealtimeConnection> {
+    const response = await this.#http.get<{
+      realtimeConnection: RealtimeConnection;
+    }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`, options);
+    return response.realtimeConnection;
+  }
+
+  async createRealtimeConnectToken(options?: {
+    signal?: AbortSignal;
+  }): Promise<RealtimeConnectGrant> {
+    const result = await this.#http.postResponse<unknown>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime/connect-tokens`,
+      undefined,
+      {
+        outcomeUnknown: true,
+        ...(options?.signal ? { signal: options.signal } : {}),
+      },
+    );
+    return requireRealtimeConnectGrantReceipt(result.data, result.requestId);
+  }
+
+  async endRealtimeConnection(options?: {
+    signal?: AbortSignal;
+  }): Promise<RealtimeConnection> {
+    const result = await this.#http.deleteResponse<unknown>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      {
+        outcomeUnknown: true,
+        ...(options?.signal ? { signal: options.signal } : {}),
+      },
+    );
+    return requireRealtimeConnectionReceipt(result.data, result.requestId);
+  }
+
+  async getRealtimeModelSelection(options?: {
+    signal?: AbortSignal;
+  }): Promise<RealtimeModelSelection> {
+    const response = await this.#http.get<{
+      session: RealtimeSessionSelectionFields;
+    }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}`, options);
+    return realtimeModelSelectionFrom(response.session);
+  }
+
+  async setRealtimeModel(
+    model: string,
+    options: { ifMatch: string; signal?: AbortSignal },
+  ): Promise<RealtimeModelSelection> {
+    requireKnownKeys(options, ["ifMatch", "signal"], "Realtime Model selection options");
+    if (!model || model.length > 128)
+      throw new TypeError("Realtime Model ID must contain 1-128 characters");
+    if (!options.ifMatch)
+      throw new TypeError("Realtime Model selection requires ifMatch");
+    const result = await this.#http.patchResponse<unknown>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime-model`,
+      { realtimeModel: model },
+      {
+        ifMatch: options.ifMatch,
+        outcomeUnknown: true,
+        ...(options.signal ? { signal: options.signal } : {}),
+      },
+    );
+    const receipt = result.data as { session?: unknown } | null | undefined;
+    return requireRealtimeModelSelectionReceipt(
+      receipt?.session,
+      result.requestId,
+    );
   }
 
   async history(options?: { signal?: AbortSignal }): Promise<TurnRecord[]> {

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -9,17 +9,61 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import {
   AppTestingPersistenceFixture,
   createAppTestingModule,
+  getAppPersistencePorts,
 } from "../test/support/app-testing-module";
+import { createPublishedFixtureAgent } from "../test/support/published-agent-creation";
 import { loadE2eEnv } from "../test/support/e2e-env";
 import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
+import { UserApiKeyService } from "../src/auth/user-api-key.service";
+import { AgentTemplateContentSchema } from "../src/agent-templates/agent-template-content";
 import { createAgentServiceFastifyAdapter } from "../src/common/fastify-adapter";
 import { ENV } from "../src/config/config.module";
 import { DEFAULT_ORG_ID } from "../src/chat/dto";
 import { OrganizationStore } from "../src/organizations/organization-store";
+import { OpsRealtimeModelSource } from "../src/ops/ops-realtime-model-source";
 
 const exec = promisify(execFile);
 let app: NestFastifyApplication;
 let temporary: string;
+
+const realtimeSettings = (model: string) => ({
+  provider: "bailian_qwen_omni" as const,
+  region: "cn-beijing" as const,
+  workspaceId: "fictional-sdk-workspace",
+  model,
+  voice: null,
+  turnDetection: null,
+  vadThreshold: null,
+  vadSilenceDurationMs: null,
+});
+const realtimeModels = [
+  {
+    id: "voice-a",
+    label: "Voice A",
+    settings: realtimeSettings("provider-a"),
+    available: true,
+  },
+  {
+    id: "voice-b",
+    label: "Voice B",
+    settings: realtimeSettings("provider-b"),
+    available: true,
+  },
+  {
+    id: "voice-unavailable",
+    label: "Unavailable voice",
+    settings: realtimeSettings("provider-unavailable"),
+    available: false,
+  },
+];
+const realtimeSource = {
+  list: async () => ({ models: realtimeModels, defaultModelId: "voice-a" }),
+  current: async () => realtimeModels[0].settings,
+  readiness: async () => "configured" as const,
+  open: async () => {
+    throw new Error("SDK Realtime verification does not redeem WebSocket credentials");
+  },
+};
 
 beforeAll(async () => {
   const moduleRef = await createAppTestingModule()
@@ -31,6 +75,8 @@ beforeAll(async () => {
         SESSION_SECRET: "fictional-sdk-service-session-secret",
       }),
     )
+    .overrideProvider(OpsRealtimeModelSource)
+    .useValue(realtimeSource)
     .compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(
     createAgentServiceFastifyAdapter(),
@@ -47,7 +93,21 @@ afterAll(async () => {
   if (temporary) await rm(temporary, { recursive: true, force: true });
 });
 
-it("the packed SDK provisions End Users and manages credentials through the selected service", async () => {
+const createSession = async (token: string, agentId: string) => {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/v1/user/sessions",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "idempotency-key": randomUUID(),
+    },
+    payload: { agentId },
+  });
+  expect(response.statusCode, response.body).toBe(201);
+  return response.json().session.sessionId as string;
+};
+
+it("the packed SDK provisions users and prepares Realtime Connections through the selected service", async () => {
   const store = app.get(OrganizationStore);
   const foreignOrganizationId = `org_sdk_${randomUUID().replaceAll("-", "")}`;
   await store.seedOrganization({
@@ -55,17 +115,83 @@ it("the packed SDK provisions End Users and manages credentials through the sele
     slug: foreignOrganizationId,
     name: "SDK foreign Organization",
   });
-  const keys = app.get(OrganizationApiKeyService);
-  const own = await keys.create({
+  const organizationKeys = app.get(OrganizationApiKeyService);
+  const own = await organizationKeys.create({
     organizationId: DEFAULT_ORG_ID,
     name: "SDK provisioning fixture",
     createdByUserId: null,
   });
-  const foreign = await keys.create({
+  const foreign = await organizationKeys.create({
     organizationId: foreignOrganizationId,
     name: "SDK foreign fixture",
     createdByUserId: null,
   });
+
+  const fixture = app.get(AppTestingPersistenceFixture);
+  const owner = await fixture.arrangeEndUser({
+    organizationId: DEFAULT_ORG_ID,
+    displayName: "SDK Realtime owner",
+  });
+  const stranger = await fixture.arrangeEndUser({
+    organizationId: DEFAULT_ORG_ID,
+    displayName: "SDK Realtime stranger",
+  });
+  const userKeys = app.get(UserApiKeyService);
+  const ownerKey = await userKeys.create({
+    organizationId: DEFAULT_ORG_ID,
+    userId: owner.userId,
+    name: "SDK Realtime owner",
+  });
+  const strangerKey = await userKeys.create({
+    organizationId: DEFAULT_ORG_ID,
+    userId: stranger.userId,
+    name: "SDK Realtime stranger",
+  });
+  const ports = getAppPersistencePorts(app);
+  const enabledTemplateId = `template_${randomUUID().replaceAll("-", "")}`;
+  await ports.agentStore.createAgentTemplate({
+    organizationId: DEFAULT_ORG_ID,
+    agentTemplateId: enabledTemplateId,
+    name: "SDK Realtime enabled",
+  });
+  await fixture.arrangeAgentTemplateContent({
+    organizationId: DEFAULT_ORG_ID,
+    templateId: enabledTemplateId,
+    content: AgentTemplateContentSchema.parse({
+      realtime: { language: "en-US" },
+      identity: { agentName: "SDK Realtime enabled" },
+      sandbox: { profileId: "standard-v1" },
+    }),
+  });
+  const enabledAgent = await createPublishedFixtureAgent(ports.agentStore, {
+    organizationId: DEFAULT_ORG_ID,
+    userId: owner.userId,
+    agentTemplateId: enabledTemplateId,
+  });
+  const disabledTemplateId = `template_${randomUUID().replaceAll("-", "")}`;
+  await ports.agentStore.createAgentTemplate({
+    organizationId: DEFAULT_ORG_ID,
+    agentTemplateId: disabledTemplateId,
+    name: "SDK Realtime disabled",
+  });
+  await fixture.arrangeAgentTemplateContent({
+    organizationId: DEFAULT_ORG_ID,
+    templateId: disabledTemplateId,
+    content: AgentTemplateContentSchema.parse({
+      realtime: null,
+      identity: { agentName: "SDK Realtime disabled" },
+      sandbox: { profileId: "standard-v1" },
+    }),
+  });
+  const disabledAgent = await createPublishedFixtureAgent(ports.agentStore, {
+    organizationId: DEFAULT_ORG_ID,
+    userId: owner.userId,
+    agentTemplateId: disabledTemplateId,
+  });
+  const enabledSessionId = await createSession(ownerKey.token, enabledAgent.agentId);
+  const exampleSessionId = await createSession(ownerKey.token, enabledAgent.agentId);
+  const disabledSessionId = await createSession(ownerKey.token, disabledAgent.agentId);
+
   temporary = await mkdtemp(path.join(tmpdir(), "agent-stack-sdk-service-"));
   const packed = JSON.parse(
     (
@@ -87,18 +213,23 @@ it("the packed SDK provisions End Users and manages credentials through the sele
       "--no-fund",
       path.join(temporary, packed.filename),
     ],
-    {
-      cwd: temporary,
-    },
+    { cwd: temporary },
   );
-  await copyFile(
-    process.env.SDK_SERVICE_CASES!,
-    path.join(temporary, "provisioning.cases.mjs"),
+  const serviceCases = JSON.parse(process.env.SDK_SERVICE_CASES!) as Array<{
+    source: string;
+    name: string;
+  }>;
+  await Promise.all(
+    serviceCases.map(async ({ source, name }) => {
+      const destination = path.join(temporary, name);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await copyFile(source, destination);
+    }),
   );
   try {
     const result = await exec(
       process.execPath,
-      ["--test", "provisioning.cases.mjs"],
+      ["--test", "--test-concurrency=1", ...serviceCases.map(({ name }) => name)],
       {
         cwd: temporary,
         env: {
@@ -106,6 +237,11 @@ it("the packed SDK provisions End Users and manages credentials through the sele
           SDK_SERVICE_URL: await app.getUrl(),
           SDK_ORGANIZATION_KEY: own.token,
           SDK_FOREIGN_ORGANIZATION_KEY: foreign.token,
+          SDK_USER_KEY: ownerKey.token,
+          SDK_FOREIGN_USER_KEY: strangerKey.token,
+          SDK_REALTIME_SESSION_ID: enabledSessionId,
+          SDK_REALTIME_EXAMPLE_SESSION_ID: exampleSessionId,
+          SDK_REALTIME_DISABLED_SESSION_ID: disabledSessionId,
         },
       },
     );

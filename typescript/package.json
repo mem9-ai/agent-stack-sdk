@@ -14,12 +14,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./examples/provision-user.mjs": "./examples/provision-user.mjs"
+    "./examples/provision-user.mjs": "./examples/provision-user.mjs",
+    "./examples/prepare-realtime-connection.mjs": "./examples/prepare-realtime-connection.mjs"
   },
   "files": [
     "dist",
     "README.md",
-    "examples/provision-user.mjs"
+    "examples/provision-user.mjs",
+    "examples/prepare-realtime-connection.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
@@ -42,5 +44,7 @@
   },
   "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme",
   "tidbLinkProvisioningRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
-  "tidbLinkProvisioningOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
+  "tidbLinkProvisioningOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "tidbLinkRealtimeRevision": "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+  "tidbLinkRealtimeOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc"
 }

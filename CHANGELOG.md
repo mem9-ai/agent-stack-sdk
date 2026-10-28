@@ -6,8 +6,11 @@
   API Key creation/listing/rotation/revocation for service revision `b59a0a58`.
 - Replace the obsolete ServiceUser handle with explicit Organization operations;
   preserve uncertain creation/issuance and one-time credential delivery.
-- Verify the packed SDK and provisioning CLI against the actual service and TiDB.
-  Retain the earlier contract evidence for APIs awaiting their refresh.
+- Verify the packed SDK and provisioning/Realtime preparation examples against
+  the actual service and TiDB. Retain the earlier contract evidence for APIs
+  awaiting their refresh.
+- Discover Realtime Models, conditionally select the next connection's model,
+  and prepare/read/end Session Realtime Connections with one-time connect tokens.
 
 - Rename the package to `@mem9/tidb-link` and errors/constants to TiDB Link names.
 - Require typed `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credentials; old formats and exports have no compatibility aliases.

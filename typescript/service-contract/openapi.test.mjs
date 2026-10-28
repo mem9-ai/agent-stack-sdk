@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const expectedRevision = "b59a0a584eb2632b8d9c6d0808b8ea26081b1474";
+const expectedRevision = "0d11f1b231879c735bd53b60ff895ac58ba60d33";
 const expectedSourceSha256 =
   "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc";
 const openApiBytes = await readFile(new URL("openapi.json", import.meta.url));

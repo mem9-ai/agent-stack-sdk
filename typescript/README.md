@@ -9,7 +9,7 @@ This refresh supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, original-result waiting and conversation history, and
 Realtime Model/Connection preparation for [service revision
-b59a0a58](https://github.com/mem9-ai/agent-stack/commit/b59a0a584eb2632b8d9c6d0808b8ea26081b1474).
+0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
@@ -434,7 +434,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -454,7 +454,7 @@ history through public SDK methods. A forwarding proxy drops only an actual
 service response to prove uncertain-submission recovery.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/b59a0a584eb2632b8d9c6d0808b8ea26081b1474/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 No production supplier credentials or WebSocket redemption are needed. A
 mismatch or unavailable service fails this check instead of silently skipping it.

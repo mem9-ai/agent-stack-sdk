@@ -258,11 +258,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   );
   assert.equal(
     installedPackage.tidbLinkProvisioningRevision,
-    "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   );
   assert.equal(
     installedPackage.tidbLinkProvisioningOpenApiSha256,
@@ -270,7 +270,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   );
   assert.equal(
     installedPackage.tidbLinkRealtimeRevision,
-    "b59a0a584eb2632b8d9c6d0808b8ea26081b1474",
+    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
   );
   assert.equal(
     installedPackage.tidbLinkRealtimeOpenApiSha256,
@@ -318,7 +318,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
-    assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "b59a0a584eb2632b8d9c6d0808b8ea26081b1474");
+    assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof provisionUser, "function");

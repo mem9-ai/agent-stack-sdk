@@ -1,4 +1,4 @@
-import { HttpClient, requireKnownKeys } from "./http.js";
+import { requestOptions, HttpClient, requireKnownKeys } from "./http.js";
 import {
   OutcomeUnknownError,
   TiDBLinkError,
@@ -206,6 +206,7 @@ export class UserFiles {
   async capabilities(
     options?: RequestOptions,
   ): Promise<FileUploadCapabilities> {
+    options = requestOptions(options);
     return (
       await this.#http.get<{ capabilities: FileUploadCapabilities }>(
         "/api/v1/user/drive/upload-capabilities",
@@ -281,6 +282,7 @@ export class UserFiles {
     uploadId: string,
     options?: RequestOptions,
   ): Promise<FileUploadStatus> {
+    options = requestOptions(options);
     return (
       await this.#http.get<{ upload: FileUploadStatus }>(
         uploadPath(uploadId),
@@ -294,6 +296,7 @@ export class UserFiles {
     bytes: Uint8Array,
     options?: RequestOptions,
   ): Promise<UserFile> {
+    options = requestOptions(options);
     const checksum = await digest(bytes);
     const { response, requestId } = await this.#http.rawResponse(
       `${uploadPath(uploadId)}/content`,
@@ -326,6 +329,7 @@ export class UserFiles {
     sha256: string,
     options?: RequestOptions,
   ): Promise<FileUploadPart> {
+    options = requestOptions(options);
     if (
       !Number.isSafeInteger(number) ||
       number < 1 ||
@@ -358,6 +362,7 @@ export class UserFiles {
     bytes: Uint8Array,
     options?: RequestOptions,
   ): Promise<UploadedFilePart> {
+    options = requestOptions(options);
     if (bytes.byteLength !== part.size)
       throw new TypeError("Part bytes do not match the signed size");
     const checksum = await digest(bytes);
@@ -417,6 +422,7 @@ export class UserFiles {
     parts?: UploadedFilePart[],
     options?: RequestOptions,
   ): Promise<UserFile> {
+    options = requestOptions(options);
     const result = await this.#http.postResponse<{ file?: UserFile }>(
       `${uploadPath(uploadId)}/complete`,
       parts === undefined ? {} : { parts },
@@ -429,6 +435,7 @@ export class UserFiles {
     uploadId: string,
     options?: RequestOptions,
   ): Promise<UserFile> {
+    options = requestOptions(options);
     const result = await this.#http.deleteResponse<{ file?: UserFile }>(
       uploadPath(uploadId),
       { ...options, outcomeUnknown: true },
@@ -527,7 +534,7 @@ export class UserFiles {
     } catch (cause) {
       if (cause instanceof OutcomeUnknownError)
         throw new FileUploadOutcomeUnknownError(
-          input.idempotencyKey,
+          metadata.idempotencyKey,
           uploadId,
           cause,
         );
@@ -553,6 +560,7 @@ export class UserFiles {
   }
 
   async get(fileId: string, options?: RequestOptions): Promise<UserFile> {
+    options = requestOptions(options);
     return (
       await this.#http.get<{ file: UserFile }>(
         `/api/v1/files/${encodeURIComponent(fileId)}`,
@@ -565,6 +573,7 @@ export class UserFiles {
     fileId: string,
     options?: RequestOptions,
   ): Promise<FileContent> {
+    options = requestOptions(options);
     const { response, requestId } = await this.#http.rawResponse(
       `/api/v1/files/${encodeURIComponent(fileId)}/content`,
       options,
@@ -607,6 +616,7 @@ export class UserFiles {
     grant: FileDownloadGrant,
     options?: RequestOptions,
   ): Promise<Uint8Array> {
+    options = requestOptions(options);
     requireActiveGrant(grant.expiresAt);
     let destination = transferUrl(this.#http.resolveUrl(grant.url));
     options?.signal?.throwIfAborted();
@@ -666,6 +676,7 @@ export class UserFiles {
     fileId: string,
     options?: RequestOptions,
   ): Promise<Uint8Array> {
+    options = requestOptions(options);
     const file = await this.get(fileId, options);
     if (
       file.status !== "ready" ||

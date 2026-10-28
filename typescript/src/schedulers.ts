@@ -1,4 +1,5 @@
 import {
+  requestOptions,
   HttpClient,
   requireKnownKeys,
   paginationQuery,
@@ -181,6 +182,7 @@ export class UserSchedulers {
     schedulerId: string,
     options?: RequestOptions,
   ): Promise<SchedulerResponse> {
+    options = requestOptions(options);
     return receipt(
       await this.#http.getResponse(path(schedulerId), options),
       false,

@@ -71,13 +71,19 @@ test("an explicit SDK retry produces its own result without rewriting the stoppe
   const retry = await session.retry(command);
   assert.equal(retry.disposition, "retrying");
   assert.equal(retry.turnId, accepted.turnId);
-  const result = await controlTurnWorkflow({
+  const observation = await Array.fromAsync(
+    session.observe(retry.clientEventId, { timeoutMs: 15000 }),
+  );
+  assert.equal(observation.at(-1).type, "result");
+  const result = observation.at(-1).result;
+  const exampleResult = await controlTurnWorkflow({
     baseUrl: process.env.SDK_SERVICE_URL,
     userApiKey: process.env.SDK_USER_KEY,
     sessionId: session.id,
     ...command,
     action: "retry",
   });
+  assert.deepEqual(exampleResult, result);
   assert.equal(result.text, "Retried task completed.");
   assert.equal(result.interaction.kind, "retry");
   assert.notEqual(

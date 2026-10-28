@@ -135,8 +135,10 @@ export async function* observeTurn(
   try {
     const receipt = await getInteraction(http, sessionId, inputId, request);
     turnId = receipt.turnId;
-    if (receipt.kind !== "message")
-      throw new TiDBLinkError("Turn observation requires a message receipt");
+    if (receipt.kind !== "message" && receipt.kind !== "retry")
+      throw new TiDBLinkError(
+        "Turn observation requires a message or checkpoint retry receipt",
+      );
     if (
       receipt.rejection ||
       receipt.mode === "rejected" ||

@@ -3,9 +3,9 @@
 Official TypeScript SDK for Node.js 22.12 or newer. ESM only, with TypeScript
 declarations and no runtime dependencies.
 
-## Current refresh scope
+## Supported scope
 
-This refresh supports Organization information, End User provisioning, User API
+This package supports Organization information, End User provisioning, User API
 Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments, Schedulers,
@@ -15,7 +15,7 @@ Realtime Model/Connection preparation, prerecorded audio and User usage reads fo
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
 default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
-outside this refresh.
+outside this package.
 
 ## Quick start
 
@@ -29,67 +29,87 @@ npm pack --workspace @mem9/tidb-link
 npm install /path/to/mem9-tidb-link-0.3.0.tgz
 ```
 
-An application backend uses an Organization API Key (`ti_org_…`). The service
-derives its Organization from that key; no Organization, User or Project selector
-is accepted by this client.
+An application backend uses an Organization API Key (`ti_org_…`) to provision an
+End User and issue its User API Key (`ti_user_…`). The credential determines the
+Organization; Organization operations name an explicit target User when needed.
+A User key then owns the application's Agent and Session workflow.
 
-```ts
-import { OrganizationClient } from "@mem9/tidb-link";
-
-const organization = new OrganizationClient({
-  baseUrl: process.env.AGENT_SERVICE_URL!,
-  apiKey: process.env.ORGANIZATION_API_KEY!,
-});
-const current = await organization.getOrganization();
-const user = await organization.createEndUser({
-  externalId: "your-application-user-id",
-  displayName: "Customer",
-});
-const issued = await organization.createUserApiKey(user.userId, {
-  name: "backend",
-});
-// Store user.userId in your application mapping and issued.token in your secret manager.
-```
-
-`externalId` is unique within the Organization. Creating it again returns
-`ConflictError` with code `resource_conflict`; it does not return the existing
-User. Use `listEndUsers()` and match `externalId` when finding an existing mapping
-or reconciling an uncertain creation, then `getEndUser(userId)` to retrieve it.
-These User and Key lists return complete arrays; this baseline has no pagination.
-A request ID identifies a request for diagnosis and does not deduplicate creation.
-
-The packaged example performs that lookup and reconciliation:
+The installed examples compose into one complete first-use workflow:
 
 ```js
+import { randomUUID } from "node:crypto";
+import { UserClient } from "@mem9/tidb-link";
 import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
-const { organization, user, apiKey, token } = await provisionUser({
-  baseUrl: process.env.AGENT_SERVICE_URL,
+import { createSessionWorkflow } from "@mem9/tidb-link/examples/create-session.mjs";
+import { sendMessageWorkflow } from "@mem9/tidb-link/examples/send-message.mjs";
+
+const baseUrl = process.env.AGENT_SERVICE_URL;
+const provisioned = await provisionUser({
+  baseUrl,
   organizationApiKey: process.env.ORGANIZATION_API_KEY,
   externalId: "your-application-user-id",
 });
-// Persist the mapping and token securely; never log token.
+// Store the User mapping and provisioned.token securely now; never log the token.
+const customer = new UserClient({ baseUrl, apiKey: provisioned.token });
+const page = await customer.listAgentTemplates();
+const template = page.templates[0];
+if (!template) throw new Error("Select an available Template; follow nextCursor if hasMore");
+const models = await customer.listModels();
+const creation = {
+  baseUrl, userApiKey: provisioned.token,
+  agentTemplateId: template.agentTemplateId,
+  model: models.effectiveDefaultModel,
+  agentCreationKey: randomUUID(), sessionCreationKey: randomUUID(),
+};
+// Save the selected Template/model and both creation keys before dispatch.
+const { session } = await createSessionWorkflow(creation);
+const message = {
+  baseUrl, userApiKey: provisioned.token, sessionId: session.id,
+  clientEventId: randomUUID(), text: "Help me plan a trip",
+};
+// Save the Session, command identity and message before dispatch.
+const result = await sendMessageWorkflow(message);
+console.log(result.text);
+const original = await session.reconcileInteraction(message.clientEventId);
+const recovered = await session.waitForResult(message.clientEventId);
 ```
 
-It can also run directly after setting `AGENT_SERVICE_URL`,
-`ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID`, and `USER_CREDENTIAL_FILE`:
+On normal startup, load the retained User credential and identities instead of
+repeating provisioning. **Every successful `provisionUser` call issues a new
+key**, even for an existing User. Repeating the same Agent/Session creation keys
+and inputs recovers those resources; reading the original message receipt or
+waiting again does not execute another Turn. See [text results and recovery](#text-messages-and-original-results)
+for uncertain submissions and local timeouts.
+
+`externalId` is unique within the Organization. Direct `createEndUser` repetition
+returns `ConflictError` with code `resource_conflict`; it does not return the
+existing User. `provisionUser` reconciles through `listEndUsers` and `externalId`.
+User and Key lists return complete arrays; this baseline has no pagination for
+those lists. An HTTP request ID is diagnostic, not a creation identity. A lost
+key-issuance response cannot recover its plaintext secret from metadata.
+
+The provisioning example can also run after setting `AGENT_SERVICE_URL`,
+`ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID` and `USER_CREDENTIAL_FILE`:
 
 ```sh
 node node_modules/@mem9/tidb-link/examples/provision-user.mjs
 ```
 
-The CLI reserves a new private file before issuing a key and writes the result,
-including the token, there. It refuses to overwrite an existing file. A failed
-run can leave an empty file; inspect the failure before trying again. **Every
-successful invocation issues a new key**, even for an existing User. Reuse the
-stored credential during normal application startup.
+Its CLI reserves a new private file before issuing a key, saves the credential
+there and refuses to overwrite an existing file. A failed run can leave an empty
+file; reconcile the outcome before deliberately issuing another credential.
 
 ## Key management
 
 ```ts
-const keys = await organization.listUserApiKeys(user.userId);
-const replacement = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
+import { OrganizationClient } from "@mem9/tidb-link";
+const organization = new OrganizationClient({
+  baseUrl, apiKey: process.env.ORGANIZATION_API_KEY,
+});
+const keys = await organization.listUserApiKeys(provisioned.user.userId);
+const replacement = await organization.rotateUserApiKey(provisioned.apiKey.apiKeyId);
 // Save replacement.token; the previous token immediately stops authenticating.
-const revoked = await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
+const revoked = await organization.revokeUserApiKey(provisioned.apiKey.apiKeyId);
 ```
 
 Create and rotate return `{ apiKey, token }`. List and revoke return metadata
@@ -243,7 +263,8 @@ raises `ConflictError` with `interaction_input_conflict`.
 Text accepts a string or a nonempty ordered array of up to nine strings for
 clarification answers. `clarificationSourceTurnId` links a saved Clarification
 Item. Optional `billingTag` (including null) and ready `userFileIds` are passed
-through; this slice does not implement file upload. Successful `TurnResult`
+through; use [file attachments](#file-attachments) to upload and verify them.
+Successful `TurnResult`
 contains the original `inputId`, `sessionId`, `turnId`, saved `messageId`, `text`
 and `interaction`; a clarification additionally contains `clarification`.
 Drafts, Session idleness, EOF and acceptance never establish success.
@@ -323,7 +344,9 @@ for await (const update of session.observe(accepted.inputId, {
 successful result. Only `type: "result"` establishes the original command's
 successful outcome using its durable receipt and matching saved Turn. Failures,
 interruption and unincorporated inputs use the same errors as `waitForResult()`.
-A later explicit retry cannot replace the earlier command's result.
+A later explicit retry cannot replace the earlier command's result. `observe()`
+also accepts the separate retry command identity, using the same original-result
+checks as `waitForResult()`; cancellation receipts are not answer receipts.
 
 `ObservationStoppedError` retains `sessionId`, `inputId`, `turnId` when known,
 the last `cursor`, and `timedOut`. On disconnect, local abort or timeout, preserve
@@ -848,8 +871,8 @@ a first detail page is complete history.
 ## Compatibility and verification
 
 `TIDB_LINK_REVISION` / `tidbLinkRevision` identify the selected exact service
-revision. The provisioning, lifecycle, Realtime and text constants and package
-fields identify their individually verified slices. `TIDB_LINK_TEXT_REVISION` /
+revision. The retained provisioning, lifecycle, Realtime and text constants and package
+fields point to that same baseline. All supported capabilities use this revision. `TIDB_LINK_TEXT_REVISION` /
 `tidbLinkTextRevision` covers text and control commands, progress, original results and history;
 `tidbLinkTextOpenApiSha256` pins the selected service's `docs/openapi.yaml`.
 `TIDB_LINK_API_VERSION` remains `0.0.1`; the version string alone does not establish
@@ -877,8 +900,10 @@ This command requires a clean service checkout at the exact revision and resets
 all rows in the selected test database before and after the run. It uses the
 service's existing AppModule test fixture, genuine credentials, real TiDB and
 controlled model dependencies. Fixtures prepare identities, Templates and eligible
-Realtime Sessions; public SDK methods perform Template-to-Agent-to-Session
-creation, ownership checks, lifecycle updates and Realtime operations. Text cases
+Realtime Sessions. A composed installed quickstart provisions one fresh User/key,
+discovers Templates/models, creates an Agent and Session, obtains a final answer
+and recovers the same original result. Public SDK methods also verify ownership,
+lifecycle updates and Realtime operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor

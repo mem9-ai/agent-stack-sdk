@@ -8,7 +8,12 @@ import {
 } from "./usage.js";
 import type { AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
-import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
+import {
+  HttpClient,
+  isApiKey,
+  requireKnownKeys,
+  requestOptions,
+} from "./http.js";
 
 export interface OrganizationClientOptions {
   baseUrl: string;
@@ -85,11 +90,6 @@ const issuedUserApiKey = (
     );
   }
   return result as IssuedUserApiKey;
-};
-
-const requestOptions = (options: RequestOptions = {}): RequestOptions => {
-  requireKnownKeys(options, ["requestId", "signal"], "Request options");
-  return options;
 };
 
 /** Customer operations authorized by an Organization API Key. */

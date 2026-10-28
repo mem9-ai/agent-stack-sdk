@@ -189,6 +189,48 @@ test("observation uses replacement drafts and the original receipt to establish 
   assert(requests.every((method) => method === "GET"));
 });
 
+test("observation follows a running checkpoint retry to its own saved terminal result", async () => {
+  let completed = false;
+  const retry = {
+    ...runningReceipt,
+    inputId: "retry_1",
+    kind: "retry",
+    message: null,
+    appliedAt: null,
+  };
+  const baseUrl = await serve((req, res) => {
+    if (req.url.endsWith("/interactions/retry_1"))
+      return json(res, {
+        interaction: completed
+          ? { ...retry, result: { status: "succeeded", completedAt } }
+          : retry,
+      });
+    if (req.url.endsWith("/turns/turn_1"))
+      return json(res, { turn: savedTurn });
+    completed = true;
+    res
+      .writeHead(200, { "content-type": "text/event-stream" })
+      .end(
+        frame("retry-progress", "agent.session.turn.progress", "progress", {
+          text: "Continuing original work",
+        }) +
+          frame(
+            "retry-complete",
+            "agent.session.turn.completed",
+            "turn_finished",
+            { status: "succeeded" },
+          ),
+      );
+  });
+  const updates = await Array.fromAsync(sessionFor(baseUrl).observe("retry_1"));
+  assert.equal(updates[0].type, "progress");
+  const result = updates.at(-1).result;
+  assert.equal(result.text, "Final answer");
+  assert.equal(result.inputId, "retry_1");
+  assert.equal(result.interaction.kind, "retry");
+  assert.equal(result.interaction.result.completedAt, completedAt);
+});
+
 test("EOF is a recoverable stopped observation with the last cursor, never successful execution", async () => {
   const baseUrl = await serve((req, res) =>
     req.url.endsWith("/interactions/input_1")

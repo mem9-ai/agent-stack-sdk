@@ -33,6 +33,7 @@ import {
 import { OutcomeUnknownError } from "./errors.js";
 import type { RequestOptions } from "./organization.js";
 import {
+  requestOptions,
   HttpClient,
   requireEtag,
   requireKnownKeys,
@@ -172,6 +173,7 @@ export class Session {
   }
 
   async refresh(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.getResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
       options,
@@ -186,6 +188,7 @@ export class Session {
     model: SelectableSessionModel,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     if (!this.#etag) await this.refresh(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/model`,
@@ -208,6 +211,7 @@ export class Session {
   }
 
   async rename(name: string, options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.postResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name`,
       { name },
@@ -221,6 +225,7 @@ export class Session {
     input: SuggestSessionNameInput,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     requireKnownKeys(
       input,
       ["userText", "assistantText"],
@@ -239,6 +244,7 @@ export class Session {
     billingTag: BillingTag | null,
     options?: RequestOptions,
   ): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/billing-tag`,
       { billingTag },
@@ -249,6 +255,7 @@ export class Session {
   }
 
   async delete(options?: RequestOptions): Promise<this> {
+    options = requestOptions(options);
     const result = await this.#http.deleteResponse<{ session: SessionRecord }>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
       { ...options, outcomeUnknown: true },
@@ -261,6 +268,7 @@ export class Session {
     input: OpenRealtimeConnectionInput = {},
     options?: { signal?: AbortSignal },
   ): Promise<OpenRealtimeConnectionResult> {
+    options = requestOptions(options);
     requireKnownKeys(input, ["audio", "metadata"], "Realtime Connection input");
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
@@ -276,6 +284,7 @@ export class Session {
   async getRealtimeConnection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnection> {
+    options = requestOptions(options);
     const response = await this.#http.get<{
       realtimeConnection: RealtimeConnection;
     }>(
@@ -288,6 +297,7 @@ export class Session {
   async createRealtimeConnectToken(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnectGrant> {
+    options = requestOptions(options);
     const result = await this.#http.postResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime/connect-tokens`,
       undefined,
@@ -302,6 +312,7 @@ export class Session {
   async endRealtimeConnection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeConnection> {
+    options = requestOptions(options);
     const result = await this.#http.deleteResponse<unknown>(
       `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
       {
@@ -315,6 +326,7 @@ export class Session {
   async getRealtimeModelSelection(options?: {
     signal?: AbortSignal;
   }): Promise<RealtimeModelSelection> {
+    options = requestOptions(options);
     const response = await this.#http.get<{
       session: RealtimeSessionSelectionFields;
     }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}`, options);

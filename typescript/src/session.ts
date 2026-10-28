@@ -1,3 +1,11 @@
+import {
+  sessionEvents,
+  observeTurn,
+  type SessionEvent,
+  type SessionEventsOptions,
+  type ObserveTurnOptions,
+  type TurnObservation,
+} from "./progress.js";
 import { OutcomeUnknownError } from "./errors.js";
 import type { RequestOptions } from "./organization.js";
 import {
@@ -315,6 +323,17 @@ export class Session {
       receipt?.session,
       result.requestId,
     );
+  }
+
+  events(options?: SessionEventsOptions): AsyncGenerator<SessionEvent> {
+    return sessionEvents(this.#http, this.id, options);
+  }
+
+  observe(
+    inputId: string,
+    options?: ObserveTurnOptions,
+  ): AsyncGenerator<TurnObservation> {
+    return observeTurn(this.#http, this.id, inputId, options);
   }
 
   history(options?: ListOptions): Promise<TurnPage> {

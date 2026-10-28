@@ -28,6 +28,7 @@ export {
   TurnWaitTimeoutError,
   InputNotAppliedError,
   OutcomeUnknownError,
+  ObservationStoppedError,
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
@@ -105,3 +106,10 @@ export type {
   SessionTimelineEntry,
   SessionTimelinePage,
 } from "./history.js";
+
+export type {
+  SessionEvent,
+  SessionEventsOptions,
+  ObserveTurnOptions,
+  TurnObservation,
+} from "./progress.js";

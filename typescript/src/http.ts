@@ -11,6 +11,12 @@ const MAX_ATTEMPTS = 3;
 
 type RetryMode = "never" | "safe";
 
+export interface RawRequestOptions extends Omit<RequestOptions, "body"> {
+  body?: BodyInit;
+  headers?: Record<string, string>;
+}
+
+
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
@@ -189,23 +195,6 @@ export class HttpClient {
     this.#apiKey = input.apiKey;
   }
 
-  #headers(
-    options: RequestOptions,
-    stableRequestId: string,
-  ): Record<string, string> {
-    return {
-      accept: "application/json",
-      authorization: `Bearer ${this.#apiKey}`,
-      "x-request-id": stableRequestId,
-      ...(options.idempotencyKey
-        ? { "idempotency-key": options.idempotencyKey }
-        : {}),
-      ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
-      ...(options.body === undefined
-        ? {}
-        : { "content-type": "application/json" }),
-    };
-  }
 
   get<T>(
     path: string,
@@ -296,6 +285,28 @@ export class HttpClient {
     path: string,
     options: RequestOptions = {},
   ): Promise<HttpResult<T>> {
+    const { body, ...requestOptions } = options;
+    const { response, requestId } = await this.rawResponse(path, {
+      ...requestOptions,
+      ...(body === undefined ? {} : {
+        body: JSON.stringify(body),
+        headers: { "content-type": "application/json" },
+      }),
+    });
+    let data: T;
+    try {
+      data = response.status === 204 ? undefined as T : await response.json() as T;
+    } catch (cause) {
+      const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : TiDBLinkError;
+      throw new ErrorClass(options.outcomeUnknown
+        ? "TiDB Link accepted the request but returned an unusable response"
+        : "TiDB Link returned invalid JSON", { requestId, cause });
+    }
+    return { data, etag: response.headers.get("etag") ?? undefined, requestId };
+  }
+
+  /** Raw bytes and event streams retain the same credential, redirect and error boundary. */
+  async rawResponse(path: string, options: RawRequestOptions = {}): Promise<{ response: Response; requestId: string }> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
@@ -317,10 +328,17 @@ export class HttpClient {
         response = await fetch(`${this.#baseUrl}${path}`, {
           method: options.method ?? "GET",
           redirect: "error",
-          headers: this.#headers(options, stableRequestId),
+          headers: {
+            accept: "application/json",
+            ...options.headers,
+            authorization: `Bearer ${this.#apiKey}`,
+            "x-request-id": stableRequestId,
+            ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+            ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
+          },
           ...(options.body === undefined
             ? {}
-            : { body: JSON.stringify(options.body) }),
+            : { body: options.body }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
@@ -347,35 +365,10 @@ export class HttpClient {
         );
       }
 
-      if (response.ok) {
-        let data: T;
-        if (response.status === 204) {
-          data = undefined as T;
-        } else {
-          try {
-            data = (await response.json()) as T;
-          } catch (cause) {
-            const ErrorClass = options.outcomeUnknown
-              ? OutcomeUnknownError
-              : TiDBLinkError;
-            throw new ErrorClass(
-              options.outcomeUnknown
-                ? "TiDB Link accepted the request but returned an unusable response"
-                : "TiDB Link returned invalid JSON",
-              {
-                requestId:
-                  response.headers.get("x-request-id") ?? stableRequestId,
-                cause,
-              },
-            );
-          }
-        }
-        return {
-          data,
-          etag: response.headers.get("etag") ?? undefined,
-          requestId: response.headers.get("x-request-id") ?? stableRequestId,
-        };
-      }
+      if (response.ok) return {
+        response,
+        requestId: response.headers.get("x-request-id") ?? stableRequestId,
+      };
 
       if (attempt < attempts && RETRYABLE_STATUS.has(response.status)) {
         await response.arrayBuffer().catch(() => undefined);

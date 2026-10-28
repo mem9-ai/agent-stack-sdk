@@ -31,6 +31,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
+  assert(files.includes("examples/observe-message.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -42,6 +43,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
+        file === "examples/observe-message.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -87,6 +89,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionTimelinePage,
       TurnPage,
       WaitForResultOptions,
+      SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
     } from "@mem9/tidb-link";
     import {
       TIDB_LINK_API_VERSION,
@@ -96,6 +99,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TIDB_LINK_LIFECYCLE_REVISION,
       TIDB_LINK_TEXT_REVISION,
       OutcomeUnknownError,
+      ObservationStoppedError,
       TurnWaitTimeoutError,
       TurnFailedError,
       TurnInterruptedError,
@@ -127,6 +131,22 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const revoked: UserApiKey = await organization.revokeUserApiKey(rotated.apiKey.apiKeyId);
       void current; void users; void keys; void revoked;
       return found;
+    }
+    async function progressWorkflow(session: Session) {
+      const options: SessionEventsOptions = {cursor: "saved-position"};
+      for await (const event of session.events(options)) {
+        const typed: SessionEvent = event;
+        void typed;
+      }
+      const observation: ObserveTurnOptions = {timeoutMs: 15000};
+      for await (const update of session.observe("original-input", observation)) {
+        const typed: TurnObservation = update;
+        if (typed.type === "draft" || typed.type === "progress") {const text: string = typed.text; void text;}
+        if (typed.type === "result") {const result: TurnResult = typed.result; void result;}
+      }
+      const stopped = new ObservationStoppedError("Stopped", {sessionId: session.id, inputId: "original-input", cursor: "saved-position"});
+      const cursor: string | undefined = stopped.cursor;
+      void cursor;
     }
     async function lifecycleWorkflow(): Promise<Session> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
@@ -318,6 +338,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
     const { sendMessageWorkflow } = await import("@mem9/tidb-link/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
+    const { observeMessageWorkflow } = await import("@mem9/tidb-link/examples/observe-message.mjs");
+    assert.equal(typeof observeMessageWorkflow,"function");
     assert.equal(sdk.TIDB_LINK_TEXT_REVISION, "0d11f1b231879c735bd53b60ff895ac58ba60d33");
     const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");

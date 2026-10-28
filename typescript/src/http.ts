@@ -22,6 +22,36 @@ interface RequestOptions {
   outcomeUnknown?: boolean;
 }
 
+export interface ListOptions {
+  limit?: number;
+  cursor?: string;
+  signal?: AbortSignal;
+  requestId?: string;
+}
+
+export const paginationQuery = (options?: ListOptions): string => {
+  if (options)
+    requireKnownKeys(
+      options,
+      ["limit", "cursor", "signal", "requestId"],
+      "List options",
+    );
+  const query = new URLSearchParams();
+  if (options?.limit !== undefined) query.set("limit", String(options.limit));
+  if (options?.cursor !== undefined) query.set("cursor", options.cursor);
+  return query.size ? `?${query}` : "";
+};
+
+export function requireCreationKey(value: unknown): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value)
+  )
+    throw new TypeError(
+      "Creation requires a stable idempotencyKey (1-128 safe characters)",
+    );
+}
+
 export interface HttpResult<T> {
   data: T;
   etag: string | undefined;
@@ -60,6 +90,22 @@ const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => {
   });
 };
 
+const pauseBeforeRetry = async (
+  milliseconds: number,
+  options: RequestOptions,
+  requestId: string,
+): Promise<void> => {
+  try {
+    await sleep(milliseconds, options.signal);
+  } catch (cause) {
+    if (!options.outcomeUnknown) throw cause;
+    throw new OutcomeUnknownError(
+      "TiDB Link request outcome is unknown after local waiting stopped; recover with the same creation key",
+      { requestId, cause },
+    );
+  }
+};
+
 const errorInput = async (
   response: Response,
   fallbackRequestId: string,
@@ -71,9 +117,17 @@ const errorInput = async (
     value = undefined;
   }
   const envelope = value as {
-    error?: { code?: unknown; message?: unknown; details?: unknown; requestId?: unknown };
+    error?: {
+      code?: unknown;
+      message?: unknown;
+      details?: unknown;
+      requestId?: unknown;
+    };
   };
-  const error = typeof envelope?.error === "object" && envelope.error !== null ? envelope.error : undefined;
+  const error =
+    typeof envelope?.error === "object" && envelope.error !== null
+      ? envelope.error
+      : undefined;
   return {
     status: response.status,
     code: typeof error?.code === "string" ? error.code : "http_error",
@@ -81,7 +135,11 @@ const errorInput = async (
       typeof error?.message === "string"
         ? error.message
         : `TiDB Link request failed with status ${response.status}`,
-    requestId: response.headers.get("x-request-id") ?? (typeof error?.requestId === "string" ? error.requestId : fallbackRequestId),
+    requestId:
+      response.headers.get("x-request-id") ??
+      (typeof error?.requestId === "string"
+        ? error.requestId
+        : fallbackRequestId),
     ...(error && "details" in error ? { details: error.details } : {}),
   };
 };
@@ -113,9 +171,14 @@ export function requireKnownKeys(
 }
 
 /** Check the frozen wire grammar without retaining or exposing the credential. */
-export const isApiKey = (value: unknown, kind: "org" | "user"): value is string => {
+export const isApiKey = (
+  value: unknown,
+  kind: "org" | "user",
+): value is string => {
   if (typeof value !== "string") return false;
-  const match = /^ti_(org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.exec(value);
+  const match = /^ti_(org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.exec(
+    value,
+  );
   return match !== null && match[0] === value && match[1] === kind;
 };
 
@@ -128,29 +191,45 @@ export class HttpClient {
     this.#apiKey = input.apiKey;
   }
 
-  #headers(options: RequestOptions, stableRequestId: string): Record<string, string> {
+  #headers(
+    options: RequestOptions,
+    stableRequestId: string,
+  ): Record<string, string> {
     return {
       accept: "application/json",
       authorization: `Bearer ${this.#apiKey}`,
       "x-request-id": stableRequestId,
-      ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+      ...(options.idempotencyKey
+        ? { "idempotency-key": options.idempotencyKey }
+        : {}),
       ...(options.ifMatch ? { "if-match": options.ifMatch } : {}),
-      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.body === undefined
+        ? {}
+        : { "content-type": "application/json" }),
     };
   }
 
-  get<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<T> {
+  get<T>(
+    path: string,
+    options?: Pick<RequestOptions, "signal" | "requestId">,
+  ): Promise<T> {
     return this.request(path, { ...options, retry: "safe" });
   }
 
-  getResponse<T>(path: string, options?: Pick<RequestOptions, "signal" | "requestId">): Promise<HttpResult<T>> {
+  getResponse<T>(
+    path: string,
+    options?: Pick<RequestOptions, "signal" | "requestId">,
+  ): Promise<HttpResult<T>> {
     return this.response(path, { ...options, retry: "safe" });
   }
 
   post<T>(
     path: string,
     body: unknown,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal"> & {
+    options?: Pick<
+      RequestOptions,
+      "outcomeUnknown" | "requestId" | "signal"
+    > & {
       idempotent?: boolean;
     },
   ): Promise<T> {
@@ -181,7 +260,10 @@ export class HttpClient {
   patchResponse<T>(
     path: string,
     body: unknown,
-    options: Pick<RequestOptions, "ifMatch" | "outcomeUnknown" | "signal">,
+    options: Pick<
+      RequestOptions,
+      "ifMatch" | "outcomeUnknown" | "requestId" | "signal"
+    >,
   ): Promise<HttpResult<T>> {
     return this.response(path, { ...options, method: "PATCH", body });
   }
@@ -189,21 +271,21 @@ export class HttpClient {
   put<T>(
     path: string,
     body: unknown,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
   ): Promise<T> {
     return this.request(path, { ...options, method: "PUT", body });
   }
 
   deleteResponse<T>(
     path: string,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
   ): Promise<HttpResult<T>> {
     return this.response(path, { ...options, method: "DELETE" });
   }
 
   delete<T>(
     path: string,
-    options?: Pick<RequestOptions, "outcomeUnknown" | "signal">,
+    options?: Pick<RequestOptions, "outcomeUnknown" | "requestId" | "signal">,
   ): Promise<T> {
     return this.request(path, { ...options, method: "DELETE" });
   }
@@ -247,10 +329,16 @@ export class HttpClient {
         ? new ConflictError(input)
         : new TiDBLinkApiError(input);
     }
-    if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
-      throw new OutcomeUnknownError("TiDB Link returned an invalid Turn stream", {
-        requestId: response.headers.get("x-request-id") ?? stableRequestId,
-      });
+    if (
+      !response.body ||
+      !response.headers.get("content-type")?.includes("application/x-ndjson")
+    ) {
+      throw new OutcomeUnknownError(
+        "TiDB Link returned an invalid Turn stream",
+        {
+          requestId: response.headers.get("x-request-id") ?? stableRequestId,
+        },
+      );
     }
     return {
       response,
@@ -262,16 +350,22 @@ export class HttpClient {
     return (await this.response<T>(path, options)).data;
   }
 
-  async response<T>(path: string, options: RequestOptions = {}): Promise<HttpResult<T>> {
+  async response<T>(
+    path: string,
+    options: RequestOptions = {},
+  ): Promise<HttpResult<T>> {
     const stableRequestId = options.requestId ?? requestId();
     if (!REQUEST_ID.test(stableRequestId)) {
       throw new TypeError("requestId must be 1-64 safe characters");
     }
     if (
       options.idempotencyKey !== undefined &&
-      (options.idempotencyKey.length > 255 || !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
+      (options.idempotencyKey.length > 255 ||
+        !/^[\x20-\x7e]+$/.test(options.idempotencyKey))
     ) {
-      throw new TypeError("idempotencyKey must be 1-255 visible ASCII characters");
+      throw new TypeError(
+        "idempotencyKey must be 1-255 visible ASCII characters",
+      );
     }
     options.signal?.throwIfAborted();
     const attempts = options.retry === "safe" ? MAX_ATTEMPTS : 1;
@@ -282,16 +376,24 @@ export class HttpClient {
           method: options.method ?? "GET",
           redirect: "error",
           headers: this.#headers(options, stableRequestId),
-          ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          ...(options.body === undefined
+            ? {}
+            : { body: JSON.stringify(options.body) }),
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (cause) {
         if (options.signal?.aborted && !options.outcomeUnknown) throw cause;
-        if (attempt < attempts) {
-          await sleep(100 * 2 ** (attempt - 1), options.signal);
+        if (attempt < attempts && !options.signal?.aborted) {
+          await pauseBeforeRetry(
+            100 * 2 ** (attempt - 1),
+            options,
+            stableRequestId,
+          );
           continue;
         }
-        const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : ConnectionError;
+        const ErrorClass = options.outcomeUnknown
+          ? OutcomeUnknownError
+          : ConnectionError;
         throw new ErrorClass(
           options.outcomeUnknown
             ? "TiDB Link request outcome is unknown; do not repeat it automatically"
@@ -311,13 +413,16 @@ export class HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (cause) {
-            const ErrorClass = options.outcomeUnknown ? OutcomeUnknownError : TiDBLinkError;
+            const ErrorClass = options.outcomeUnknown
+              ? OutcomeUnknownError
+              : TiDBLinkError;
             throw new ErrorClass(
               options.outcomeUnknown
                 ? "TiDB Link accepted the request but returned an unusable response"
                 : "TiDB Link returned invalid JSON",
               {
-                requestId: response.headers.get("x-request-id") ?? stableRequestId,
+                requestId:
+                  response.headers.get("x-request-id") ?? stableRequestId,
                 cause,
               },
             );
@@ -331,20 +436,33 @@ export class HttpClient {
       }
 
       if (attempt < attempts && RETRYABLE_STATUS.has(response.status)) {
-        await response.arrayBuffer();
-        await sleep(100 * 2 ** (attempt - 1), options.signal);
+        await response.arrayBuffer().catch(() => undefined);
+        await pauseBeforeRetry(
+          100 * 2 ** (attempt - 1),
+          options,
+          stableRequestId,
+        );
         continue;
       }
 
       const input = await errorInput(response, stableRequestId);
-      const error = input.status === 409 || input.status === 412
-        ? new ConflictError(input)
-        : new TiDBLinkApiError(input);
-      if (options.outcomeUnknown && (input.status >= 500 || input.status === 408)) {
-        throw new OutcomeUnknownError("TiDB Link could not confirm the mutation outcome", {
-          ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
-          cause: error,
-        });
+      const error =
+        input.status === 409 || input.status === 412
+          ? new ConflictError(input)
+          : new TiDBLinkApiError(input);
+      if (
+        options.outcomeUnknown &&
+        (input.status >= 500 || input.status === 408)
+      ) {
+        throw new OutcomeUnknownError(
+          "TiDB Link could not confirm the mutation outcome",
+          {
+            ...(input.requestId === undefined
+              ? {}
+              : { requestId: input.requestId }),
+            cause: error,
+          },
+        );
       }
       throw error;
     }

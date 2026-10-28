@@ -1,4 +1,11 @@
-import { HttpClient, requireEtag, requireKnownKeys } from "./http.js";
+import { OutcomeUnknownError } from "./errors.js";
+import type { RequestOptions } from "./organization.js";
+import {
+  HttpClient,
+  requireEtag,
+  requireKnownKeys,
+  requireCreationKey,
+} from "./http.js";
 import {
   realtimeModelSelectionFrom,
   requireOpenRealtimeConnectionReceipt,
@@ -20,17 +27,21 @@ import {
   type TurnStreamEvent,
 } from "./turn.js";
 
-export type SelectableSessionModel =
-  | "gpt-6-astra"
-  | "gpt-5.6-sol"
-  | "gpt-5.6-terra"
-  | "gpt-5.6-luna"
-  | "claude-haiku-4-5"
-  | "claude-sonnet-5"
-  | "claude-opus-5"
-  | "DeepSeek-V4-Flash";
+/** Model IDs come from the deployment catalog, including newly published models. */
+export type SelectableSessionModel = string;
+export type SessionModel = string;
 
-export type SessionModel = SelectableSessionModel | "gpt-5.4";
+export interface CreateSessionOptions extends RequestOptions {
+  idempotencyKey: string;
+  model?: string;
+  realtimeModel?: string;
+  billingTag?: BillingTag | null;
+}
+
+export interface SuggestSessionNameInput {
+  userText: string;
+  assistantText?: string;
+}
 
 export interface BillingTag {
   key: string;
@@ -44,14 +55,24 @@ export interface SessionRecord {
   autoTitle: string | null;
   ownerUserId: string;
   startedByUserId: string;
-  createdByType: "user" | "scheduler" | "voice";
+  createdByType: "user" | "scheduler" | "template_preview";
   readOnly: boolean;
   sourceSchedulerId: string | null;
   sourceSchedulerFireId: string | null;
-  sourceVoiceSessionId: string | null;
   billingTag: BillingTag | null;
   model: SessionModel;
   modelRevision: number;
+  realtimeModel: string | null;
+  realtimeModelRevision: number;
+  realtimeModelEtag: string;
+  realtimeVoice: import("./realtime.js").RealtimeVoiceSetting | null;
+  template?: { templateId: string; contentDigest: string } | null;
+  realtime: {
+    id: string;
+    status: "connecting" | "active" | "paused";
+    audio: import("./realtime.js").RealtimeAudioFormats;
+    startedAt: string;
+  } | null;
   createdWithAgentId: string;
   modelPolicyStatus: "allowed" | "organization_disallowed";
   status: "active" | "deleted";
@@ -105,7 +126,12 @@ export class Session {
   #etag: string | undefined;
   #record: SessionRecord | undefined;
 
-  constructor(http: HttpClient, id: string, record?: SessionRecord, etag?: string) {
+  constructor(
+    http: HttpClient,
+    id: string,
+    record?: SessionRecord,
+    etag?: string,
+  ) {
     if (!id) throw new TypeError("Session id is required");
     this.#http = http;
     this.id = id;
@@ -121,29 +147,89 @@ export class Session {
     return this.#record?.model;
   }
 
-  async refresh(options?: { signal?: AbortSignal }): Promise<this> {
+  async refresh(options?: RequestOptions): Promise<this> {
     const result = await this.#http.getResponse<{ session: SessionRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}`,
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
       options,
     );
+    const etag = requireEtag(result);
     this.#record = result.data.session;
-    this.#etag = requireEtag(result);
+    this.#etag = etag;
     return this;
   }
 
-  async setModel(model: SelectableSessionModel, options?: { signal?: AbortSignal }): Promise<this> {
+  async setModel(
+    model: SelectableSessionModel,
+    options?: RequestOptions,
+  ): Promise<this> {
     if (!this.#etag) await this.refresh(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
-      `/api/sessions/${encodeURIComponent(this.id)}/model`,
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/model`,
       { model },
       {
         ifMatch: this.#etag as string,
         outcomeUnknown: true,
-        ...(options?.signal ? { signal: options.signal } : {}),
+        ...options,
       },
     );
-    this.#record = result.data.session;
-    this.#etag = requireEtag(result);
+    if (!result.etag)
+      throw new OutcomeUnknownError(
+        "Session model update returned no model ETag; read the Session before changing it again",
+        { requestId: result.requestId },
+      );
+    this.#record = sessionReceipt(result.data, result.requestId);
+    const etag = result.etag;
+    this.#etag = etag;
+    return this;
+  }
+
+  async rename(name: string, options?: RequestOptions): Promise<this> {
+    const result = await this.#http.postResponse<{ session: SessionRecord }>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name`,
+      { name },
+      { ...options, outcomeUnknown: true },
+    );
+    this.#record = sessionReceipt(result.data, result.requestId);
+    return this;
+  }
+
+  async suggestName(
+    input: SuggestSessionNameInput,
+    options?: RequestOptions,
+  ): Promise<this> {
+    requireKnownKeys(
+      input,
+      ["userText", "assistantText"],
+      "Session naming input",
+    );
+    const result = await this.#http.postResponse<{ session: SessionRecord }>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name/suggest`,
+      input,
+      { ...options, outcomeUnknown: true },
+    );
+    this.#record = sessionReceipt(result.data, result.requestId);
+    return this;
+  }
+
+  async setBillingTag(
+    billingTag: BillingTag | null,
+    options?: RequestOptions,
+  ): Promise<this> {
+    const result = await this.#http.patchResponse<{ session: SessionRecord }>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/billing-tag`,
+      { billingTag },
+      { ...options, outcomeUnknown: true },
+    );
+    this.#record = sessionReceipt(result.data, result.requestId);
+    return this;
+  }
+
+  async delete(options?: RequestOptions): Promise<this> {
+    const result = await this.#http.deleteResponse<{ session: SessionRecord }>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
+      { ...options, outcomeUnknown: true },
+    );
+    this.#record = sessionReceipt(result.data, result.requestId);
     return this;
   }
 
@@ -168,7 +254,10 @@ export class Session {
   }): Promise<RealtimeConnection> {
     const response = await this.#http.get<{
       realtimeConnection: RealtimeConnection;
-    }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`, options);
+    }>(
+      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      options,
+    );
     return response.realtimeConnection;
   }
 
@@ -212,7 +301,11 @@ export class Session {
     model: string,
     options: { ifMatch: string; signal?: AbortSignal },
   ): Promise<RealtimeModelSelection> {
-    requireKnownKeys(options, ["ifMatch", "signal"], "Realtime Model selection options");
+    requireKnownKeys(
+      options,
+      ["ifMatch", "signal"],
+      "Realtime Model selection options",
+    );
     if (!model || model.length > 128)
       throw new TypeError("Realtime Model ID must contain 1-128 characters");
     if (!options.ifMatch)
@@ -241,7 +334,10 @@ export class Session {
     return response.turns;
   }
 
-  async getTurn(turnId: string, options?: { signal?: AbortSignal }): Promise<TurnRecord> {
+  async getTurn(
+    turnId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<TurnRecord> {
     const response = await this.#http.get<{ turn: TurnRecord }>(
       `/api/sessions/${encodeURIComponent(this.id)}/turns/${encodeURIComponent(turnId)}`,
       options,
@@ -258,22 +354,57 @@ export class Session {
   }
 }
 
+const sessionReceipt = (
+  value: { session?: SessionRecord },
+  requestId: string,
+): SessionRecord => {
+  if (
+    typeof value?.session?.sessionId !== "string" ||
+    !value.session.sessionId
+  ) {
+    throw new OutcomeUnknownError(
+      "Session mutation returned no usable Session; reconcile before retrying",
+      { requestId },
+    );
+  }
+  return value.session;
+};
+
 export const createSessionForAgent = async (
   http: HttpClient,
   agentId: string,
-  options?: { billingTag?: BillingTag | null; signal?: AbortSignal },
+  options: CreateSessionOptions,
 ): Promise<Session> => {
-  if (options) requireKnownKeys(options, ["billingTag", "signal"], "Session options");
+  requireKnownKeys(
+    options,
+    [
+      "idempotencyKey",
+      "model",
+      "realtimeModel",
+      "billingTag",
+      "signal",
+      "requestId",
+    ],
+    "Session options",
+  );
+  requireCreationKey(options.idempotencyKey);
+  const { idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
-    "/api/sessions",
+    "/api/v1/user/sessions",
+    { agentId, ...body },
     {
-      agentId,
-      ...(options?.billingTag === undefined ? {} : { billingTag: options.billingTag }),
-    },
-    {
+      idempotencyKey,
+      idempotent: true,
       outcomeUnknown: true,
-      ...(options?.signal ? { signal: options.signal } : {}),
+      ...(signal ? { signal } : {}),
+      ...(requestId ? { requestId } : {}),
     },
   );
-  return new Session(http, result.data.session.sessionId, result.data.session, requireEtag(result));
+  const record = sessionReceipt(result.data, result.requestId);
+  if (!result.etag)
+    throw new OutcomeUnknownError(
+      "Session creation returned no model ETag; recover with the same creation key",
+      { requestId: result.requestId },
+    );
+  return new Session(http, record.sessionId, record, result.etag);
 };

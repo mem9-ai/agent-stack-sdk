@@ -1,3 +1,4 @@
+import type { AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
 import { HttpClient, isApiKey, requireKnownKeys } from "./http.js";
 
@@ -88,13 +89,37 @@ export class OrganizationClient {
   readonly #http: HttpClient;
 
   constructor(options: OrganizationClientOptions) {
-    requireKnownKeys(options, ["baseUrl", "apiKey"], "OrganizationClient options");
+    requireKnownKeys(
+      options,
+      ["baseUrl", "apiKey"],
+      "OrganizationClient options",
+    );
     if (!isApiKey(options.apiKey, "org")) {
       throw new TypeError(
         "OrganizationClient requires an Organization API Key",
       );
     }
     this.#http = new HttpClient(options);
+  }
+
+  async unlinkAgent(
+    userId: string,
+    agentId: string,
+    options?: RequestOptions,
+  ): Promise<AgentRecord> {
+    const result = await this.#http.deleteResponse<{ agent: AgentRecord }>(
+      `/api/v1/org/users/${encodeURIComponent(userId)}/agents/${encodeURIComponent(agentId)}`,
+      { ...requestOptions(options), outcomeUnknown: true },
+    );
+    if (
+      typeof result.data?.agent?.agentId !== "string" ||
+      !result.data.agent.agentId
+    )
+      throw new OutcomeUnknownError(
+        "Agent unlink returned no usable receipt; reconcile the association",
+        { requestId: result.requestId },
+      );
+    return result.data.agent;
   }
 
   async getOrganization(options?: RequestOptions): Promise<Organization> {

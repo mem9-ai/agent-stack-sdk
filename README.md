@@ -13,9 +13,11 @@ runtime dependencies.
 - [Security policy](SECURITY.md)
 
 The SDK is pre-1.0 while the TiDB Link HTTP API remains pre-1.0. Each SDK
-release declares its service baselines and supported scope. The current refresh verifies Organization/End User/Key provisioning and Realtime
-Model/Connection preparation against one exact service revision. See the TypeScript
-README for the supported boundaries and the retained exports that still await refresh.
+release declares its service baselines and supported scope. The current refresh
+covers Organization/End User/Key provisioning, Template discovery, personal Agent
+and Session management, and Realtime Model/Connection preparation against one
+exact service revision. See the TypeScript README for the supported boundaries
+and the Turn/history exports that still await refresh.
 
 ## Development
 

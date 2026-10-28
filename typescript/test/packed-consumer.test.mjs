@@ -29,6 +29,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("dist/index.d.ts"));
   assert(files.includes("examples/provision-user.mjs"));
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
+  assert(files.includes("examples/create-session.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -38,6 +39,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "package.json" ||
         file === "examples/provision-user.mjs" ||
         file === "examples/prepare-realtime-connection.mjs" ||
+        file === "examples/create-session.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -60,10 +62,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     path.join(temporary, "consumer.ts"),
     `import type {
       Agent,
-      AgentConfigPatch,
-      TemplateContent,
-      HardwareRequirement,
-      PublicAgentConfig,
+      AgentRecord,
+      AgentTemplatePage,
+      AgentModelCatalog,
+      SessionPage,
+      CreateSessionOptions,
       Organization,
       EndUser,
       IssuedUserApiKey,
@@ -82,6 +85,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TIDB_LINK_REVISION,
       TIDB_LINK_PROVISIONING_REVISION,
       TIDB_LINK_REALTIME_REVISION,
+      TIDB_LINK_LIFECYCLE_REVISION,
       TiDBLinkApiError,
       TiDBLinkError,
       OrganizationClient,
@@ -110,24 +114,30 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       void current; void users; void keys; void revoked;
       return found;
     }
-    declare const publicConfig: PublicAgentConfig;
-    async function retainedUserWorkflow(): Promise<TurnResult> {
+    async function lifecycleWorkflow(): Promise<Session> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
-      const agents: Agent[] = await user.listAgents();
-      const agent = agents[0] ?? await user.createAgent({ agentTemplateId: "template_1", templateVersion: 1, name: "Customer Agent" });
-      const requirement: HardwareRequirement = {definitionId:"hdef_"+"a".repeat(32),capabilityNames:["set_level"]};
-      const config: AgentConfigPatch = { memory: { enabled: true }, hardware:{requirements:[requirement]} };
-      const published = await user.getPublishedTemplateVersion("template_1",1);
-      const content: TemplateContent = published.content;
-      void content;
-      // @ts-expect-error Content version 1 cannot declare Hardware.
-      const invalidContent: TemplateContent = { ...published.content,schemaVersion:"agent-template-content@1",hardware:{requirements:[]} };
-      // @ts-expect-error Every new Agent needs an explicit Template selector.
-      user.createAgent({name:"Missing selection"});
-      void invalidContent;
-      await agent.configure(config);
-      const session: Session = await agent.createSession();
-      return session.turn({ text: "Hello" });
+      const templates: AgentTemplatePage = await user.listAgentTemplates({limit:1});
+      const models: AgentModelCatalog = await user.listModels();
+      const agent: Agent = await user.createAgent({agentTemplateId:templates.templates[0]!.agentTemplateId,idempotencyKey:"agent-1"});
+      await agent.update({additionalInstructions:"Concise"});
+      const options: CreateSessionOptions = {idempotencyKey:"session-1",model:models.effectiveDefaultModel};
+      const session: Session = await agent.createSession(options);
+      await session.rename("My Session");
+      await session.suggestName({userText:"Hello"});
+      await session.setBillingTag({key:"account",value:"customer"});
+      await session.setModel("dynamic.model");
+      const page: SessionPage = await user.listSessions({limit:1});
+      const archived: AgentRecord = await organization.unlinkAgent(agent.data.ownerUserId,agent.id);
+      // @ts-expect-error Retired Template versions are not creation selectors.
+      user.createAgent({agentTemplateId:"template_1",idempotencyKey:"a",templateVersion:1});
+      // @ts-expect-error Agent creation requires a recoverable identity.
+      user.createAgent({agentTemplateId:"template_1"});
+      // @ts-expect-error Session creation requires a recoverable identity.
+      agent.createSession();
+      // @ts-expect-error Memory and general config overrides are retired.
+      agent.configure({memory:{enabled:true}});
+      void page; void archived;
+      return session.delete();
     }
     async function realtimeWorkflow(session: Session): Promise<RealtimeConnection> {
       const user = new UserClient({ baseUrl, apiKey: userApiKey });
@@ -151,10 +161,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     // @ts-expect-error Project selection was removed from User authority.
     new UserClient({ baseUrl, apiKey: "ti_user_key_${"x".repeat(43)}", projectId: "removed" });
     // @ts-expect-error Runtime selection is not an Agent configuration capability.
-    const removedRuntime: AgentConfigPatch = { runtime: { backend: "codex", authId: "removed" } };
+    const removedRuntime: CreateSessionOptions = { idempotencyKey:"a", runtime: { backend: "codex", authId: "removed" } };
     declare const session: Session;
-    // @ts-expect-error Historical Session models cannot be selected for new Runs.
-    session.setModel("gpt-5.4");
+    session.setModel("deployment.model");
     // @ts-expect-error Structured Turn output is not supported.
     session.turn({ text: "Hello", outputSchema: { type: "object" } });
     void TIDB_LINK_API_VERSION;
@@ -163,11 +172,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     void TIDB_LINK_REALTIME_REVISION;
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
     void apiError;
-    void publicConfig;
     void WorkspaceClient;
     void removedRuntime;
     void provisionEndUser;
-    void retainedUserWorkflow;
+    void lifecycleWorkflow;
     void realtimeWorkflow;
     `,
   );
@@ -264,9 +272,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
     assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
     assert.equal(sdk.TIDB_LINK_PROVISIONING_REVISION, ${JSON.stringify(installedPackage.tidbLinkProvisioningRevision)});
+    assert.equal(sdk.TIDB_LINK_LIFECYCLE_REVISION, ${JSON.stringify(installedPackage.tidbLinkLifecycleRevision)});
     assert.equal(sdk.TIDB_LINK_REALTIME_REVISION, ${JSON.stringify(installedPackage.tidbLinkRealtimeRevision)});
     const { provisionUser } = await import("@mem9/tidb-link/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@mem9/tidb-link/examples/prepare-realtime-connection.mjs");
+    const { createSessionWorkflow } = await import("@mem9/tidb-link/examples/create-session.mjs");
+    assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof provisionUser, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
@@ -280,7 +291,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const server = createServer((request, response) => {
       requests.push({ method: request.method, url: request.url, key: request.headers.authorization });
       response.setHeader("content-type", "application/json");
-      if (request.url === "/api/agents") {
+      if (request.url === "/api/v1/user/agents") {
         response.end(JSON.stringify({ agents: [] }));
       } else if (request.url === "/api/v1/realtime-models") {
         response.end(JSON.stringify({
@@ -331,9 +342,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       assert.equal(JSON.stringify(new sdk.UserClient({ baseUrl, apiKey: rotated.token })).includes(prepared.connectToken), false);
       assert.deepEqual(requests, [
         {method:"POST",url:"/api/v1/org/users/user_1/api-keys",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/agents",key:"Bearer " + userKey},
+        {method:"GET",url:"/api/v1/user/agents",key:"Bearer " + userKey},
         {method:"POST",url:"/api/v1/org/user-api-keys/uak_key/rotate",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/agents",key:"Bearer " + rotatedKey},
+        {method:"GET",url:"/api/v1/user/agents",key:"Bearer " + rotatedKey},
         {method:"GET",url:"/api/v1/realtime-models",key:"Bearer " + rotatedKey},
         {method:"GET",url:"/api/v1/user/sessions/session_1",key:"Bearer " + rotatedKey},
         {method:"POST",url:"/api/v1/user/sessions/session_1/realtime",key:"Bearer " + rotatedKey},

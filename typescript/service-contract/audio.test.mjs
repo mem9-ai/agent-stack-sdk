@@ -12,7 +12,7 @@ const manifest = JSON.parse(
 test("prerecorded audio keeps its multipart request and distinct response-owned event contract", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "f28963573aea5841881b266bd885b3ffc3386f1fb4f696cd54707d02c9a248d6",
+    "c1dce73bc7e4a15ab5b46d34a5b846b26b9ff8ee4977fded29f11d83b5f23182",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(

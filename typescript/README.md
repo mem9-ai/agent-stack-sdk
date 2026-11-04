@@ -10,7 +10,7 @@ Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments, Schedulers,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
-39b7b58c](https://github.com/mem9-ai/agent-stack/commit/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a).
+24be6066](https://github.com/mem9-ai/agent-stack/commit/24be606699db1386d7a17b10ef24c3414b494bf9).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
@@ -925,7 +925,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/24be606699db1386d7a17b10ef24c3414b494bf9/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -989,7 +989,7 @@ supplier and budget refusals, model failure, active-response interruption and th
 installed audio example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/24be606699db1386d7a17b10ef24c3414b494bf9/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 Usage cases seed controlled facts and verify both public projections, exact filters,
 paging and authority without executing messages to manufacture billing data.

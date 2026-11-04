@@ -13,7 +13,7 @@ const upload = "/api/v1/user/drive/uploads";
 test("file transfers retain the exact selected service contract and separate User and ticket authority", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "6247288bd79a6067080bf4e254ecc69b2e76aca724c5a3311c6f01839d6e4c8f",
+    "571cf7f4be143bc9e4735c375d528b13e9f64fb543ae029395e19c0f4ed2e6c2",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(

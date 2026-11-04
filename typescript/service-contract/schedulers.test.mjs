@@ -12,7 +12,7 @@ const manifest = JSON.parse(
 test("Schedulers keep their selected public authority, creation identity, conditional writes and fire projection", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "b6fb4c513f508f22b7ac49b488424ca126ad98a153695e7d54d38c23c25628e6",
+    "ffe1fa7caa40908fb41f2d6911106e0f9d3d13ef77ab29dbae18b9e8dbc2b0f5",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(

@@ -380,7 +380,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "39b7b58c0c76b4926f97a6692b0f0183f6f8f34a",
+    "24be606699db1386d7a17b10ef24c3414b494bf9",
   );
   assert.equal(
     installedPackage.tidbLinkOpenApiSha256,

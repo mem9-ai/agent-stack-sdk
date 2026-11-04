@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "39b7b58c0c76b4926f97a6692b0f0183f6f8f34a" as const;
+  "24be606699db1386d7a17b10ef24c3414b494bf9" as const;
 
 export {
   TiDBLinkApiError,

@@ -2,6 +2,10 @@
 
 ## Unreleased (0.3.0)
 
+- Bind User API Key creation, rotation and revocation receipts to their requested
+  targets. Validate credential status and token/key identity, preserving unknown
+  outcomes and request IDs without automatically replaying credential mutations.
+
 - Consolidate service compatibility metadata under `TIDB_LINK_REVISION`,
   `tidbLinkRevision` and `tidbLinkOpenApiSha256`. Remove the Provisioning,
   Realtime, Lifecycle and Text revision exports and duplicate package fields;

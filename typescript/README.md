@@ -813,6 +813,12 @@ After uncertain issuance or rotation, listing keys can confirm metadata but
 any unwanted key before deciding whether to issue again. The provisioning
 example never repeats an uncertain credential operation.
 
+Credential receipts must match the requested User (creation) or API Key
+(rotation/revocation), with the expected status. Issued tokens must also match
+their key metadata. A mismatched or unusable success receipt raises
+`OutcomeUnknownError` with the request identity; it never triggers an automatic
+credential retry.
+
 After uncertain Agent/Session creation, repeat the original input with the same
 creation key. After an uncertain preference, name, tag or model update, read the
 resource before deciding on another change. Unlinking and deletion can hide a

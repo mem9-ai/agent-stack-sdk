@@ -7,6 +7,21 @@ import { ConflictError, ConnectionError, OrganizationClient, OutcomeUnknownError
 
 const servers = [];
 const organizationApiKey = "ti_org_" + "keyId_" + "x".repeat(43);
+const userApiKeyMetadata = (overrides = {}) => ({
+  apiKeyId: "uak_1",
+  organizationId: "org_1",
+  userId: "user_1",
+  name: "backend",
+  tokenPrefix: "ti_user_1_",
+  status: "active",
+  createdByUserId: null,
+  createdByOrganizationApiKeyId: "oak_1",
+  createdAt: "2026-08-25T00:00:00.000Z",
+  updatedAt: "2026-08-25T00:00:00.000Z",
+  lastUsedAt: null,
+  revokedAt: null,
+  ...overrides,
+});
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -147,20 +162,7 @@ test("clients accept only the frozen typed credential grammar before dispatch", 
 
 test("an Organization client manages an End User's credentials", async () => {
   const calls = [];
-  const apiKey = {
-    apiKeyId: "uak_1",
-    organizationId: "org_1",
-    userId: "user_1",
-    name: "backend",
-    tokenPrefix: "ti_user_1_",
-    status: "active",
-    createdByUserId: null,
-    createdByOrganizationApiKeyId: "oak_1",
-    createdAt: "2026-08-25T00:00:00.000Z",
-    updatedAt: "2026-08-25T00:00:00.000Z",
-    lastUsedAt: null,
-    revokedAt: null,
-  };
+  const apiKey = userApiKeyMetadata();
   const baseUrl = await serve(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
@@ -171,7 +173,7 @@ test("an Organization client manages an End User's credentials", async () => {
       return;
     }
     if (request.url === "/api/v1/org/user-api-keys/uak_1/rotate") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_2_" + "b".repeat(43) }));
+      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_1_" + "b".repeat(43) }));
       return;
     }
     response.writeHead(201).end(
@@ -187,7 +189,7 @@ test("an Organization client manages an End User's credentials", async () => {
 
 
   assert.equal((await client.createUserApiKey("user_1", { name: "backend" })).token, "ti_user_1_" + "a".repeat(43));
-  assert.equal((await client.rotateUserApiKey("uak_1")).token, "ti_user_2_" + "b".repeat(43));
+  assert.equal((await client.rotateUserApiKey("uak_1")).token, "ti_user_1_" + "b".repeat(43));
   assert.equal((await client.revokeUserApiKey("uak_1")).status, "revoked");
 
   assert.deepEqual(JSON.parse(calls[0].body), { name: "backend" });
@@ -232,7 +234,7 @@ test("unusable credential responses are outcome unknown", async () => {
   ];
   const bodies = [
     "not-json", JSON.stringify({ apiKey: { apiKeyId: "uak_1" } }),
-    ...invalidTokens.map((token) => JSON.stringify({ apiKey: { apiKeyId: "uak_1" }, token })),
+    ...invalidTokens.map((token) => JSON.stringify({ apiKey: userApiKeyMetadata(), token })),
   ];
   let request = 0;
   const baseUrl = await serve((_request, response) => {
@@ -255,6 +257,72 @@ test("unusable credential responses are outcome unknown", async () => {
       },
     );
     assert.equal(request, attempt + 1);
+  }
+});
+
+test("credential receipts reject wrong targets, states and token identities without replay or disclosure", async () => {
+  const token = "ti_user_1_" + "s".repeat(43);
+  const otherToken = "ti_user_2_" + "t".repeat(43);
+  const issued = (overrides = {}, issuedToken = token) => ({
+    apiKey: userApiKeyMetadata(overrides), token: issuedToken,
+  });
+  const revoked = (overrides = {}) => ({
+    apiKey: userApiKeyMetadata({
+      status: "revoked", revokedAt: "2026-08-25T01:00:00.000Z", ...overrides,
+    }),
+  });
+  const cases = [
+    ["create", "another user", issued({ userId: "user_2" })],
+    ["create", "missing user", issued({ userId: undefined })],
+    ["create", "missing organization", issued({ organizationId: undefined })],
+    ["create", "empty key ID", issued({ apiKeyId: "" })],
+    ["create", "revoked key", issued({ status: "revoked" })],
+    ["create", "revokedAt on active key", issued({ revokedAt: "2026-08-25T01:00:00.000Z" })],
+    ["create", "token for another key", issued({}, otherToken)],
+    ["create", "mismatched token prefix", issued({ tokenPrefix: "ti_user_2_" })],
+    ["rotate", "another key", issued({ apiKeyId: "uak_2", tokenPrefix: "ti_user_2_" }, otherToken)],
+    ["rotate", "missing key ID", issued({ apiKeyId: undefined })],
+    ["rotate", "missing user", issued({ userId: undefined })],
+    ["rotate", "revoked key", issued({ status: "revoked" })],
+    ["rotate", "token for another key", issued({}, otherToken)],
+    ["rotate", "mismatched token prefix", issued({ tokenPrefix: "ti_user_2_" })],
+    ["revoke", "another key", revoked({ apiKeyId: "uak_2" })],
+    ["revoke", "active key", issued()],
+    ["revoke", "missing user", revoked({ userId: undefined })],
+    ["revoke", "missing organization", revoked({ organizationId: undefined })],
+    ["revoke", "missing revocation time", revoked({ revokedAt: null })],
+    ["revoke", "invalid revocation time", revoked({ revokedAt: "invalid" })],
+    ["revoke", "missing envelope", null],
+    ["revoke", "missing key", {}],
+    ["revoke", "array key", { apiKey: [] }],
+  ];
+  let requests = 0;
+  const baseUrl = await serve((_request, response) => {
+    const index = requests++;
+    response.writeHead(201, {
+      "content-type": "application/json", "x-request-id": `receipt_${index}`,
+    }).end(JSON.stringify(cases[index][2]));
+  });
+  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+  for (const [index, [operation, reason]] of cases.entries()) {
+    await assert.rejects(
+      operation === "create"
+        ? client.createUserApiKey("user_1", { name: "backend" })
+        : operation === "rotate"
+          ? client.rotateUserApiKey("uak_1")
+          : client.revokeUserApiKey("uak_1"),
+      (error) => {
+        assert(error instanceof OutcomeUnknownError);
+        assert.equal(error.requestId, `receipt_${index}`);
+        for (const rendered of [String(error), error.stack, JSON.stringify(error), inspect(error)]) {
+          for (const secret of [organizationApiKey, token, otherToken])
+            assert(!rendered.includes(secret));
+        }
+        return true;
+      },
+      `${operation}: ${reason}`,
+    );
+    assert.equal(requests, index + 1, "credential mutations must not be replayed");
   }
 });
 
@@ -283,6 +351,9 @@ test("credential cancellation is outcome unknown only after dispatch", async () 
 
 test("offboarding revokes every active key and leaves revoked keys alone", async () => {
   const revoked = [];
+  const revokedKey = userApiKeyMetadata({
+    apiKeyId: "uak_active", status: "revoked", revokedAt: "2026-08-25T01:00:00.000Z",
+  });
   const baseUrl = await serve((request, response) => {
     response.setHeader("content-type", "application/json");
     if (request.method === "GET") {
@@ -298,7 +369,7 @@ test("offboarding revokes every active key and leaves revoked keys alone", async
     }
     revoked.push(request.url);
     response.writeHead(201).end(
-      JSON.stringify({ apiKey: { apiKeyId: "uak_active", status: "revoked" } }),
+      JSON.stringify({ apiKey: revokedKey }),
     );
   });
   const client = new OrganizationClient({
@@ -308,7 +379,7 @@ test("offboarding revokes every active key and leaves revoked keys alone", async
 
   const result = await Promise.all((await client.listUserApiKeys("user_1")).filter(key => key.status === "active").map(key => client.revokeUserApiKey(key.apiKeyId)));
 
-  assert.deepEqual(result, [{ apiKeyId: "uak_active", status: "revoked" }]);
+  assert.deepEqual(result, [revokedKey]);
   assert.deepEqual(revoked, ["/api/v1/org/user-api-keys/uak_active/revoke"]);
 });
 
@@ -569,7 +640,7 @@ for (const failure of ["disconnect", "conflict"]) {
         else
           response.writeHead(201).end(
             JSON.stringify({
-              apiKey: { apiKeyId: "key_1" },
+              apiKey: userApiKeyMetadata({ apiKeyId: "uak_key1", tokenPrefix: "ti_user_key1_" }),
               token: "ti_user_key1_" + "y".repeat(43),
             }),
           );

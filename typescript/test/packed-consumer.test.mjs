@@ -476,7 +476,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         }));
       } else {
         const token = request.url.endsWith("/rotate") ? rotatedKey : userKey;
-        response.writeHead(201).end(JSON.stringify({ apiKey: { apiKeyId: "uak_key" }, token }));
+        response.writeHead(201).end(JSON.stringify({ apiKey: {
+          apiKeyId: "uak_key", userId: "user_1", organizationId: "org_1",
+          status: "active", revokedAt: null, tokenPrefix: "ti_user_key_",
+        }, token }));
       }
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

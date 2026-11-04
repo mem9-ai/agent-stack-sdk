@@ -60,7 +60,8 @@ export interface Scheduler {
   };
   validFrom: string | null;
   validUntil: string | null;
-  status: "enabled" | "disabled";
+  /** Deleted records are returned only by Organization-owned list history. */
+  status: "enabled" | "disabled" | "deleted";
   nextFireAt: string | null;
   lastFiredAt: string | null;
   revision: number;
@@ -77,6 +78,9 @@ export interface SchedulerPage {
 }
 export interface SchedulerListOptions extends ListOptions {
   status?: "enabled" | "disabled";
+}
+export interface OrganizationSchedulerListOptions extends ListOptions {
+  status?: Scheduler["status"];
 }
 export interface SchedulerMutationOptions extends RequestOptions {
   ifMatch: string;
@@ -137,7 +141,10 @@ const receipt = (
   return { scheduler, etag: result.etag };
 };
 
-export class UserSchedulers {
+export class UserSchedulers<
+  TListOptions extends OrganizationSchedulerListOptions =
+    SchedulerListOptions,
+> {
   readonly #http: HttpClient;
   constructor(http: HttpClient) {
     this.#http = http;
@@ -230,13 +237,14 @@ export class UserSchedulers {
     });
   }
 
-  list(options: SchedulerListOptions = {}): Promise<SchedulerPage> {
+  list(options?: TListOptions): Promise<SchedulerPage> {
+    const input: OrganizationSchedulerListOptions = options ?? {};
     requireKnownKeys(
-      options,
+      input,
       ["status", "limit", "cursor", "signal", "requestId"],
       "Scheduler list options",
     );
-    const { status, ...paging } = options;
+    const { status, ...paging } = input;
     const query = new URLSearchParams(paginationQuery(paging).slice(1));
     if (status !== undefined) query.set("status", status);
     return this.#http.get(

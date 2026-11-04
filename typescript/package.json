@@ -8,8 +8,8 @@
     "node": ">=22.12"
   },
   "tidbLinkApiVersion": "0.0.1",
-  "tidbLinkRevision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "tidbLinkOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "tidbLinkRevision": "882287809f91d9a3fdf60537460431d9f0fc23e7",
+  "tidbLinkOpenApiSha256": "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,7 +25,8 @@
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/schedule-task.mjs": "./examples/schedule-task.mjs",
     "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs",
-    "./examples/submit-audio.mjs": "./examples/submit-audio.mjs"
+    "./examples/submit-audio.mjs": "./examples/submit-audio.mjs",
+    "./examples/organization-session.mjs": "./examples/organization-session.mjs"
   },
   "files": [
     "dist",
@@ -40,7 +41,8 @@
     "examples/upload-file.mjs",
     "examples/schedule-task.mjs",
     "examples/answer-client-tool.mjs",
-    "examples/submit-audio.mjs"
+    "examples/submit-audio.mjs",
+    "examples/organization-session.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

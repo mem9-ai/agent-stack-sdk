@@ -5,7 +5,7 @@ import {
   type UserUsageSummary,
   type UserUsageDetails,
 } from "./usage.js";
-import { UserSchedulers } from "./schedulers.js";
+import { UserSchedulers, type OrganizationSchedulerListOptions } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
@@ -153,12 +153,17 @@ export interface SessionPage {
   nextCursor: string | null;
 }
 
-export class UserClient {
+/** Ordinary End User resources under the caller's authority. */
+export class EndUserClient {
   readonly #http: HttpClient;
-  readonly #files: UserFiles;
-  readonly #schedulers: UserSchedulers;
 
-  get schedulers(): UserSchedulers {
+  protected get http(): HttpClient {
+    return this.#http;
+  }
+  readonly #files: UserFiles;
+  readonly #schedulers: UserSchedulers<OrganizationSchedulerListOptions>;
+
+  get schedulers(): UserSchedulers<OrganizationSchedulerListOptions> {
     return this.#schedulers;
   }
 
@@ -166,13 +171,10 @@ export class UserClient {
     return this.#files;
   }
 
-  constructor(options: UserClientOptions) {
-    requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
-    if (!isApiKey(options.apiKey, "user"))
-      throw new TypeError("UserClient requires a User API Key");
-    this.#http = new HttpClient(options);
-    this.#files = new UserFiles(this.#http);
-    this.#schedulers = new UserSchedulers(this.#http);
+  constructor(http: HttpClient) {
+    this.#http = http;
+    this.#files = new UserFiles(http);
+    this.#schedulers = new UserSchedulers(http);
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {
@@ -208,22 +210,6 @@ export class UserClient {
       },
     );
     return new Agent(this.#http, agentReceipt(result.data, result.requestId));
-  }
-
-  getUsage(options: UserUsageOptions = {}): Promise<UserUsageSummary> {
-    return this.#http.get(
-      `/api/v1/billing/usage${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue"])}`,
-      options,
-    );
-  }
-
-  getUsageDetails(
-    options: UserUsageDetailsOptions = {},
-  ): Promise<UserUsageDetails> {
-    return this.#http.get(
-      `/api/v1/billing/usage/details${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue", "limit"])}`,
-      options,
-    );
   }
 
   async getAgent(id: string, options?: RequestOptions): Promise<Agent> {
@@ -281,5 +267,35 @@ export class UserClient {
   }
   getSession(id: string, options?: RequestOptions): Promise<Session> {
     return this.session(id).refresh(options);
+  }
+}
+
+/** Existing User API Key entry point; Organization callers use organization.user(userId). */
+export class UserClient extends EndUserClient {
+  override get schedulers(): UserSchedulers {
+    return super.schedulers;
+  }
+
+  constructor(options: UserClientOptions) {
+    requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
+    if (!isApiKey(options.apiKey, "user"))
+      throw new TypeError("UserClient requires a User API Key");
+    super(new HttpClient(options));
+  }
+
+  getUsage(options: UserUsageOptions = {}): Promise<UserUsageSummary> {
+    return this.http.get(
+      `/api/v1/billing/usage${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue"])}`,
+      options,
+    );
+  }
+
+  getUsageDetails(
+    options: UserUsageDetailsOptions = {},
+  ): Promise<UserUsageDetails> {
+    return this.http.get(
+      `/api/v1/billing/usage/details${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue", "limit"])}`,
+      options,
+    );
   }
 }

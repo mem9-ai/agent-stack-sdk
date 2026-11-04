@@ -6,7 +6,7 @@ import {
   type OrganizationUserUsageSummary,
   type OrganizationUserUsageDetails,
 } from "./usage.js";
-import type { AgentRecord } from "./user.js";
+import { EndUserClient, type AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
@@ -140,6 +140,11 @@ export class OrganizationClient {
       );
     }
     this.#http = new HttpClient(options);
+  }
+
+  /** Select the ordinary resource owner without issuing or impersonating a User API Key. */
+  user(userId: string): EndUserClient {
+    return new EndUserClient(this.#http.forUser(userId));
   }
 
   async unlinkAgent(

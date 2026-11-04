@@ -1,6 +1,6 @@
 {
-  "revision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "sourceOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "revision": "882287809f91d9a3fdf60537460431d9f0fc23e7",
+  "sourceOpenApiSha256": "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
   "paths": {
     "/api/v1/schedulers": {
       "post": {
@@ -738,9 +738,1099 @@
         ],
         "description": "Authorization: UserApiKey; persisted credentials determine Organization and End User scope."
       }
+    },
+    "/api/v1/org/users/{userId}/schedulers": {
+      "post": {
+        "description": "New scheduling requires an active ordinary owner and binds the exact creating Key. Replaying a saved create response never replaces continuing authority; explicitly resume with a fresh Key after rotation or revocation.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization and End User scope.",
+        "operationId": "SchedulerPublicController_organizationCreate",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CreateNewSessionPublicSchedulerOpenApiDto"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CreateBoundSessionPublicSchedulerOpenApiDto"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying an in-progress idempotent request",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Stored idempotency witness is invalid (idempotency_witness_invalid).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Create or replay an Organization-Key Scheduler",
+        "tags": [
+          "SchedulerPublic"
+        ]
+      },
+      "get": {
+        "operationId": "SchedulerPublicController_organizationList",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the caller scope and status filter.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "enabled",
+                "disabled",
+                "deleted"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of Schedulers. Defaults to enabled and disabled; use status=deleted for retained history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSchedulerListResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Required audit persistence is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/org/users/{userId}/schedulers/{schedulerId}": {
+      "get": {
+        "operationId": "SchedulerPublicController_organizationGet",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Required audit persistence is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      },
+      "patch": {
+        "description": "enabled:true binds future fires to this exact current Organization Key and cancels only unstarted queued fires. Accepted Turns and create receipts retain their original identity. A disabled owner cannot resume scheduling.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization and End User scope.",
+        "operationId": "SchedulerPublicController_organizationUpdate",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePublicSchedulerOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated Scheduler.",
+            "headers": {
+              "ETag": {
+                "description": "The current Scheduler revision ETag",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Required audit persistence is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Update or explicitly reauthorize a Scheduler",
+        "tags": [
+          "SchedulerPublic"
+        ]
+      },
+      "delete": {
+        "operationId": "SchedulerPublicController_organizationRemove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "",
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Required audit persistence is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/org/users/{userId}/schedulers/{schedulerId}/fires": {
+      "get": {
+        "operationId": "SchedulerPublicController_organizationFires",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schedulerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the caller scope and Scheduler.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of immutable Fire execution snapshots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSchedulerFiresResponseOpenApiDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Required audit persistence is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Prevents Scheduler state from being cached.",
+                "schema": {
+                  "type": "string",
+                  "example": "private, no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "SchedulerPublic"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
     }
   },
   "components": {
+    "securitySchemes": {
+      "HardwareCredentialAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Hardware Credential authenticates only one inventoried device on /api/v1/hardware/connect. It grants no User, Session or management authority. Send it in Authorization, never in a URL."
+      },
+      "ConnectorKeyAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Connector Key authenticates only tunnel connections on /api/v1/connectors/ws. It identifies one Organization-owned Connector and grants no End User, Session or management authority. Send it in Authorization, never in a URL."
+      },
+      "UserApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      },
+      "OrganizationApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
+      }
+    },
     "schemas": {
       "CreateNewSessionPublicSchedulerOpenApiDto": {
         "type": "object",
@@ -1314,7 +2404,6 @@
                   "invalid_current_password",
                   "account_already_exists",
                   "account_not_found",
-                  "password_not_configured",
                   "password_already_configured",
                   "google_identity_already_linked",
                   "verification_not_found",
@@ -1769,14 +2858,150 @@
           "nextCursor"
         ],
         "additionalProperties": false
-      }
-    },
-    "securitySchemes": {
-      "UserApiKey": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      },
+      "OrganizationSchedulerListResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "schedulers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schedulerId": {
+                  "type": "string"
+                },
+                "ownerUserId": {
+                  "type": "string"
+                },
+                "organizationId": {
+                  "type": "string"
+                },
+                "agentId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "delivery": {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "string",
+                      "enum": [
+                        "new_session",
+                        "bound_session"
+                      ]
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "target",
+                    "sessionId"
+                  ]
+                },
+                "schedule": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "once",
+                        "cron"
+                      ]
+                    },
+                    "cronExpr": {
+                      "type": "string",
+                      "maxLength": 128,
+                      "nullable": true
+                    },
+                    "runAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "timezone": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "cronExpr",
+                    "runAt",
+                    "timezone"
+                  ]
+                },
+                "validFrom": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "validUntil": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled",
+                    "deleted"
+                  ]
+                },
+                "nextFireAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "lastFiredAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": false
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "schedulerId",
+                "ownerUserId",
+                "organizationId",
+                "agentId",
+                "title",
+                "prompt",
+                "delivery",
+                "schedule",
+                "validFrom",
+                "validUntil",
+                "status",
+                "nextFireAt",
+                "lastFiredAt",
+                "revision",
+                "createdAt",
+                "updatedAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "schedulers",
+          "nextCursor"
+        ]
       }
     }
   }

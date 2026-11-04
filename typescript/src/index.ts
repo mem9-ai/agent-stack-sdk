@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "0d11f1b231879c735bd53b60ff895ac58ba60d33" as const;
+  "882287809f91d9a3fdf60537460431d9f0fc23e7" as const;
 
 export {
   TiDBLinkApiError,
@@ -26,7 +26,7 @@ export type {
   OrganizationClientOptions,
   UserApiKey,
 } from "./organization.js";
-export { Agent, UserClient } from "./user.js";
+export { Agent, EndUserClient, UserClient } from "./user.js";
 export type {
   AgentRecord,
   AgentTemplate,
@@ -184,6 +184,7 @@ export type {
   SchedulerResponse,
   SchedulerPage,
   SchedulerListOptions,
+  OrganizationSchedulerListOptions,
   SchedulerMutationOptions,
   SchedulerFire,
   SchedulerFirePage,

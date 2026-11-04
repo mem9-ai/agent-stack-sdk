@@ -25,7 +25,9 @@ run `npm run test:service` with the exact service checkout and a dedicated TiDB
 test database; setup is in [the package README](typescript/README.md#compatibility-and-verification).
 This verifies the installed packed SDK and its examples against the actual service.
 The service runner discovers each `*.fixture.ts` with neighboring `*.cases.mjs`
-and runs those distinct dependency lifecycles sequentially. Every case must have
+and runs those distinct dependency lifecycles sequentially. `*.compiled.fixture.ts`
+fixtures rebuild the selected backend and use its system harness; other fixtures
+retain the AppModule test seam. Every case must have
 exactly one fixture owner. The default HTTP tests supplement reproducible failure cases. Keep the
 package free of runtime dependencies and do not commit credentials, recorded
 production responses, or plaintext API Keys.

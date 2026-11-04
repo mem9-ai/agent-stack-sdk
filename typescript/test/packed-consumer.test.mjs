@@ -30,6 +30,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/provision-user.mjs"));
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
+  assert(files.includes("examples/organization-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
@@ -48,6 +49,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/provision-user.mjs" ||
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
+        file === "examples/organization-session.mjs" ||
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
@@ -81,7 +83,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       Scheduler, SchedulerResponse, SchedulerFirePage, SchedulerPage, CreateSchedulerInput,
       UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
       FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
-      Agent,
+      Agent, EndUserClient, BillingPrincipalBucket,
       AgentRecord,
       AgentTemplatePage,
       AgentModelCatalog,
@@ -135,6 +137,12 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     declare const baseUrl: string;
     declare const organizationApiKey: string;
     const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+    const owner: EndUserClient = organization.user("user_1");
+    const orgAgent: Promise<Agent> = owner.getAgent("agent_1");
+    const deleted: Promise<SchedulerPage> = owner.schedulers.list({ status: "deleted" });
+    const principal: BillingPrincipalBucket = "organization_user";
+    // @ts-expect-error User-Key Scheduler lists do not accept deleted history.
+    new UserClient({ baseUrl, apiKey: "unused" }).schedulers.list({ status: "deleted" });
     declare const userApiKey: string;
     async function provisionEndUser(): Promise<EndUser> {
       const current: Organization = await organization.getOrganization();
@@ -372,11 +380,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "0d11f1b231879c735bd53b60ff895ac58ba60d33",
+    "39b7b58c0c76b4926f97a6692b0f0183f6f8f34a",
   );
   assert.equal(
     installedPackage.tidbLinkOpenApiSha256,
-    "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+    "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
   );
   for (const prefix of ["Provisioning", "Realtime", "Lifecycle", "Text"]) {
     assert.equal("tidbLink" + prefix + "Revision" in installedPackage, false);

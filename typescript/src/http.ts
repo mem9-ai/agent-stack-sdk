@@ -198,10 +198,40 @@ export const isApiKey = (
 export class HttpClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
+  readonly #ownerPrefix: string | undefined;
 
-  constructor(input: { baseUrl: string; apiKey: string }) {
+  constructor(input: { baseUrl: string; apiKey: string; userId?: string }) {
     this.#baseUrl = normalizeBaseUrl(input.baseUrl);
     this.#apiKey = input.apiKey;
+    this.#ownerPrefix =
+      input.userId === undefined
+        ? undefined
+        : `/api/v1/org/users/${encodeURIComponent(input.userId)}`;
+  }
+
+  forUser(userId: string): HttpClient {
+    if (typeof userId !== "string" || !/^[a-z0-9_-]{1,64}$/.test(userId))
+      throw new TypeError(
+        "Organization resources require an explicit User ID",
+      );
+    return new HttpClient({
+      baseUrl: this.#baseUrl,
+      apiKey: this.#apiKey,
+      userId,
+    });
+  }
+
+  private resourcePath(path: string): string {
+    if (this.#ownerPrefix === undefined) return path;
+    if (path.startsWith("/api/v1/user/"))
+      return this.#ownerPrefix + path.slice("/api/v1/user".length);
+    if (
+      /^\/api\/v1\/(files|schedulers|agent-models|realtime-models)([/?]|$)/.test(
+        path,
+      )
+    )
+      return this.#ownerPrefix + path.slice("/api/v1".length);
+    throw new TypeError("Unsupported Organization User resource path");
   }
 
   resolveUrl(value: string): URL {
@@ -335,7 +365,7 @@ export class HttpClient {
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
       try {
-        response = await fetch(`${this.#baseUrl}${path}`, {
+        response = await fetch(`${this.#baseUrl}${this.resourcePath(path)}`, {
           method: options.method ?? "GET",
           redirect: "error",
           headers: {

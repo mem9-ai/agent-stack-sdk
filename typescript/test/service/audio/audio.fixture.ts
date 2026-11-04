@@ -189,16 +189,22 @@ it("the installed SDK submits actual audio through transcription, budget and Run
     }),
   );
   const [owner, stranger, budget] = users;
-  const limited = await app
-    .get(BillingUsageStore)
-    .mutateLlmSpendLimit({
+  const billing = app.get(BillingUsageStore);
+  for (const user of [owner!, budget!]) {
+    const limit = await billing.getUserLlmSpendLimitView({
       organizationId: DEFAULT_ORG_ID,
-      scope: { kind: "member", userId: budget!.userId },
-      expectedRevision: 0,
-      monthlyBaseMicros: 0,
+      userId: user.userId,
+    });
+    const updated = await billing.mutateLlmSpendLimit({
+      organizationId: DEFAULT_ORG_ID,
+      scope: { kind: "member", userId: user.userId },
+      expectedRevision: limit!.revision,
+      // ASR reserves its conservative USD 20 maximum before transcription.
+      monthlyBaseMicros: user === budget ? 0 : 1_000_000_000,
       actorUserId: owner!.userId,
     });
-  expect(limited?.availableMicros).toBe(0);
+    if (user === budget) expect(updated?.availableMicros).toBe(0);
+  }
   const templateId = `template_${randomUUID().replaceAll("-", "")}`;
   await getAppPersistencePorts(app).agentStore.createAgentTemplate({
     organizationId: DEFAULT_ORG_ID,

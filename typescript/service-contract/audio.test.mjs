@@ -12,7 +12,7 @@ const manifest = JSON.parse(
 test("prerecorded audio keeps its multipart request and distinct response-owned event contract", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "eefa54403906c10db59831cc66f84627c038756d9ade1d5cbbb3d16597b8287d",
+    "f28963573aea5841881b266bd885b3ffc3386f1fb4f696cd54707d02c9a248d6",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
@@ -75,4 +75,12 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
     "failed",
     "interrupted",
   ]);
+});
+
+
+test("Organization audio binds the explicit User and retains the streaming contract", () => {
+  const operation = contract.paths["/api/v1/org/users/{userId}/sessions/{id}/turns/audio"].post;
+  assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
+  assert(operation.parameters.some((p) => p.name === "userId" && p.required));
+  assert(operation.responses["201"].content["text/event-stream"]);
 });

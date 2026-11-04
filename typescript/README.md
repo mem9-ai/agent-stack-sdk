@@ -10,12 +10,13 @@ Key management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments, Schedulers,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
-0d11f1b2](https://github.com/mem9-ai/agent-stack/commit/0d11f1b231879c735bd53b60ff895ac58ba60d33).
+39b7b58c](https://github.com/mem9-ai/agent-stack/commit/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
 default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
-outside this package.
+outside this package. Existing resource workflows accept either User authority or
+Organization authority with an explicit owner.
 
 ## Quick start
 
@@ -29,87 +30,109 @@ npm pack --workspace @mem9/tidb-link
 npm install /path/to/mem9-tidb-link-0.3.0.tgz
 ```
 
-An application backend uses an Organization API Key (`ti_org_…`) to provision an
-End User and issue its User API Key (`ti_user_…`). The credential determines the
-Organization; Organization operations name an explicit target User when needed.
-A User key then owns the application's Agent and Session workflow.
-
-The installed examples compose into one complete first-use workflow:
+An application backend uses its Organization API Key (`ti_org_…`) and explicitly
+selects the ordinary End User with `organization.user(userId)`. The Key remains
+the caller; the User owns the resources. No User API Key is issued by this flow.
 
 ```js
 import { randomUUID } from "node:crypto";
-import { UserClient } from "@mem9/tidb-link";
-import { provisionUser } from "@mem9/tidb-link/examples/provision-user.mjs";
-import { createSessionWorkflow } from "@mem9/tidb-link/examples/create-session.mjs";
-import { sendMessageWorkflow } from "@mem9/tidb-link/examples/send-message.mjs";
+import { OrganizationClient } from "@mem9/tidb-link";
+import { organizationSessionWorkflow } from "@mem9/tidb-link/examples/organization-session.mjs";
 
 const baseUrl = process.env.AGENT_SERVICE_URL;
-const provisioned = await provisionUser({
-  baseUrl,
-  organizationApiKey: process.env.ORGANIZATION_API_KEY,
-  externalId: "your-application-user-id",
-});
-// Store the User mapping and provisioned.token securely now; never log the token.
-const customer = new UserClient({ baseUrl, apiKey: provisioned.token });
-const page = await customer.listAgentTemplates();
+const organizationApiKey = process.env.ORGANIZATION_API_KEY;
+const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
+const endUser = await organization.createEndUser({ externalId: "your-application-user-id" });
+// Retain this mapping. On later startup, load it instead of repeating creation.
+const user = organization.user(endUser.userId);
+const page = await user.listAgentTemplates();
 const template = page.templates[0];
 if (!template) throw new Error("Select an available Template; follow nextCursor if hasMore");
-const models = await customer.listModels();
 const creation = {
-  baseUrl, userApiKey: provisioned.token,
+  baseUrl, organizationApiKey, userId: endUser.userId,
   agentTemplateId: template.agentTemplateId,
-  model: models.effectiveDefaultModel,
   agentCreationKey: randomUUID(), sessionCreationKey: randomUUID(),
 };
-// Save the selected Template/model and both creation keys before dispatch.
-const { session } = await createSessionWorkflow(creation);
-const message = {
-  baseUrl, userApiKey: provisioned.token, sessionId: session.id,
-  clientEventId: randomUUID(), text: "Help me plan a trip",
-};
-// Save the Session, command identity and message before dispatch.
-const result = await sendMessageWorkflow(message);
+// Persist the selected Template, optional model and both creation identities.
+const { session } = await organizationSessionWorkflow(creation);
+const message = { clientEventId: randomUUID(), text: "Help me plan a trip" };
+// Retain the Session, command identity and original input before dispatch.
+const receipt = await session.submitMessage(message);
+const result = await session.waitForResult(receipt.inputId);
 console.log(result.text);
-const original = await session.reconcileInteraction(message.clientEventId);
 const recovered = await session.waitForResult(message.clientEventId);
 ```
 
-On normal startup, load the retained User credential and identities instead of
-repeating provisioning. **Every successful `provisionUser` call issues a new
-key**, even for an existing User. Repeating the same Agent/Session creation keys
-and inputs recovers those resources; reading the original message receipt or
-waiting again does not execute another Turn. See [text results and recovery](#text-messages-and-original-results)
-for uncertain submissions and local timeouts.
+`externalId` is unique within an Organization. A repeated `createEndUser` returns
+`resource_conflict`; recover the mapping with `listEndUsers` and the original
+`externalId`. Agent/Session creation replays require the same creation keys and
+inputs. Reading the original message receipt or waiting again does not execute
+another Turn. An HTTP request ID is diagnostic, not a creation identity.
 
-`externalId` is unique within the Organization. Direct `createEndUser` repetition
-returns `ConflictError` with code `resource_conflict`; it does not return the
-existing User. `provisionUser` reconciles through `listEndUsers` and `externalId`.
-User and Key lists return complete arrays; this baseline has no pagination for
-those lists. An HTTP request ID is diagnostic, not a creation identity. A lost
-key-issuance response cannot recover its plaintext secret from metadata.
-
-The provisioning example can also run after setting `AGENT_SERVICE_URL`,
-`ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID` and `USER_CREDENTIAL_FILE`:
+The installed Organization example can run with `AGENT_SERVICE_URL`,
+`ORGANIZATION_API_KEY`, `END_USER_ID`, `TEMPLATE_ID`, `AGENT_CREATION_KEY` and
+`SESSION_CREATION_KEY` (`MODEL_ID` is optional):
 
 ```sh
-node node_modules/@mem9/tidb-link/examples/provision-user.mjs
+node node_modules/@mem9/tidb-link/examples/organization-session.mjs
 ```
 
-Its CLI reserves a new private file before issuing a key, saves the credential
-there and refuses to overwrite an existing file. A failed run can leave an empty
-file; reconcile the outcome before deliberately issuing another credential.
+`organization.user(userId)` returns an `EndUserClient`. Its Agent, Session, file,
+Scheduler and catalog methods are the same resource methods used by `UserClient`.
+Keep usage reads on `organization.getUserUsage(userId, options)` and
+`getUserUsageDetails`; their range and response shapes differ from User-Key reads.
+Private MCP registration, general Drive entry management, sandbox preferences,
+Scheduler Plans and native Hardware APIs are not wrapped by this SDK. Use the
+pinned public HTTP contract for those existing service capabilities. Building ToD,
+a device gateway or management integration remains outside this package.
+Artifact APIs remain gated. The SDK prepares Realtime HTTP grants; applications
+own WebSocket/media transport. This change adds neither a generated full API
+client nor a media client.
+
+### User-Key compatibility and migration
+
+Existing `new UserClient({ baseUrl, apiKey: userApiKey })` callers and the existing
+User-Key examples remain supported. To migrate resource workflows, replace that
+client with `new OrganizationClient({ baseUrl, apiKey: organizationApiKey }).user(userId)`.
+Retain the same resource IDs, creation inputs and command identities; do not issue
+a User Key to use Organization authority. The SDK sends the real Organization
+Key only to owner-scoped service endpoints and never as an owner identity header.
+
+The optional `provision-user.mjs` example still creates a User API Key on each
+successful call, including for an existing User. Its CLI requires
+`AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID` and
+`USER_CREDENTIAL_FILE`; it reserves a new private file and refuses to overwrite it.
+A lost issuance response cannot recover a plaintext key from metadata.
+
+After Organization Key rotation or revocation, create a new `OrganizationClient`
+with fresh valid authority and select the same User. Existing handles retain their
+old credential. New old-authority requests, subscriptions, Scheduler fires,
+Realtime tokens and Organization-issued file tickets lose authority. Accepted
+Turns continue, and admitted file transfers may finish. Reconnect/obtain new
+grants with fresh authority and reconcile the original command before submitting
+new work. Updating retained Schedulers with fresh authority reauthorizes future
+fires. Another valid Key remains usable. Disabled Users cannot start new work;
+Organization authority can still read retained history/files and perform supported
+cleanup. User-Key ticket lifetime remains the service's separate compatibility
+contract. Application policies and K3 spending policy are separate concerns.
 
 ## Key management
+
+Use these methods when your application also needs a User-Key client. Organization
+owner-scoped resource access does not require issuing this credential.
 
 ```ts
 import { OrganizationClient } from "@mem9/tidb-link";
 const organization = new OrganizationClient({
   baseUrl, apiKey: process.env.ORGANIZATION_API_KEY,
 });
-const keys = await organization.listUserApiKeys(provisioned.user.userId);
-const replacement = await organization.rotateUserApiKey(provisioned.apiKey.apiKeyId);
+const issued = await organization.createUserApiKey(endUser.userId, {
+  name: "Optional User-Key client",
+});
+const keys = await organization.listUserApiKeys(endUser.userId);
+const replacement = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
 // Save replacement.token; the previous token immediately stops authenticating.
-const revoked = await organization.revokeUserApiKey(provisioned.apiKey.apiKeyId);
+const revoked = await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
 ```
 
 Create and rotate return `{ apiKey, token }`. List and revoke return metadata
@@ -123,7 +146,7 @@ An Organization key likewise grants no User identity.
 
 ## Templates, Agents and Sessions
 
-Use a User API Key to discover available Templates and deployment models. Model
+Use `organization.user(userId)` or a User-Key `UserClient` to discover available Templates and deployment models. Model
 IDs are strings from the deployment catalog, including newly published models.
 `effectiveDefaultModel` is the create-time default; `defaultModel` is the
 service's canonical catalog default and may differ.
@@ -203,12 +226,13 @@ deletion. Name and Billing Tag changes do not change the frozen recipe.
 Organization authority can explicitly unlink an Agent belonging to a target User:
 
 ```ts
-const archived = await organization.unlinkAgent(provisioned.user.userId, agent.id);
+const archived = await organization.unlinkAgent(endUser.userId, agent.id);
 ```
 
 The returned association is archived. Unlinking retains existing Session
 ownership, binding, configuration and history; it does not grant the Organization
-access to the User's private Session content. The User retains access to its saved history.
+access to existing Sessions by itself. Authorized Organization owner-scoped
+clients and the User retain access to saved history under the service rules.
 
 The packaged example completes discovery and creation without message execution:
 
@@ -356,7 +380,7 @@ those values. Reconnect with `session.observe(inputId, { cursor })`, or query
 `getInteraction(inputId)` / `waitForResult(inputId)`; do not submit another message.
 Breaking the loop stops only observation. EOF, a revoked observer credential,
 Session idleness and the absence of subscribers do not establish success or cancel
-execution. With revoked credentials, use another currently authorized User Key
+execution. With revoked credentials, use another currently authorized credential
 for recovery. The SDK does not automatically reconnect or resubmit.
 
 `session.events({ cursor, signal })` exposes the independent Session-wide stream
@@ -704,7 +728,7 @@ it does not delete a previously accepted conversation.
 `download(fileId)` handles both forms and verifies complete size and SHA-256.
 A new authorized content read obtains a fresh grant after expiry. Upload and
 download grants are bearer credentials: do not log or store their URLs beyond
-need. Transfers send only the grant's required headers, never the User API Key.
+need. Transfers send only the grant's required headers, never an API Key.
 Uploads reject redirects; a download may follow one HTTPS redirect without an
 API Key. Files are held in memory while hashing or downloading, so size your
 backend's concurrency for the service's advertised maximum.
@@ -719,7 +743,8 @@ node node_modules/@mem9/tidb-link/examples/upload-file.mjs
 
 The example returns the final conversation result; its exported
 `uploadFileWorkflow()` accepts bytes directly. It does not manage general Drive
-directories, write Session text files, or grant Organization access to User files.
+directories or write Session text files. Organization owner-scoped clients can
+upload, read and attach the same ordinary Files.
 
 ## Scheduled work
 
@@ -767,6 +792,9 @@ prompt, Agent/delivery target, schedule, enabled state, validity window and
 `snoozeUntil`. Enabling an elapsed one-time schedule requires a future time.
 Disabling or deleting a Scheduler does not roll back completed effects. Deleted
 Schedulers are no longer available through detail or fire-history reads.
+`organization.user(userId).schedulers.list({ status: "deleted" })` returns their
+retained tombstones. User-Key lists accept only `enabled` or `disabled`; both
+list surfaces omit deleted records by default.
 
 `list({ status, limit, cursor })` and `fires(id, { limit, cursor })` return
 `nextCursor` rather than `hasMore`. Cursors retain their original owner/filter
@@ -897,7 +925,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -905,10 +933,33 @@ TEST_TIDB_DATABASE_URL=mysql://root@127.0.0.1:4000/tidb_link_sdk_test \
 TIDB_SSL=off npm run test:service
 ```
 
-This command requires a clean service checkout at the exact revision and resets
-all rows in the selected test database before and after the run. It uses the
-service's existing AppModule test fixture, genuine credentials, real TiDB and
-controlled model dependencies. Fixtures prepare identities, Templates and eligible
+This command requires a clean service checkout at the exact revision. It builds
+the service for the compiled Organization consumer and uses a dedicated TiDB
+connection. Run just that consumer with:
+
+```sh
+AGENT_SERVICE_ROOT=/path/to/agent-stack \
+TEST_TIDB_DATABASE_URL=mysql://root@127.0.0.1:4000/tidb_link_sdk_test \
+TIDB_SSL=off npm run test:service -- organization/organization.compiled.fixture.ts
+```
+
+The compiled fixture reuses the service system harness, its isolated database,
+controlled model/storage/ASR/voice dependencies and real background runner. A
+separate process installs the tarball in a clean directory and calls only the
+installed SDK and packaged Organization example for its application workflow.
+It verifies Organization provisioning without a User Key, discovery, Agent/Session
+creation replay, owner isolation, file upload/download and message attachment,
+text results, SSE/history, Client Tools, audio, Scheduler fires and deleted history,
+Realtime HTTP grants, rotation/revocation and fresh-authority recovery. A separate
+User-Key control reads the same retained resources. Management credential changes
+and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
+redemption, live speech suppliers, physical hardware and deployment compatibility
+are outside this SDK proof.
+
+The remaining fixtures use the service's existing AppModule test seam and reset
+all rows in the selected dedicated test database before and after their runs.
+They use genuine credentials, real TiDB and controlled dependencies. Their scope:
+Fixtures prepare identities, Templates and eligible
 Realtime Sessions. A composed installed quickstart provisions one fresh User/key,
 discovers Templates/models, creates an Agent and Session, obtains a final answer
 and recovers the same original result. Public SDK methods also verify ownership,
@@ -938,7 +989,7 @@ supplier and budget refusals, model failure, active-response interruption and th
 installed audio example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/0d11f1b231879c735bd53b60ff895ac58ba60d33/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/39b7b58c0c76b4926f97a6692b0f0183f6f8f34a/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 Usage cases seed controlled facts and verify both public projections, exact filters,
 paging and authority without executing messages to manufacture billing data.

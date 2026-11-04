@@ -13,7 +13,7 @@ const upload = "/api/v1/user/drive/uploads";
 test("file transfers retain the exact selected service contract and separate User and ticket authority", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "845d31280c2915ca1abad8c602516c3a0f87778718e4497856bca402279ecdd3",
+    "6247288bd79a6067080bf4e254ecc69b2e76aca724c5a3311c6f01839d6e4c8f",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
@@ -24,7 +24,7 @@ test("file transfers retain the exact selected service contract and separate Use
     for (const operation of Object.values(methods)) {
       assert.deepEqual(
         operation.security,
-        path.includes("{ticket}") ? [] : [{ UserApiKey: [] }],
+        path.includes("{ticket}") ? [] : path.includes("/org/users/") ? [{ OrganizationApiKey: [] }] : [{ UserApiKey: [] }],
       );
     }
   }

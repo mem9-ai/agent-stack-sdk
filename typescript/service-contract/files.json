@@ -1,6 +1,6 @@
 {
-  "revision": "0d11f1b231879c735bd53b60ff895ac58ba60d33",
-  "sourceOpenApiSha256": "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc",
+  "revision": "39b7b58c0c76b4926f97a6692b0f0183f6f8f34a",
+  "sourceOpenApiSha256": "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
   "paths": {
     "/api/v1/files": {
       "get": {
@@ -1079,7 +1079,7 @@
             "in": "path",
             "schema": {
               "type": "string",
-              "maxLength": 314
+              "maxLength": 444
             }
           },
           {
@@ -1218,7 +1218,7 @@
     },
     "/api/v1/drive-downloads/{ticket}": {
       "get": {
-        "description": "Anonymous, ticket-authorized endpoint for every authenticated download resource kind. Returns complete same-path inline bytes or an HTTPS Drive9 storage redirect with bounded presign exposure.\n\nAuthorization: short-lived download ticket; no API Key required.",
+        "description": "Anonymous, ticket-authorized endpoint for every authenticated download resource kind. Returns complete same-path inline bytes or an HTTPS Drive9 storage redirect with bounded presign exposure. Organization-issued Drive tickets require their exact issuing credential to remain current at new redemption admission; revoked or rotated issuers return 404. An admitted transfer may finish within existing limits. A returned provider URL retains its own expiry and is not revoked by this core check. Legacy unattributed v3.drive tickets are refused; obtain a fresh ticket.\n\nAuthorization: short-lived download ticket; no API Key required.",
         "operationId": "DriveDownloadController_redeem",
         "parameters": [
           {
@@ -1228,7 +1228,7 @@
             "description": "Opaque 60-second download ticket; consumers must follow the current maxLength.",
             "schema": {
               "type": "string",
-              "maxLength": 410
+              "maxLength": 538
             }
           }
         ],
@@ -1363,9 +1363,1391 @@
           "Drive"
         ]
       }
+    },
+    "/api/v1/org/users/{userId}/files": {
+      "get": {
+        "operationId": "OrganizationUserFilesController_list",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "false",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 2048,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilesPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/org/users/{userId}/files/{fileId}": {
+      "get": {
+        "operationId": "OrganizationUserFilesController_get",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
+    "/api/v1/org/users/{userId}/files/{fileId}/content": {
+      "get": {
+        "description": "Bounded content is verified before delivery. Files above 50 MiB return a short-lived download ticket bound to the exact issuing Organization credential. Revocation and same-ID rotation deny new redemption; admitted transfers may finish.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization and End User scope.",
+        "operationId": "OrganizationUserFilesController_content",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.tidb-link.file-download+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "byteSize": {
+                      "type": "integer"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt",
+                    "byteSize",
+                    "sha256"
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Read an ordinary User File, including disabled owners",
+        "tags": [
+          "OrganizationUserFiles"
+        ]
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/upload-capabilities": {
+      "get": {
+        "operationId": "OrganizationUserFilesController_capabilities",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUserFileUploadCapabilitiesOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Discover the effective inline and multipart upload limits",
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization."
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/uploads": {
+      "post": {
+        "description": "The Idempotency-Key binds the exact input, File and fixed expiry. Fresh valid Organization authority can recover the same owned upload after rotation or revocation. Inline responses include contentUrl and an optional core upload ticket; multipart responses include partSize and totalParts.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization.",
+        "operationId": "OrganizationUserFilesController_create",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePublicUserFileUploadBodyOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Create or replay an ordinary User upload with current Organization authority",
+        "tags": [
+          "OrganizationUserFiles"
+        ]
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/uploads/{uploadId}": {
+      "get": {
+        "operationId": "OrganizationUserFilesController_status",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadStatusResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization."
+      },
+      "delete": {
+        "operationId": "OrganizationUserFilesController_abort",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization."
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/uploads/{uploadId}/content": {
+      "put": {
+        "operationId": "OrganizationUserFilesController_upload",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Digest",
+            "in": "header",
+            "description": "RFC 9530 SHA-256 digest.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationUserFiles"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization."
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/uploads/{uploadId}/parts/{partNumber}/presign": {
+      "post": {
+        "description": "Each request checks the exact current Organization Key and active ordinary owner before durable audit and provider access. PUT exactly the returned size and every returned header to the provider URL, then retain its ETag. This URL is a separate provider grant: Organization Key rotation or revocation does not revoke it. New core presign and completion requests still require current authority.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization.",
+        "operationId": "OrganizationUserFilesController_presignPart",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partNumber",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignPublicUserFileUploadPartBodyOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUserFileUploadPartResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Bind a multipart part digest and obtain its provider upload grant",
+        "tags": [
+          "OrganizationUserFiles"
+        ]
+      }
+    },
+    "/api/v1/org/users/{userId}/drive/uploads/{uploadId}/complete": {
+      "post": {
+        "description": "Inline uploads accept an empty object. Multipart uploads submit every part in ascending order with its bound SHA-256 and provider ETag. Success requires exact whole-file size and digest verification; retries return the same ready File. An admitted completion may finish after Key invalidation, while new requests require current authority.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope. The path userId selects an ordinary target User that must belong to that Organization.",
+        "operationId": "OrganizationUserFilesController_complete",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileConfirmationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or content digest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The ordinary User or owned File is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload state or idempotency conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large; read the current upload limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: content does not match the declared identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage or required durable audit is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Confirm a whole-file verified upload with current Organization authority",
+        "tags": [
+          "OrganizationUserFiles"
+        ]
+      }
     }
   },
   "components": {
+    "securitySchemes": {
+      "HardwareCredentialAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Hardware Credential authenticates only one inventoried device on /api/v1/hardware/connect. It grants no User, Session or management authority. Send it in Authorization, never in a URL."
+      },
+      "ConnectorKeyAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Connector Key authenticates only tunnel connections on /api/v1/connectors/ws. It identifies one Organization-owned Connector and grants no End User, Session or management authority. Send it in Authorization, never in a URL."
+      },
+      "UserApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
+      },
+      "OrganizationApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
+      }
+    },
     "schemas": {
       "FilesPageDto": {
         "type": "object",
@@ -1660,7 +3042,6 @@
                   "invalid_current_password",
                   "account_already_exists",
                   "account_not_found",
-                  "password_not_configured",
                   "password_already_configured",
                   "google_identity_already_linked",
                   "verification_not_found",
@@ -2260,14 +3641,6 @@
             }
           }
         }
-      }
-    },
-    "securitySchemes": {
-      "UserApiKey": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
       }
     }
   }

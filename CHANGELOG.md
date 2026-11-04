@@ -2,6 +2,17 @@
 
 ## Unreleased (0.3.0)
 
+- Add `OrganizationClient.user(userId)` for the existing supported End User
+  resource workflows without issuing a User Key. Retain `UserClient` compatibility,
+  real authorizing credentials, owner-scoped handles and separate usage projections.
+- Pin the supported contract to service
+  `39b7b58c0c76b4926f97a6692b0f0183f6f8f34a` and OpenAPI SHA-256
+  `906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b`.
+- Include `organization_user` billing attribution and deleted Scheduler history.
+  Add a packaged Organization example and a compiled-backend independent packed
+  consumer for the supported journey. MCP, general Drive management and WebSocket
+  media transport remain outside the SDK. No package publication is performed.
+
 - Bind User API Key creation, rotation and revocation receipts to their requested
   targets. Validate credential status and token/key identity, preserving unknown
   outcomes and request IDs without automatically replaying credential mutations.

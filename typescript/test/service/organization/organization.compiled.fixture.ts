@@ -130,6 +130,7 @@ it("an independent installed SDK consumer uses Organization authority against th
       output += bytes;
     });
     let paused: ReturnType<typeof harness.model.enqueueText> | undefined;
+    let title: ReturnType<typeof harness.model.enqueueText> | undefined;
     const consumer = child;
     child.on("message", (message: { stage: string; userId?: string }) => {
       void (async () => {
@@ -153,7 +154,16 @@ it("an independent installed SDK consumer uses Organization authority against th
           harness.model.enqueueText({
             chunks: ["Organization SDK answer."],
           });
+          title = harness.model.enqueueText({
+            chunks: ["SDK Organization journey"],
+            expectRequest: {
+              bodyIncludes: ["Generate exactly one concise session title."],
+            },
+          });
         } else if (message.stage === "tools") {
+          // A display name does not suppress the first Turn's background auto-title.
+          await title!.waitUntilRequested();
+          title!.verifyRequest();
           harness.model.enqueueToolCalls({
             toolCalls: [
               { id: "sdk_order", name: "lookup_order", arguments: {} },

@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** This recording request owns its response; aborting it may interrupt the Turn. */
 export async function submitAudioWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   sessionId,
   bytes,
   filename,
@@ -14,7 +15,10 @@ export async function submitAudioWorkflow({
   billingTag,
   signal,
 }) {
-  return new UserClient({ baseUrl, apiKey: userApiKey })
+  return new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId)
     .session(sessionId)
     .audio({
       bytes,
@@ -34,7 +38,8 @@ if (
       throw new Error("Set AUDIO_FILE_PATH to an existing recording");
     const result = await submitAudioWorkflow({
       baseUrl: process.env.AGENT_SERVICE_URL,
-      userApiKey: process.env.USER_API_KEY,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
       sessionId: process.env.SESSION_ID,
       filename: basename(process.env.AUDIO_FILE_PATH),
       bytes: await readFile(process.env.AUDIO_FILE_PATH),

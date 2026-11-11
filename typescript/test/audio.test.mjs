@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 import {
-  UserClient,
+  OrganizationClient,
   TurnFailedError,
   TurnInterruptedError,
   OutcomeUnknownError,
   TiDBLinkApiError,
 } from "../dist/index.js";
-const apiKey = "ti_user_audio_" + "x".repeat(43);
+const apiKey = "ti_org_audio_" + "x".repeat(43);
 const servers = [];
 after(async () =>
   Promise.all(
@@ -31,7 +31,7 @@ const event = (name, payload, seq = 0, turnId = "turn-audio") => ({
 });
 const frame = (e) => `event: ${e.event}\ndata: ${JSON.stringify(e)}\n\n`;
 const sessionAt = (baseUrl) =>
-  new UserClient({ baseUrl, apiKey }).session("session-audio");
+  new OrganizationClient({ baseUrl, apiKey }).user("user_1").session("session-audio");
 const input = () => ({
   bytes: new Uint8Array([1, 2, 3, 4]),
   filename: "recording.wav",
@@ -41,7 +41,7 @@ const input = () => ({
 test("prerecorded audio sends multipart bytes and JSON billing metadata and waits for its own terminal result", async () => {
   const baseUrl = await serve(async (req, res) => {
     assert.equal(req.method, "POST");
-    assert.equal(req.url, "/api/v1/user/sessions/session-audio/turns/audio");
+    assert.equal(req.url, "/api/v1/org/users/user_1/sessions/session-audio/turns/audio");
     assert.equal(req.headers.authorization, `Bearer ${apiKey}`);
     assert.equal(req.headers["idempotency-key"], undefined);
     const bytes = Buffer.concat(await Array.fromAsync(req));

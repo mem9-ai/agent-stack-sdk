@@ -3,25 +3,10 @@ import { inspect } from "node:util";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { ConflictError, ConnectionError, OrganizationClient, OutcomeUnknownError, TiDBLinkApiError, TiDBLinkError, UserClient } from "../dist/index.js";
+import { ConflictError, ConnectionError, OrganizationClient, OutcomeUnknownError, TiDBLinkApiError, TiDBLinkError } from "../dist/index.js";
 
 const servers = [];
 const organizationApiKey = "ti_org_" + "keyId_" + "x".repeat(43);
-const userApiKeyMetadata = (overrides = {}) => ({
-  apiKeyId: "uak_1",
-  organizationId: "org_1",
-  userId: "user_1",
-  name: "backend",
-  tokenPrefix: "ti_user_1_",
-  status: "active",
-  createdByUserId: null,
-  createdByOrganizationApiKeyId: "oak_1",
-  createdAt: "2026-08-25T00:00:00.000Z",
-  updatedAt: "2026-08-25T00:00:00.000Z",
-  lastUsedAt: null,
-  revokedAt: null,
-  ...overrides,
-});
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
@@ -47,7 +32,7 @@ test("an Organization client retries a safe read with one request identity", asy
       );
       return;
     }
-    response.end(JSON.stringify({ apiKeys: [] }));
+    response.end(JSON.stringify({ users: [] }));
   });
 
   const client = new OrganizationClient({
@@ -55,9 +40,9 @@ test("an Organization client retries a safe read with one request identity", asy
     apiKey: organizationApiKey,
   });
 
-  assert.deepEqual(await client.listUserApiKeys("user_1"), []);
+  assert.deepEqual(await client.listEndUsers(), []);
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].url, "/api/v1/org/users/user_1/api-keys");
+  assert.equal(requests[0].url, "/api/v1/org/users");
   assert.equal(requests[0].headers.authorization, `Bearer ${organizationApiKey}`);
   assert.equal(requests[0].headers["x-request-id"], requests[1].headers["x-request-id"]);
   assert.equal(requests[0].headers["x-agent9-workspace-id"], undefined);
@@ -89,7 +74,7 @@ test("an Organization service conflict preserves safe error details", async () =
     apiKey: organizationApiKey,
   });
 
-  await assert.rejects(client.listUserApiKeys("user_1"), (error) => {
+  await assert.rejects(client.listEndUsers(), (error) => {
     assert(error instanceof ConflictError);
     assert(error instanceof TiDBLinkApiError);
     assert(error instanceof TiDBLinkError);
@@ -113,274 +98,48 @@ test("an Organization client rejects a User API Key without exposing it", () => 
   );
 });
 
-test("clients accept only the frozen typed credential grammar before dispatch", async () => {
+test("the client accepts only the frozen Organization credential grammar before dispatch", async () => {
   const calls = [];
   const baseUrl = await serve((request, response) => {
     calls.push({ url: request.url, headers: request.headers });
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({ apiKeys: [], agents: [] }));
+    response.end(JSON.stringify({ users: [] }));
   });
   const secret = "x".repeat(40) + "-_A";
-  for (const [kind, Client] of [["org", OrganizationClient], ["user", UserClient]]) {
-    const invalid = kind === "org" ? [
-      `ti_${kind}_key_${"x".repeat(42)}`,
-      `ti_${kind}_key_${"x".repeat(44)}`,
-      `ti_${kind}__${secret}`,
-      `ti_${kind}_${"a".repeat(65)}_${secret}`,
-      `ti_${kind}_key_id_${secret}`,
-      `ti_${kind}_é_${secret}`,
-      `ti_${kind}_key_${"x".repeat(42)}+`,
-      `ti_${kind}_key_${secret}\n`,
-      `ti_${kind}_key_\n${secret}`,
-      `ti_${kind}.key.${secret}`,
-      "ag9_oak." + "key." + "x".repeat(32),
-      "", null, undefined, 123,
-    ] : [`ti_user_key_${"x".repeat(42)}`];
-    for (const apiKey of invalid) {
-      assert.throws(() => new Client({ baseUrl, apiKey }), (error) => {
-        assert(error instanceof TypeError);
-        if (typeof apiKey === "string" && apiKey) {
-          for (const rendered of [String(error), error.stack, JSON.stringify(error), inspect(error)]) {
-            assert(!rendered.includes(apiKey));
-          }
-        }
-        return true;
-      });
-    }
-    assert.equal(calls.length, kind === "org" ? 0 : 2);
-    for (const id of ["A", "a".repeat(64)]) {
-      const apiKey = `ti_${kind}_${id}_${secret}`;
-      const client = new Client({ baseUrl, apiKey });
-      assert(!JSON.stringify(client).includes(apiKey));
-      if (kind === "org") await client.listUserApiKeys("user_1");
-      else await client.listAgents();
-      assert.equal(calls.at(-1).headers.authorization, `Bearer ${apiKey}`);
-    }
-  }
-  assert.equal(calls.length, 4);
-});
-
-test("an Organization client manages an End User's credentials", async () => {
-  const calls = [];
-  const apiKey = userApiKeyMetadata();
-  const baseUrl = await serve(async (request, response) => {
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    calls.push({ method: request.method, url: request.url, body, headers: request.headers });
-    response.setHeader("content-type", "application/json");
-    if (request.url === "/api/v1/org/users/user_1/api-keys") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_1_" + "a".repeat(43) }));
-      return;
-    }
-    if (request.url === "/api/v1/org/user-api-keys/uak_1/rotate") {
-      response.writeHead(201).end(JSON.stringify({ apiKey, token: "ti_user_1_" + "b".repeat(43) }));
-      return;
-    }
-    response.writeHead(201).end(
-      JSON.stringify({
-        apiKey: { ...apiKey, status: "revoked", revokedAt: "2026-08-25T01:00:00.000Z" },
-      }),
-    );
-  });
-  const client = new OrganizationClient({
-    baseUrl,
-    apiKey: organizationApiKey,
-  });
-
-
-  assert.equal((await client.createUserApiKey("user_1", { name: "backend" })).token, "ti_user_1_" + "a".repeat(43));
-  assert.equal((await client.rotateUserApiKey("uak_1")).token, "ti_user_1_" + "b".repeat(43));
-  assert.equal((await client.revokeUserApiKey("uak_1")).status, "revoked");
-
-  assert.deepEqual(JSON.parse(calls[0].body), { name: "backend" });
-  assert.deepEqual(
-    calls.map(({ method, url }) => [method, url]),
-    [
-      ["POST", "/api/v1/org/users/user_1/api-keys"],
-      ["POST", "/api/v1/org/user-api-keys/uak_1/rotate"],
-      ["POST", "/api/v1/org/user-api-keys/uak_1/revoke"],
-    ],
-  );
-});
-
-test("a lost credential response is outcome unknown and is not retried", async () => {
-  let attempts = 0;
-  const baseUrl = await serve((request) => {
-    attempts += 1;
-    request.socket.destroy();
-  });
-  const client = new OrganizationClient({
-    baseUrl,
-    apiKey: organizationApiKey,
-  });
-
-  await assert.rejects(
-    client.createUserApiKey("user_1", { name: "backend" }),
-    (error) => {
-      assert(error instanceof OutcomeUnknownError);
-      assert.match(error.requestId, /^[0-9a-f-]{36}$/);
-      assert(!String(error).includes(organizationApiKey));
-      return true;
-    },
-  );
-  assert.equal(attempts, 1);
-});
-
-test("unusable credential responses are outcome unknown", async () => {
-  const invalidTokens = [
-    "ag9_uak_" + "1_" + "x".repeat(32),
-    organizationApiKey,
-    "ti_user_1_" + "x".repeat(42),
-  ];
-  const bodies = [
-    "not-json", JSON.stringify({ apiKey: { apiKeyId: "uak_1" } }),
-    ...invalidTokens.map((token) => JSON.stringify({ apiKey: userApiKeyMetadata(), token })),
-  ];
-  let request = 0;
-  const baseUrl = await serve((_request, response) => {
-    response.writeHead(201, { "content-type": "application/json" }).end(bodies[request++]);
-  });
-  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
-
-  for (let attempt = 0; attempt < bodies.length; attempt += 1) {
-    await assert.rejects(
-      attempt % 2 === 0
-        ? client.createUserApiKey("user_1", { name: "backend" })
-        : client.rotateUserApiKey("uak_1"),
-      (error) => {
-        assert(error instanceof OutcomeUnknownError);
-        for (const token of [organizationApiKey, ...invalidTokens]) {
-          assert(!String(error).includes(token));
-          assert(!JSON.stringify(error).includes(token));
-        }
-        return true;
-      },
-    );
-    assert.equal(request, attempt + 1);
-  }
-});
-
-test("credential receipts reject wrong targets, states and token identities without replay or disclosure", async () => {
-  const token = "ti_user_1_" + "s".repeat(43);
-  const otherToken = "ti_user_2_" + "t".repeat(43);
-  const issued = (overrides = {}, issuedToken = token) => ({
-    apiKey: userApiKeyMetadata(overrides), token: issuedToken,
-  });
-  const revoked = (overrides = {}) => ({
-    apiKey: userApiKeyMetadata({
-      status: "revoked", revokedAt: "2026-08-25T01:00:00.000Z", ...overrides,
-    }),
-  });
-  const cases = [
-    ["create", "another user", issued({ userId: "user_2" })],
-    ["create", "missing user", issued({ userId: undefined })],
-    ["create", "missing organization", issued({ organizationId: undefined })],
-    ["create", "empty key ID", issued({ apiKeyId: "" })],
-    ["create", "revoked key", issued({ status: "revoked" })],
-    ["create", "revokedAt on active key", issued({ revokedAt: "2026-08-25T01:00:00.000Z" })],
-    ["create", "token for another key", issued({}, otherToken)],
-    ["create", "mismatched token prefix", issued({ tokenPrefix: "ti_user_2_" })],
-    ["rotate", "another key", issued({ apiKeyId: "uak_2", tokenPrefix: "ti_user_2_" }, otherToken)],
-    ["rotate", "missing key ID", issued({ apiKeyId: undefined })],
-    ["rotate", "missing user", issued({ userId: undefined })],
-    ["rotate", "revoked key", issued({ status: "revoked" })],
-    ["rotate", "token for another key", issued({}, otherToken)],
-    ["rotate", "mismatched token prefix", issued({ tokenPrefix: "ti_user_2_" })],
-    ["revoke", "another key", revoked({ apiKeyId: "uak_2" })],
-    ["revoke", "active key", issued()],
-    ["revoke", "missing user", revoked({ userId: undefined })],
-    ["revoke", "missing organization", revoked({ organizationId: undefined })],
-    ["revoke", "missing revocation time", revoked({ revokedAt: null })],
-    ["revoke", "invalid revocation time", revoked({ revokedAt: "invalid" })],
-    ["revoke", "missing envelope", null],
-    ["revoke", "missing key", {}],
-    ["revoke", "array key", { apiKey: [] }],
-  ];
-  let requests = 0;
-  const baseUrl = await serve((_request, response) => {
-    const index = requests++;
-    response.writeHead(201, {
-      "content-type": "application/json", "x-request-id": `receipt_${index}`,
-    }).end(JSON.stringify(cases[index][2]));
-  });
-  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
-  for (const [index, [operation, reason]] of cases.entries()) {
-    await assert.rejects(
-      operation === "create"
-        ? client.createUserApiKey("user_1", { name: "backend" })
-        : operation === "rotate"
-          ? client.rotateUserApiKey("uak_1")
-          : client.revokeUserApiKey("uak_1"),
-      (error) => {
-        assert(error instanceof OutcomeUnknownError);
-        assert.equal(error.requestId, `receipt_${index}`);
+  for (const apiKey of [
+    `ti_org_key_${"x".repeat(42)}`,
+    `ti_org_key_${"x".repeat(44)}`,
+    `ti_org__${secret}`,
+    `ti_org_${"a".repeat(65)}_${secret}`,
+    `ti_org_key_id_${secret}`,
+    `ti_org_é_${secret}`,
+    `ti_org_key_${"x".repeat(42)}+`,
+    `ti_org_key_${secret}\n`,
+    `ti_org_key_\n${secret}`,
+    `ti_org.key.${secret}`,
+    `ti_user_key_${secret}`,
+    "ag9_oak." + "key." + "x".repeat(32),
+    "", null, undefined, 123,
+  ]) {
+    assert.throws(() => new OrganizationClient({ baseUrl, apiKey }), (error) => {
+      assert(error instanceof TypeError);
+      if (typeof apiKey === "string" && apiKey) {
         for (const rendered of [String(error), error.stack, JSON.stringify(error), inspect(error)]) {
-          for (const secret of [organizationApiKey, token, otherToken])
-            assert(!rendered.includes(secret));
+          assert(!rendered.includes(apiKey));
         }
-        return true;
-      },
-      `${operation}: ${reason}`,
-    );
-    assert.equal(requests, index + 1, "credential mutations must not be replayed");
+      }
+      return true;
+    });
   }
-});
-
-test("credential cancellation is outcome unknown only after dispatch", async () => {
-  const controller = new AbortController();
-  let requests = 0;
-  const baseUrl = await serve(() => {
-    requests += 1;
-    controller.abort(new Error("stop after dispatch"));
-  });
-  const client = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
-
-  await assert.rejects(
-    client.createUserApiKey("user_1", { name: "backend" }, { signal: controller.signal }),
-    OutcomeUnknownError,
-  );
-
-  const beforeDispatch = new AbortController();
-  beforeDispatch.abort(new Error("stop before dispatch"));
-  await assert.rejects(
-    client.createUserApiKey("user_1", { name: "backend" }, { signal: beforeDispatch.signal }),
-    /stop before dispatch/,
-  );
-  assert.equal(requests, 1);
-});
-
-test("offboarding revokes every active key and leaves revoked keys alone", async () => {
-  const revoked = [];
-  const revokedKey = userApiKeyMetadata({
-    apiKeyId: "uak_active", status: "revoked", revokedAt: "2026-08-25T01:00:00.000Z",
-  });
-  const baseUrl = await serve((request, response) => {
-    response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.end(
-        JSON.stringify({
-          apiKeys: [
-            { apiKeyId: "uak_active", status: "active" },
-            { apiKeyId: "uak_revoked", status: "revoked" },
-          ],
-        }),
-      );
-      return;
-    }
-    revoked.push(request.url);
-    response.writeHead(201).end(
-      JSON.stringify({ apiKey: revokedKey }),
-    );
-  });
-  const client = new OrganizationClient({
-    baseUrl,
-    apiKey: organizationApiKey,
-  });
-
-  const result = await Promise.all((await client.listUserApiKeys("user_1")).filter(key => key.status === "active").map(key => client.revokeUserApiKey(key.apiKeyId)));
-
-  assert.deepEqual(result, [revokedKey]);
-  assert.deepEqual(revoked, ["/api/v1/org/user-api-keys/uak_active/revoke"]);
+  assert.equal(calls.length, 0);
+  for (const id of ["A", "a".repeat(64)]) {
+    const apiKey = `ti_org_${id}_${secret}`;
+    const client = new OrganizationClient({ baseUrl, apiKey });
+    assert(!JSON.stringify(client).includes(apiKey));
+    await client.listEndUsers();
+    assert.equal(calls.at(-1).headers.authorization, `Bearer ${apiKey}`);
+  }
+  assert.equal(calls.length, 2);
 });
 
 test("an Organization client confirms its Organization without identity selectors", async () => {
@@ -448,7 +207,7 @@ test("native End Users can be created, listed and retrieved with their external 
   assert.deepEqual(await client.getEndUser(created.userId), user);
 });
 
-test("a lost rotation or User creation response is not replayed", async () => {
+test("a lost User creation response is not replayed", async () => {
   let requests = 0;
   const baseUrl = await serve((request) => {
     requests++;
@@ -458,17 +217,12 @@ test("a lost rotation or User creation response is not replayed", async () => {
     baseUrl,
     apiKey: organizationApiKey,
   });
-  for (const operation of [
-    () => client.rotateUserApiKey("key_1", { requestId: "rotate_1" }),
-    () =>
-      client.createEndUser(
-        { externalId: "customer-1" },
-        { requestId: "create_1" },
-      ),
-  ])
-    await assert.rejects(operation(), OutcomeUnknownError);
-  assert.equal(requests, 2);
-  await assert.rejects(client.listUserApiKeys("user_1"), (error) => {
+  await assert.rejects(
+    client.createEndUser({ externalId: "customer-1" }, { requestId: "create_1" }),
+    OutcomeUnknownError,
+  );
+  assert.equal(requests, 1);
+  await assert.rejects(client.listEndUsers(), (error) => {
     assert(error instanceof ConnectionError);
     assert(!(error instanceof OutcomeUnknownError));
     return true;
@@ -512,7 +266,7 @@ test("service errors retain body request identity, and uncertain server failures
     apiKey: organizationApiKey,
   });
   await assert.rejects(
-    client.createUserApiKey("user_1", { name: "backend" }),
+    client.createEndUser({ externalId: "customer-1" }),
     (error) => {
       assert(error instanceof OutcomeUnknownError);
       assert.equal(error.requestId, "body_request");
@@ -544,117 +298,6 @@ test("redirects never send an API Key to another recipient", async () => {
   assert.equal(received, 0);
 });
 
-test("revocation aborted after dispatch retains its uncertain outcome and request identity", async () => {
-  const controller = new AbortController();
-  let requests = 0;
-  const baseUrl = await serve(() => {
-    requests++;
-    controller.abort(new Error("stop revocation"));
-  });
-  const client = new OrganizationClient({
-    baseUrl,
-    apiKey: organizationApiKey,
-  });
-  await assert.rejects(
-    client.revokeUserApiKey("key_1", {
-      requestId: "revoke_1",
-      signal: controller.signal,
-    }),
-    (error) => {
-      assert(error instanceof OutcomeUnknownError);
-      assert.equal(error.requestId, "revoke_1");
-      return true;
-    },
-  );
-  assert.equal(requests, 1);
-});
-
-test("failed reconciliation preserves the original uncertain creation identity", async () => {
-  const { provisionUser } = await import("../examples/provision-user.mjs");
-  let creating = false;
-  const baseUrl = await serve((request, response) => {
-    if (request.url === "/api/v1/org") {
-      response.end(
-        JSON.stringify({ organization: { organizationId: "org_1" } }),
-      );
-    } else if (request.method === "GET" && !creating) {
-      response.end(JSON.stringify({ users: [] }));
-    } else {
-      const requestId =
-        request.method === "POST" ? "original_creation" : "reconciliation";
-      creating = true;
-      response.writeHead(503, { "x-request-id": requestId }).end(
-        JSON.stringify({
-          error: {
-            code: "service_unavailable",
-            message: "Temporarily unavailable",
-          },
-        }),
-      );
-    }
-  });
-  await assert.rejects(
-    provisionUser({ baseUrl, organizationApiKey, externalId: "customer-1" }),
-    (error) => {
-      assert(error instanceof OutcomeUnknownError);
-      assert.equal(error.requestId, "original_creation");
-      return true;
-    },
-  );
-});
-
-for (const failure of ["disconnect", "conflict"]) {
-  test(`the provisioning example reconciles ${failure} without issuing twice`, async () => {
-    const { provisionUser } = await import("../examples/provision-user.mjs");
-    let user;
-    let creations = 0;
-    let issuances = 0;
-    const baseUrl = await serve((request, response) => {
-      response.setHeader("content-type", "application/json");
-      if (request.url === "/api/v1/org") {
-        response.end(
-          JSON.stringify({ organization: { organizationId: "org_1" } }),
-        );
-      } else if (
-        request.url === "/api/v1/org/users" &&
-        request.method === "GET"
-      ) {
-        response.end(JSON.stringify({ users: user ? [user] : [] }));
-      } else if (
-        request.url === "/api/v1/org/users" &&
-        request.method === "POST"
-      ) {
-        creations++;
-        user = { userId: "user_1", externalId: "customer-1" };
-        if (failure === "disconnect") request.socket.destroy();
-        else
-          response.writeHead(409).end(
-            JSON.stringify({
-              error: { code: "resource_conflict", message: "Already exists" },
-            }),
-          );
-      } else {
-        assert.equal(request.url, "/api/v1/org/users/user_1/api-keys");
-        issuances++;
-        if (issuances > 1) request.socket.destroy();
-        else
-          response.writeHead(201).end(
-            JSON.stringify({
-              apiKey: userApiKeyMetadata({ apiKeyId: "uak_key1", tokenPrefix: "ti_user_key1_" }),
-              token: "ti_user_key1_" + "y".repeat(43),
-            }),
-          );
-      }
-    });
-    const input = { baseUrl, organizationApiKey, externalId: " customer-1 " };
-    assert.equal((await provisionUser(input)).user.userId, "user_1");
-    await assert.rejects(provisionUser(input), OutcomeUnknownError);
-    assert.equal(creations, 1);
-    assert.equal(issuances, 2);
-  });
-}
-
-
 test("public request options cannot change operations or enable unsafe replay", async () => {
   const requests = [];
   let inFlightOptions;
@@ -682,20 +325,9 @@ test("public request options cannot change operations or enable unsafe replay", 
     baseUrl,
     apiKey: organizationApiKey,
   });
-  const user = new UserClient({
-    baseUrl,
-    apiKey: "ti_user_key_" + "x".repeat(43),
-  });
-  const session = user.session("session_1");
+  const session = client.user("user_1").session("session_1");
   for (const operation of [
     () => client.createEndUser({}, { idempotent: true }),
-    () =>
-      client.createUserApiKey(
-        "user_1",
-        { name: "backend" },
-        { idempotent: true },
-      ),
-    () => client.rotateUserApiKey("key_1", { idempotent: true }),
     () => session.refresh({ method: "DELETE", body: { unexpected: true } }),
     () => session.getRealtimeConnection({ method: "DELETE" }),
     () => session.suggestName({ userText: "Name this" }, { idempotent: true }),

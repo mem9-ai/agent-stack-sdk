@@ -1,13 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient, OrganizationClient } from "@tidblink/server";
-
-export async function readOwnUsage({ baseUrl, userApiKey, options = {} }) {
-  const user = new UserClient({ baseUrl, apiKey: userApiKey });
-  return {
-    summary: await user.getUsage(options),
-    details: await user.getUsageDetails(options),
-  };
-}
+import { OrganizationClient } from "@tidblink/server";
 
 /** Organization details return the first page; retain nextCursor and the original filters. */
 export async function readUserUsage({
@@ -38,22 +30,12 @@ if (
       tagKey: process.env.TAG_KEY,
       tagValue: process.env.TAG_VALUE,
     };
-    const baseUrl = process.env.AGENT_SERVICE_URL;
-    let result;
-    if (process.env.USAGE_AUTHORITY === "user")
-      result = await readOwnUsage({
-        baseUrl,
-        userApiKey: process.env.USER_API_KEY,
-        options,
-      });
-    else if (process.env.USAGE_AUTHORITY === "organization")
-      result = await readUserUsage({
-        baseUrl,
-        organizationApiKey: process.env.ORGANIZATION_API_KEY,
-        userId: process.env.END_USER_ID,
-        options,
-      });
-    else throw new TypeError("USAGE_AUTHORITY must be user or organization");
+    const result = await readUserUsage({
+      baseUrl: process.env.AGENT_SERVICE_URL,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
+      options,
+    });
     console.log(JSON.stringify(result));
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Usage read failed");

@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
-  UserClient,
+  OrganizationClient,
   OutcomeUnknownError,
   TurnWaitTimeoutError,
   TurnFailedError,
@@ -16,12 +16,13 @@ import {
 import { sendMessageWorkflow } from "@tidblink/server/examples/send-message.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
-const apiKey = process.env.SDK_USER_KEY;
+const apiKey = process.env.SDK_ORGANIZATION_KEY;
+const userId = process.env.SDK_USER_ID;
 assert(
-  baseUrl && apiKey && process.env.SDK_TEXT_SESSION_ID,
+  baseUrl && apiKey && userId && process.env.SDK_TEXT_SESSION_ID,
   "Run through npm run test:service",
 );
-const user = new UserClient({ baseUrl, apiKey });
+const user = new OrganizationClient({ baseUrl, apiKey }).user(userId);
 const freshSession = async () => {
   const agent = await user.createAgent({
     agentTemplateId: process.env.SDK_TEMPLATE_ID,
@@ -125,10 +126,10 @@ test("actual SDK text acceptance, final results and paged Full Agent/Realtime hi
         entry.realtime.interrupted === true,
     ),
   );
-  const stranger = new UserClient({
-    baseUrl,
-    apiKey: process.env.SDK_FOREIGN_USER_KEY,
-  }).session(session.id);
+  const stranger = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID).session(session.id);
   for (const read of [
     () => stranger.getInteraction(input.clientEventId),
     () => stranger.listInteractions(),
@@ -171,7 +172,7 @@ test("actual failed and interrupted executions preserve original message outcome
   });
   // Explicit cancellation is test arrangement for the message's interrupted outcome.
   const cancelled = await fetch(
-    `${baseUrl}/api/v1/user/sessions/${interrupted.id}/events`,
+    `${baseUrl}/api/v1/org/users/${userId}/sessions/${interrupted.id}/events`,
     {
       method: "POST",
       headers: {
@@ -269,10 +270,12 @@ test("a lost actual service response recovers the original submission without a 
   });
   await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
   try {
-    const proxied = new UserClient({
+    const proxied = new OrganizationClient({
       baseUrl: `http://127.0.0.1:${proxy.address().port}`,
       apiKey,
-    }).session(session.id);
+    })
+      .user(userId)
+      .session(session.id);
     await assert.rejects(
       proxied.submitMessage({
         clientEventId,
@@ -303,7 +306,8 @@ test("the installed message example waits for a real final result and recovers i
   const session = await freshSession();
   const input = {
     baseUrl,
-    userApiKey: apiKey,
+    organizationApiKey: apiKey,
+    userId,
     sessionId: session.id,
     clientEventId: randomUUID(),
     text: "SDK_FIXTURE_EXAMPLE",
@@ -323,7 +327,8 @@ test("the installed message example waits for a real final result and recovers i
       env: {
         ...process.env,
         AGENT_SERVICE_URL: baseUrl,
-        USER_API_KEY: apiKey,
+        ORGANIZATION_API_KEY: apiKey,
+        END_USER_ID: userId,
         SESSION_ID: session.id,
         CLIENT_EVENT_ID: input.clientEventId,
         MESSAGE_TEXT: input.text,

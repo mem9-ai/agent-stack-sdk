@@ -1,17 +1,21 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** Persist sessionId, clientEventId and text before calling; reuse them for recovery. */
 export async function sendMessageWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   sessionId,
   clientEventId,
   text,
   timeoutMs,
   signal,
 }) {
-  const session = new UserClient({ baseUrl, apiKey: userApiKey }).session(
+  const session = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId).session(
     sessionId,
   );
   return session.turn(
@@ -30,7 +34,8 @@ if (
   try {
     const result = await sendMessageWorkflow({
       baseUrl: process.env.AGENT_SERVICE_URL,
-      userApiKey: process.env.USER_API_KEY,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
       sessionId: process.env.SESSION_ID,
       clientEventId: process.env.CLIENT_EVENT_ID,
       text: process.env.MESSAGE_TEXT,

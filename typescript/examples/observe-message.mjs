@@ -1,17 +1,21 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** Observe an already submitted input. Persist each event cursor for reconnection. */
 export function observeMessageWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   sessionId,
   inputId,
   cursor,
   timeoutMs,
   signal,
 }) {
-  return new UserClient({ baseUrl, apiKey: userApiKey })
+  return new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId)
     .session(sessionId)
     .observe(inputId, {
       ...(cursor === undefined ? {} : { cursor }),
@@ -27,7 +31,8 @@ if (
   try {
     for await (const update of observeMessageWorkflow({
       baseUrl: process.env.AGENT_SERVICE_URL,
-      userApiKey: process.env.USER_API_KEY,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
       sessionId: process.env.SESSION_ID,
       inputId: process.env.INPUT_ID,
       cursor: process.env.EVENT_CURSOR,

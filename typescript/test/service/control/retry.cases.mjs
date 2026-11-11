@@ -3,18 +3,14 @@ import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { test } from "node:test";
 import { access, writeFile } from "node:fs/promises";
-import {
-  UserClient,
-  TiDBLinkApiError,
-  TurnInterruptedError,
-} from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError, TurnInterruptedError } from "@tidblink/server";
 
 import { controlTurnWorkflow } from "@tidblink/server/examples/control-turn.mjs";
 
-const user = new UserClient({
+const user = new OrganizationClient({
   baseUrl: process.env.SDK_SERVICE_URL,
-  apiKey: process.env.SDK_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
 const wait = { timeoutMs: 15000, pollIntervalMs: 25 };
 
 test("an explicit SDK retry produces its own result without rewriting the stopped input", async () => {
@@ -105,7 +101,8 @@ test("an explicit SDK retry produces its own result without rewriting the stoppe
   const result = observation.at(-1).result;
   const exampleResult = await controlTurnWorkflow({
     baseUrl: process.env.SDK_SERVICE_URL,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     sessionId: session.id,
     ...command,
     action: "retry",

@@ -27,10 +27,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("package.json"));
   assert(files.includes("dist/index.js"));
   assert(files.includes("dist/index.d.ts"));
-  assert(files.includes("examples/provision-user.mjs"));
   assert(files.includes("examples/prepare-realtime-connection.mjs"));
   assert(files.includes("examples/create-session.mjs"));
-  assert(files.includes("examples/organization-session.mjs"));
   assert(files.includes("examples/send-message.mjs"));
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
@@ -46,10 +44,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "LICENSE" ||
         file === "README.md" ||
         file === "package.json" ||
-        file === "examples/provision-user.mjs" ||
         file === "examples/prepare-realtime-connection.mjs" ||
         file === "examples/create-session.mjs" ||
-        file === "examples/organization-session.mjs" ||
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
@@ -91,8 +87,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       CreateSessionOptions,
       Organization,
       EndUser,
-      IssuedUserApiKey,
-      UserApiKey,
       Session,
       RealtimeAudioFormats,
       RealtimeConnectGrant,
@@ -107,7 +101,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionTimelinePage,
       TurnPage,
       WaitForResultOptions,
-      UserUsageSummary, UserUsageDetails, UserUsageOptions,
       OrganizationUserUsageSummary, OrganizationUserUsageDetails,
       OrganizationUserUsageOptions, OrganizationUserUsageDetailsOptions,
       TurnCommandInput,
@@ -127,12 +120,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TiDBLinkApiError,
       TiDBLinkError,
       OrganizationClient,
-      UserClient,
     } from "@tidblink/server";
     // @ts-expect-error Previous compatibility constants and error exports have no aliases.
     import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@tidblink/server";
     // @ts-expect-error Workspace authority was removed from the supported SDK.
     import { WorkspaceClient } from "@tidblink/server";
+    // @ts-expect-error User API Key authority was removed from the supported SDK.
+    import { UserClient } from "@tidblink/server";
 
     declare const baseUrl: string;
     declare const organizationApiKey: string;
@@ -141,9 +135,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const orgAgent: Promise<Agent> = owner.getAgent("agent_1");
     const deleted: Promise<SchedulerPage> = owner.schedulers.list({ status: "deleted" });
     const principal: BillingPrincipalBucket = "organization_user";
-    // @ts-expect-error User-Key Scheduler lists do not accept deleted history.
-    new UserClient({ baseUrl, apiKey: "unused" }).schedulers.list({ status: "deleted" });
-    declare const userApiKey: string;
+    // @ts-expect-error User API Key management was removed with User authority.
+    organization.createUserApiKey("user_1", { name: "backend" });
     async function provisionEndUser(): Promise<EndUser> {
       const current: Organization = await organization.getOrganization();
       const created: EndUser = await organization.createEndUser({
@@ -151,11 +144,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       });
       const users: EndUser[] = await organization.listEndUsers();
       const found: EndUser = await organization.getEndUser(created.userId);
-      const issued: IssuedUserApiKey = await organization.createUserApiKey(created.userId, { name: "backend" });
-      const keys: UserApiKey[] = await organization.listUserApiKeys(created.userId);
-      const rotated: IssuedUserApiKey = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
-      const revoked: UserApiKey = await organization.revokeUserApiKey(rotated.apiKey.apiKeyId);
-      void current; void users; void keys; void revoked;
+      void current; void users;
       return found;
     }
     async function clientToolsWorkflow(session: Session, agent: Agent) {
@@ -189,7 +178,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       session.audio({...input,clientEventId:"text-only"});
       return session.audio(input);
     }
-    async function schedulerWorkflow(user: UserClient): Promise<Scheduler> {
+    async function schedulerWorkflow(user: EndUserClient): Promise<Scheduler> {
       const input: CreateSchedulerInput = {agentId:"agent-1",title:"Report",prompt:"Summarize",schedule:{kind:"once",after:"1h"},idempotencyKey:"scheduler-1"};
       const created: SchedulerResponse = await user.schedulers.create(input);
       const bound: CreateSchedulerInput = {delivery:{target:"bound_session",sessionId:"session-1"},title:"Report",prompt:"Summarize",schedule:{kind:"cron",cronExpr:"0 9 * * *",timezone:"Asia/Shanghai"},idempotencyKey:"scheduler-2"};
@@ -204,7 +193,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       void invalid; void list; void fires;
       return current.scheduler;
     }
-    async function fileWorkflow(user: UserClient): Promise<UserFile> {
+    async function fileWorkflow(user: EndUserClient): Promise<UserFile> {
       const capabilities: FileUploadCapabilities = await user.files.capabilities();
       const intent: FileUpload = await user.files.createUpload({originalName:"empty", byteSize:0, sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", contentType:null,idempotencyKey:"empty-file"});
       const status: FileUploadStatus = await user.files.getUpload(intent.uploadId);
@@ -236,24 +225,20 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       void cursor;
     }
     async function usageWorkflow() {
-      const user = new UserClient({baseUrl, apiKey: userApiKey});
-      const options: UserUsageOptions = {from:"2030-01-02",to:"2030-01-02"};
-      const own: UserUsageSummary = await user.getUsage(options);
-      const details: UserUsageDetails = await user.getUsageDetails({...options,limit:1});
       const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour"};
       const target: OrganizationUserUsageSummary = await organization.getUserUsage("user_1",range);
       const pageOptions: OrganizationUserUsageDetailsOptions = {from:range.from,to:range.to,kind:"llm",limit:1};
       const page: OrganizationUserUsageDetails = await organization.getUserUsageDetails("user_1",pageOptions);
       const cost: number | null | undefined = page.items[0]?.costMicros;
       const cursor: string | null = page.nextCursor;
-      // @ts-expect-error User usage has no other User selector or cursor.
-      await user.getUsageDetails({userId:"other",cursor:"unsupported"});
+      // @ts-expect-error Usage is read through the Organization client with an explicit target.
+      await owner.getUsage(range);
       // @ts-expect-error Organization aggregate requires an explicit target User.
       await organization.getUserUsage(range);
-      void own;void details;void target;void cost;void cursor;
+      void target;void cost;void cursor;
     }
     async function lifecycleWorkflow(): Promise<Session> {
-      const user = new UserClient({ baseUrl, apiKey: userApiKey });
+      const user = owner;
       const templates: AgentTemplatePage = await user.listAgentTemplates({limit:1});
       const models: AgentModelCatalog = await user.listModels();
       const agent: Agent = await user.createAgent({agentTemplateId:templates.templates[0]!.agentTemplateId,idempotencyKey:"agent-1"});
@@ -278,7 +263,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       return session.delete();
     }
     async function realtimeWorkflow(session: Session): Promise<RealtimeConnection> {
-      const user = new UserClient({ baseUrl, apiKey: userApiKey });
+      const user = owner;
       const catalog: RealtimeModelCatalog = await user.listRealtimeModels();
       const current: RealtimeModelSelection = await session.getRealtimeModelSelection();
       const selected: RealtimeModelSelection = await session.setRealtimeModel(catalog.models[0]!.id, { ifMatch: current.etag });
@@ -296,8 +281,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     organization.serviceUser("user_1");
     // @ts-expect-error Native End User creation replaces the retired Service User operation.
     organization.createServiceUser({ displayName: "Customer" });
-    // @ts-expect-error Project selection was removed from User authority.
-    new UserClient({ baseUrl, apiKey: "ti_user_key_${"x".repeat(43)}", projectId: "removed" });
+    // @ts-expect-error The owner is selected with organization.user(), not a client option.
+    new OrganizationClient({ baseUrl, apiKey: organizationApiKey, userId: "user_1" });
     // @ts-expect-error Runtime selection is not an Agent configuration capability.
     const removedRuntime: CreateSessionOptions = { idempotencyKey:"a", runtime: { backend: "codex", authId: "removed" } };
     declare const session: Session;
@@ -335,6 +320,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const apiError: TiDBLinkError = new TiDBLinkApiError({ status: 400, code: "test", message: "safe" });
     void apiError;
     void WorkspaceClient;
+    void UserClient;
     void removedRuntime;
     void provisionEndUser;
     void lifecycleWorkflow;
@@ -425,10 +411,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     import * as sdk from "@tidblink/server";
     assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
     assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
-    const { provisionUser } = await import("@tidblink/server/examples/provision-user.mjs");
     const { prepareRealtimeConnection } = await import("@tidblink/server/examples/prepare-realtime-connection.mjs");
-    const { readOwnUsage, readUserUsage } = await import("@tidblink/server/examples/read-usage.mjs");
-    assert.equal(typeof readOwnUsage,"function");
+    const { readUserUsage } = await import("@tidblink/server/examples/read-usage.mjs");
     assert.equal(typeof readUserUsage,"function");
     const { sendMessageWorkflow } = await import("@tidblink/server/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
@@ -444,32 +428,31 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof answerClientToolWorkflow,"function");
     const { createSessionWorkflow } = await import("@tidblink/server/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
-    assert.equal(typeof provisionUser, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
+    assert.equal(sdk.UserClient, undefined);
     for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError", "TIDB_LINK_PROVISIONING_REVISION", "TIDB_LINK_REALTIME_REVISION", "TIDB_LINK_LIFECYCLE_REVISION", "TIDB_LINK_TEXT_REVISION"]) {
       assert.equal(sdk[name], undefined);
     }
     const orgKey = "ti_org_key_" + "x".repeat(43);
     const userKey = "ti_user_key_" + "y".repeat(43);
-    const rotatedKey = "ti_user_key_" + "z".repeat(43);
     const requests = [];
     const server = createServer((request, response) => {
       requests.push({ method: request.method, url: request.url, key: request.headers.authorization });
       response.setHeader("content-type", "application/json");
-      if (request.url === "/api/v1/user/agents") {
+      if (request.url === "/api/v1/org/users/user_1/agents") {
         response.end(JSON.stringify({ agents: [] }));
-      } else if (request.url === "/api/v1/realtime-models") {
+      } else if (request.url === "/api/v1/org/users/user_1/realtime-models") {
         response.end(JSON.stringify({
           defaultModel: "voice-a",
           models: [{ id: "voice-a", label: "Voice A", available: true, isDefault: true, languages: ["en-US"], endpointingModes: ["client"], audio: { input: [], output: [] } }],
         }));
-      } else if (request.url === "/api/v1/user/sessions/session_1") {
+      } else if (request.url === "/api/v1/org/users/user_1/sessions/session_1") {
         response.end(JSON.stringify({ session: {
           realtimeModel: "voice-a", realtimeModelRevision: 1,
           realtimeModelEtag: "realtime-v1", realtimeVoice: { language: "en-US" },
         } }));
-      } else if (request.url === "/api/v1/user/sessions/session_1/realtime") {
+      } else if (request.url === "/api/v1/org/users/user_1/sessions/session_1/realtime") {
         response.writeHead(201).end(JSON.stringify({
           realtimeConnection: {
             object: "realtime_connection", id: "rtc_1", sessionId: "session_1", agentId: "agent_1",
@@ -483,53 +466,40 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
           connectTokenExpiresAt: "2026-10-27T00:01:00.000Z",
         }));
       } else {
-        const token = request.url.endsWith("/rotate") ? rotatedKey : userKey;
-        response.writeHead(201).end(JSON.stringify({ apiKey: {
-          apiKeyId: "uak_key", userId: "user_1", organizationId: "org_1",
-          status: "active", revokedAt: null, tokenPrefix: "ti_user_key_",
-        }, token }));
+        response.writeHead(404).end(JSON.stringify({ error: { code: "not_found", message: "Not found" } }));
       }
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
       const baseUrl = "http://127.0.0.1:" + server.address().port;
       const org = new sdk.OrganizationClient({ baseUrl, apiKey: orgKey });
-      const { token } = await org.createUserApiKey("user_1", { name: "test" });
-      assert.equal(token, userKey);
-      const user = new sdk.UserClient({ baseUrl, apiKey: token });
+      const user = org.user("user_1");
       assert.deepEqual(await user.listAgents(), []);
-      const rotated = await org.rotateUserApiKey("uak_key");
-      assert.equal(rotated.token, rotatedKey);
-      assert.deepEqual(await new sdk.UserClient({ baseUrl, apiKey: rotated.token }).listAgents(), []);
       const prepared = await prepareRealtimeConnection({
         baseUrl,
-        userApiKey: rotated.token,
+        organizationApiKey: orgKey,
+        userId: "user_1",
         sessionId: "session_1",
       });
       assert.equal(prepared.realtimeConnection.id, "rtc_1");
       assert.match(prepared.connectToken, /^rct_/);
-      assert.equal(JSON.stringify(new sdk.UserClient({ baseUrl, apiKey: rotated.token })).includes(prepared.connectToken), false);
+      assert.equal(JSON.stringify(user).includes(prepared.connectToken), false);
       assert.deepEqual(requests, [
-        {method:"POST",url:"/api/v1/org/users/user_1/api-keys",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/v1/user/agents",key:"Bearer " + userKey},
-        {method:"POST",url:"/api/v1/org/user-api-keys/uak_key/rotate",key:"Bearer " + orgKey},
-        {method:"GET",url:"/api/v1/user/agents",key:"Bearer " + rotatedKey},
-        {method:"GET",url:"/api/v1/realtime-models",key:"Bearer " + rotatedKey},
-        {method:"GET",url:"/api/v1/user/sessions/session_1",key:"Bearer " + rotatedKey},
-        {method:"POST",url:"/api/v1/user/sessions/session_1/realtime",key:"Bearer " + rotatedKey},
+        {method:"GET",url:"/api/v1/org/users/user_1/agents",key:"Bearer " + orgKey},
+        {method:"GET",url:"/api/v1/org/users/user_1/realtime-models",key:"Bearer " + orgKey},
+        {method:"GET",url:"/api/v1/org/users/user_1/sessions/session_1",key:"Bearer " + orgKey},
+        {method:"POST",url:"/api/v1/org/users/user_1/sessions/session_1/realtime",key:"Bearer " + orgKey},
       ]);
-      for (const [Client, apiKey] of [[sdk.UserClient, orgKey], [sdk.OrganizationClient, "ag9_oak." + "key." + "x".repeat(32)]]) {
-        assert.throws(() => new Client({baseUrl,apiKey}), (error) => {
+      for (const apiKey of [userKey, "ag9_oak." + "key." + "x".repeat(32)]) {
+        assert.throws(() => new sdk.OrganizationClient({baseUrl,apiKey}), (error) => {
           assert(error instanceof TypeError);
           assert(!String(error).includes(apiKey));
           assert(!JSON.stringify(error).includes(apiKey));
           return true;
         });
       }
-      assert.equal(requests.length, 7);
-      for (const client of [org, user]) {
-        for (const key of [orgKey, userKey, rotatedKey]) assert(!JSON.stringify(client).includes(key));
-      }
+      assert.equal(requests.length, 4);
+      for (const client of [org, user]) assert(!JSON.stringify(client).includes(orgKey));
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }

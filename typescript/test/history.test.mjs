@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import { UserClient } from "../dist/index.js";
+import { OrganizationClient } from "../dist/index.js";
 
-const userApiKey = "ti_user_key_" + "x".repeat(43);
+const organizationApiKey = "ti_org_key_" + "x".repeat(43);
 const createdAt = "2026-10-28T00:00:00.000Z";
 const turn = {
   id: "turn_1",
@@ -48,10 +48,12 @@ const serve = async (context, handler) => {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   context.after(() => new Promise((resolve) => server.close(resolve)));
-  return new UserClient({
+  return new OrganizationClient({
     baseUrl: `http://127.0.0.1:${server.address().port}`,
-    apiKey: userApiKey,
-  }).session("session/1");
+    apiKey: organizationApiKey,
+  })
+    .user("user_1")
+    .session("session/1");
 };
 
 test("history preserves Turn pages and selected Full Agent details", async (context) => {
@@ -68,8 +70,8 @@ test("history preserves Turn pages and selected Full Agent details", async (cont
   );
   assert.deepEqual(await session.getTurn("turn_1"), turn);
   assert.deepEqual(calls, [
-    "/api/v1/user/sessions/session%2F1/turns?limit=1&cursor=opaque%2B%2F%3D",
-    "/api/v1/user/sessions/session%2F1/turns/turn_1",
+    "/api/v1/org/users/user_1/sessions/session%2F1/turns?limit=1&cursor=opaque%2B%2F%3D",
+    "/api/v1/org/users/user_1/sessions/session%2F1/turns/turn_1",
   ]);
 });
 
@@ -110,10 +112,10 @@ test("interaction pagination and exact command reconciliation preserve durable o
   );
   assert.equal(await session.reconcileInteraction("missing"), null);
   assert.deepEqual(calls, [
-    "/api/v1/user/sessions/session%2F1/interactions?limit=1&cursor=interaction-cursor",
-    "/api/v1/user/sessions/session%2F1/interactions/command%2F1",
-    "/api/v1/user/sessions/session%2F1/interactions?clientEventId=command%2F1",
-    "/api/v1/user/sessions/session%2F1/interactions?clientEventId=missing",
+    "/api/v1/org/users/user_1/sessions/session%2F1/interactions?limit=1&cursor=interaction-cursor",
+    "/api/v1/org/users/user_1/sessions/session%2F1/interactions/command%2F1",
+    "/api/v1/org/users/user_1/sessions/session%2F1/interactions?clientEventId=command%2F1",
+    "/api/v1/org/users/user_1/sessions/session%2F1/interactions?clientEventId=missing",
   ]);
 });
 
@@ -188,8 +190,8 @@ test("mixed history and timeline preserve Realtime projections and opaque contin
     timelinePage,
   );
   assert.deepEqual(calls, [
-    "/api/v1/user/sessions/session%2F1/turns",
-    "/api/v1/user/sessions/session%2F1/timeline?limit=2&cursor=timeline%2B%2F%3D",
+    "/api/v1/org/users/user_1/sessions/session%2F1/turns",
+    "/api/v1/org/users/user_1/sessions/session%2F1/timeline?limit=2&cursor=timeline%2B%2F%3D",
   ]);
 });
 

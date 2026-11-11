@@ -1,17 +1,9 @@
-import {
-  usageQuery,
-  type UserUsageOptions,
-  type UserUsageDetailsOptions,
-  type UserUsageSummary,
-  type UserUsageDetails,
-} from "./usage.js";
 import { UserSchedulers, type OrganizationSchedulerListOptions } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   requestOptions,
   HttpClient,
-  isApiKey,
   paginationQuery,
   requireCreationKey,
   requireKnownKeys,
@@ -25,11 +17,6 @@ import {
   type SessionRecord,
 } from "./session.js";
 import type { RealtimeModelCatalog } from "./realtime.js";
-
-export interface UserClientOptions {
-  baseUrl: string;
-  apiKey: string;
-}
 
 /** Create/list/unlink return association metadata; owner get/update also include preferences. */
 export interface AgentRecord {
@@ -156,10 +143,6 @@ export interface SessionPage {
 /** Ordinary End User resources under the caller's authority. */
 export class EndUserClient {
   readonly #http: HttpClient;
-
-  protected get http(): HttpClient {
-    return this.#http;
-  }
   readonly #files: UserFiles;
   readonly #schedulers: UserSchedulers<OrganizationSchedulerListOptions>;
 
@@ -267,35 +250,5 @@ export class EndUserClient {
   }
   getSession(id: string, options?: RequestOptions): Promise<Session> {
     return this.session(id).refresh(options);
-  }
-}
-
-/** Existing User API Key entry point; Organization callers use organization.user(userId). */
-export class UserClient extends EndUserClient {
-  override get schedulers(): UserSchedulers {
-    return super.schedulers;
-  }
-
-  constructor(options: UserClientOptions) {
-    requireKnownKeys(options, ["baseUrl", "apiKey"], "UserClient options");
-    if (!isApiKey(options.apiKey, "user"))
-      throw new TypeError("UserClient requires a User API Key");
-    super(new HttpClient(options));
-  }
-
-  getUsage(options: UserUsageOptions = {}): Promise<UserUsageSummary> {
-    return this.http.get(
-      `/api/v1/billing/usage${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue"])}`,
-      options,
-    );
-  }
-
-  getUsageDetails(
-    options: UserUsageDetailsOptions = {},
-  ): Promise<UserUsageDetails> {
-    return this.http.get(
-      `/api/v1/billing/usage/details${usageQuery(options, ["period", "from", "to", "tagKey", "tagValue", "limit"])}`,
-      options,
-    );
   }
 }

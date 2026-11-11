@@ -1,77 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  UserClient,
-  OrganizationClient,
-  TiDBLinkApiError,
-} from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError } from "@tidblink/server";
 
-import {
-  readOwnUsage,
-  readUserUsage,
-} from "@tidblink/server/examples/read-usage.mjs";
+import { readUserUsage } from "@tidblink/server/examples/read-usage.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
 const organization = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 });
-const userId = process.env.SDK_USAGE_USER_ID;
+const userId = process.env.SDK_USER_ID;
 const tag = { tagKey: "cost_center", tagValue: "Café/QA" };
-const userRange = {
-  from: "2030-01-02",
-  to: "2030-01-02",
-  period: "day",
-  ...tag,
-};
 const range = {
   from: "2030-01-02T00:00:00.000Z",
   to: "2030-01-03T00:00:00.000Z",
   ...tag,
 };
-
-test("actual User usage keeps its self projection and unknown, unpriced and incomplete facts", async () => {
-  const summary = await user.getUsage(userRange);
-  assert.equal(summary.scope.level, "user");
-  assert.equal(summary.scope.userId, userId);
-  assert.equal(summary.range.from, userRange.from);
-  assert.equal(summary.range.to, userRange.to);
-  assert.equal(summary.totals.totalCostMicros, 1000);
-  assert.equal(summary.totals.unknownLlmRequestCount, 2);
-  assert.equal(summary.totals.valuation.status, "incomplete");
-  assert.equal(summary.factCompleteness.status, "incomplete");
-  assert.equal(summary.factCompleteness.indeterminateIntentCount, 1);
-  const detail = await user.getUsageDetails({ ...userRange, limit: 10 });
-  assert.equal(detail.llm.length, 3);
-  assert.equal(
-    detail.llm.find((row) => row.id === "sdk_usage_unknown").costMicros,
-    null,
-  );
-  const stale = detail.llm.find((row) => row.id === "sdk_usage_stale_cost");
-  assert.equal(stale.costMicros, 99000);
-  assert.equal(stale.valuationStatus, "unpriced");
-  assert.equal(stale.pricingStatus, "unknown");
-  assert.equal(detail.sandbox[0].durationSeconds, null);
-  assert.equal(detail.sandbox[0].endedAt, null);
-  assert.equal(detail.webSearch[0].pricingStatus, "unpriced");
-  assert.equal(detail.webSearch[0].returnedResultCount, null);
-  assert.equal("nextCursor" in detail, false);
-  assert.equal(
-    (await user.getUsageDetails({ ...userRange, limit: 1 })).llm.length,
-    1,
-  );
-  assert.equal(
-    (await user.getUsage({ ...userRange, tagValue: "café/qa" })).totals
-      .llmRequestCount,
-    0,
-  );
-  assert.equal(
-    (await user.getUsage({ from: "2030-01-03", to: "2030-01-03" })).totals
-      .llmRequestCount,
-    0,
-  );
-});
 
 test("actual Organization target-User reads preserve exact range, global pages and private-field omission", async () => {
   const summary = await organization.getUserUsage(userId, {
@@ -134,15 +78,12 @@ test("actual Organization target-User reads preserve exact range, global pages a
 });
 
 test("actual usage separates Users and refuses foreign or missing Organization targets", async () => {
-  const stranger = new UserClient({
-    baseUrl,
-    apiKey: process.env.SDK_FOREIGN_USER_KEY,
-  });
-  const own = await stranger.getUsage(userRange);
-  assert.equal(own.scope.userId, process.env.SDK_USAGE_STRANGER_ID);
-  assert.equal(own.totals.totalCostMicros, 3333);
-  assert.equal(own.factCompleteness.status, "complete");
-  assert.throws(() => stranger.getUsage({ ...userRange, userId }), TypeError);
+  const other = await organization.getUserUsage(
+    process.env.SDK_FOREIGN_USER_ID,
+    range,
+  );
+  assert.equal(other.totals.totalCostMicros, 3333);
+  assert.equal(other.factCompleteness.status, "complete");
   const foreign = new OrganizationClient({
     baseUrl,
     apiKey: process.env.SDK_FOREIGN_ORGANIZATION_KEY,
@@ -166,20 +107,13 @@ test("actual usage separates Users and refuses foreign or missing Organization t
   }
 });
 
-test("the installed usage examples preserve both public projections", async () => {
-  const own = await readOwnUsage({
-    baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
-    options: userRange,
-  });
+test("the installed usage example preserves the Organization projection", async () => {
   const target = await readUserUsage({
     baseUrl,
     organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
     userId,
     options: { ...range, interval: "hour" },
   });
-  assert.equal(own.summary.totals.totalCostMicros, 1000);
-  assert.equal(own.details.llm.length, 3);
   assert.equal(target.summary.totals.totalCostMicros, 1000);
   assert.equal(target.details.items.length, 5);
 });

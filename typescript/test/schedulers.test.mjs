@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 import {
-  UserClient,
+  OrganizationClient,
   OutcomeUnknownError,
   ConflictError,
 } from "../dist/index.js";
 
-const apiKey = "ti_user_scheduler_" + "x".repeat(43);
+const apiKey = "ti_org_scheduler_" + "x".repeat(43);
 const servers = [];
 after(async () =>
   Promise.all(
@@ -55,7 +55,7 @@ const scheduler = {
 
 test("Scheduler creation preserves stable identity and its original ETag response", async () => {
   const baseUrl = await serve(async (req, res) => {
-    assert.equal(req.url, "/api/v1/schedulers");
+    assert.equal(req.url, "/api/v1/org/users/user_1/schedulers");
     assert.equal(req.headers.authorization, `Bearer ${apiKey}`);
     assert.equal(req.headers["idempotency-key"], "create-once");
     assert.deepEqual(await body(req), {
@@ -66,7 +66,7 @@ test("Scheduler creation preserves stable identity and its original ETag respons
     });
     json(res, { scheduler }, '"scheduler:sched-1:0"', 201);
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   const result = await user.schedulers.create({
     agentId: "a1",
     title: "Report",
@@ -108,7 +108,7 @@ test("Scheduler update and deletion use the caller ETag without hiding conflicts
       res.writeHead(204).end();
     }
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   const current = await user.schedulers.get("id/with slash");
   const updated = await user.schedulers.update(
     "id/with slash",
@@ -135,7 +135,7 @@ test("Scheduler update and deletion use the caller ETag without hiding conflicts
     ["GET", "PATCH", "PATCH", "DELETE"],
   );
   assert(
-    requests.every((r) => r.path === "/api/v1/schedulers/id%2Fwith%20slash"),
+    requests.every((r) => r.path === "/api/v1/org/users/user_1/schedulers/id%2Fwith%20slash"),
   );
 });
 
@@ -171,7 +171,7 @@ test("Scheduler lists and immutable fire history keep their own pagination and n
       json(res, { schedulers: [scheduler], nextCursor: "next" });
     }
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   assert.deepEqual(
     await user.schedulers.list({
       status: "enabled",
@@ -202,7 +202,7 @@ test("unusable mutation receipts and lost responses stay uncertain without repea
         );
     });
     await assert.rejects(
-      new UserClient({ baseUrl, apiKey }).schedulers.create({
+      new OrganizationClient({ baseUrl, apiKey }).user("user_1").schedulers.create({
         agentId: "a1",
         title: "",
         prompt: "report",
@@ -221,7 +221,7 @@ test("Scheduler commands reject missing concurrency/identity and obsolete select
     requests++;
     res.end();
   });
-  const schedulers = new UserClient({ baseUrl, apiKey }).schedulers;
+  const schedulers = new OrganizationClient({ baseUrl, apiKey }).user("user_1").schedulers;
   await assert.rejects(
     schedulers.update("s", { enabled: false }, {}),
     /ifMatch/,
@@ -271,7 +271,7 @@ test("an in-progress Scheduler creation exposes its service retry hint without a
       );
   });
   await assert.rejects(
-    new UserClient({ baseUrl, apiKey }).schedulers.create({
+    new OrganizationClient({ baseUrl, apiKey }).user("user_1").schedulers.create({
       agentId: "a",
       title: "Report",
       prompt: "x",

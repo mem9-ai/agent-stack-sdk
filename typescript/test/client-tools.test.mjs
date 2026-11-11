@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 import {
-  UserClient,
+  OrganizationClient,
   OutcomeUnknownError,
   TiDBLinkApiError,
 } from "../dist/index.js";
@@ -25,7 +25,7 @@ const serve = async (handler) => {
   return `http://127.0.0.1:${server.address().port}`;
 };
 const userFor = (baseUrl) =>
-  new UserClient({ baseUrl, apiKey: "ti_user_key_" + "x".repeat(43) });
+  new OrganizationClient({ baseUrl, apiKey: "ti_org_key_" + "x".repeat(43) }).user("user_1");
 const tool = {
   type: "function",
   name: "lookup_order",
@@ -45,7 +45,7 @@ const json = (res, body, status = 200, headers = {}) =>
 test("Client Tool declarations can be sent at Session creation and read or replaced with their own ETag", async () => {
   const requests = [];
   const baseUrl = await serve(async (req, res) => {
-    if (req.url === "/api/v1/user/agents/agent_1")
+    if (req.url === "/api/v1/org/users/user_1/agents/agent_1")
       return json(res, { agent: { agentId: "agent_1" } });
     let body = "";
     for await (const chunk of req) body += chunk;
@@ -55,7 +55,7 @@ test("Client Tool declarations can be sent at Session creation and read or repla
       body: body ? JSON.parse(body) : undefined,
       etag: req.headers["if-match"],
     });
-    if (req.url === "/api/v1/user/sessions")
+    if (req.url === "/api/v1/org/users/user_1/sessions")
       return json(res, { session: { sessionId: "session_1" } }, 201, {
         etag: '"model.session_1.0"',
       });
@@ -92,19 +92,19 @@ test("Client Tool declarations can be sent at Session creation and read or repla
   assert.deepEqual(requests, [
     {
       method: "POST",
-      url: "/api/v1/user/sessions",
+      url: "/api/v1/org/users/user_1/sessions",
       body: { agentId: "agent_1", tools: [tool] },
       etag: undefined,
     },
     {
       method: "GET",
-      url: "/api/v1/user/sessions/session_1/tools",
+      url: "/api/v1/org/users/user_1/sessions/session_1/tools",
       body: undefined,
       etag: undefined,
     },
     {
       method: "PUT",
-      url: "/api/v1/user/sessions/session_1/tools",
+      url: "/api/v1/org/users/user_1/sessions/session_1/tools",
       body: { tools: [] },
       etag: '"tools.session_1.1"',
     },

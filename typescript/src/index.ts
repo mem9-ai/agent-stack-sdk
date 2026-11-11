@@ -22,11 +22,9 @@ export type {
   EndUser,
   CreateEndUserInput,
   RequestOptions,
-  IssuedUserApiKey,
   OrganizationClientOptions,
-  UserApiKey,
 } from "./organization.js";
-export { Agent, EndUserClient, UserClient } from "./user.js";
+export { Agent, EndUserClient } from "./user.js";
 export type {
   AgentRecord,
   AgentTemplate,
@@ -35,7 +33,6 @@ export type {
   CreateAgentInput,
   UpdateAgentInput,
   SessionPage,
-  UserClientOptions,
 } from "./user.js";
 export type { ListOptions } from "./http.js";
 export { Session } from "./session.js";
@@ -119,7 +116,6 @@ export type {
   BillingCostBearer,
   BillingPrincipalBucket,
   BillingAttributionKind,
-  BillingAuthKind,
   BillingLlmRequestPurpose,
   LlmPricingStatus,
   LlmPricingContextTier,
@@ -130,19 +126,13 @@ export type {
   BillingValuationBreakdown,
   BillingFactCompletenessCounters,
   BillingFactCompleteness,
-  UserUsageScopeLevel,
-  UserUsagePeriod,
-  UserUsageScope,
-  UserUsageRange,
   UsageTotals,
   BillingBearerCostTotals,
   BillingAttributionCounters,
   BillingAttributionBreakdown,
   LlmUsageAggregate,
-  UserUsageAggregate,
   SandboxUsageAggregate,
   WebSearchUsageAggregate,
-  UsageDayPoint,
   BillingUsageSeriesInterval,
   BillingUsageSeriesRange,
   BillingUsageSeriesLlmBreakdown,
@@ -151,19 +141,12 @@ export type {
   BillingUsageSeriesBreakdown,
   BillingUsageSeriesBreakdownGroups,
   BillingUsageSeriesPoint,
-  UserUsageSummary,
-  UserLlmUsage,
-  UserSandboxUsage,
-  UserWebSearchUsage,
-  UserUsageDetails,
   OrganizationUserUsageSummary,
   OrganizationLlmUsage,
   OrganizationSandboxUsage,
   OrganizationWebSearchUsage,
   OrganizationUsageItem,
   OrganizationUserUsageDetails,
-  UserUsageOptions,
-  UserUsageDetailsOptions,
   OrganizationUserUsageOptions,
   OrganizationUserUsageDetailsOptions,
 } from "./usage.js";

@@ -34,7 +34,7 @@ import {
   piAgentRuntimeConfigFromEnv,
 } from "../src/config/runtime-config";
 import { AGENT_MODEL_NAMES } from "../src/agent-models/agent-model-registry";
-import { UserApiKeyService } from "../src/auth/user-api-key.service";
+import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
 import { DEFAULT_ORG_ID } from "../src/chat/dto";
 import { CHECKPOINT_FS_PORT } from "../src/checkpoint/checkpoint-port";
 import { Drive9CheckpointFsPort } from "../src/checkpoint/drive9-checkpoint-fs.port";
@@ -140,10 +140,10 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
     organizationId: DEFAULT_ORG_ID,
     displayName: "SDK retry owner",
   });
-  const key = await app.get(UserApiKeyService).create({
+  const key = await app.get(OrganizationApiKeyService).create({
     organizationId: DEFAULT_ORG_ID,
-    userId: owner.userId,
     name: "SDK retry",
+    createdByUserId: null,
   });
   const agent = await createPublishedFixtureAgent(
     getAppPersistencePorts(app).agentStore,
@@ -217,7 +217,8 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
         env: {
           ...process.env,
           SDK_SERVICE_URL: await app.getUrl(),
-          SDK_USER_KEY: key.token,
+          SDK_ORGANIZATION_KEY: key.token,
+          SDK_USER_ID: owner.userId,
           SDK_RETRY_AGENT_ID: agent.agentId,
           SDK_RETRY_PAUSED_FILE: pausedFile,
           SDK_RETRY_OBSERVED_DRAFT_FILE: observedDraftFile,

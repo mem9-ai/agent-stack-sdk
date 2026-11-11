@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError } from "@tidblink/server";
 import { answerClientToolWorkflow } from "@tidblink/server/examples/answer-client-tool.mjs";
 const baseUrl = process.env.SDK_SERVICE_URL;
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const stranger = new UserClient({
+const user = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FOREIGN_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
+const stranger = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
 const tool = {
   type: "function",
   name: "lookup_order",
@@ -118,7 +121,8 @@ for (const outcome of ["success", "failure"])
       outcome === "success"
         ? await answerClientToolWorkflow({
             baseUrl,
-            userApiKey: process.env.SDK_USER_KEY,
+            organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
             sessionId: session.id,
             ...command,
           })

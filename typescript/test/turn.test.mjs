@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
-import { OutcomeUnknownError, UserClient } from "../dist/index.js";
+import { OutcomeUnknownError, OrganizationClient } from "../dist/index.js";
 
 const servers = [];
 after(async () => {
@@ -14,7 +14,7 @@ const serve = async (handler) => {
   return `http://127.0.0.1:${server.address().port}`;
 };
 const sessionFor = (baseUrl) =>
-  new UserClient({ baseUrl, apiKey: "ti_user_key_" + "x".repeat(43) }).session(
+  new OrganizationClient({ baseUrl, apiKey: "ti_org_key_" + "x".repeat(43) }).user("user_1").session(
     "session_1",
   );
 const receipt = (overrides = {}) => ({
@@ -62,7 +62,7 @@ test("text submission exposes acceptance with the caller's stable identity and d
     receipt(),
   );
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "/api/v1/user/sessions/session_1/events");
+  assert.equal(calls[0].url, "/api/v1/org/users/user_1/sessions/session_1/events");
   assert.equal(calls[0].headers["x-request-id"], "http_1");
   assert.deepEqual(calls[0].body, {
     type: "agent.session.input.message",
@@ -124,9 +124,9 @@ test("waiting polls the original interaction until incorporation and terminal su
   assert.equal(result.sessionId, "session_1");
   assert.deepEqual(result.interaction, finalReceipt());
   assert.deepEqual(calls, [
-    ["GET", "/api/v1/user/sessions/session_1/interactions/input_1"],
-    ["GET", "/api/v1/user/sessions/session_1/interactions/input_1"],
-    ["GET", "/api/v1/user/sessions/session_1/turns/turn_1"],
+    ["GET", "/api/v1/org/users/user_1/sessions/session_1/interactions/input_1"],
+    ["GET", "/api/v1/org/users/user_1/sessions/session_1/interactions/input_1"],
+    ["GET", "/api/v1/org/users/user_1/sessions/session_1/turns/turn_1"],
   ]);
 });
 
@@ -440,6 +440,6 @@ test("turn waiting stays bound to its submitted identity even if the caller muta
   assert.equal(result.inputId, "input_1");
   assert.equal(
     reads[0],
-    "/api/v1/user/sessions/session_1/interactions/input_1",
+    "/api/v1/org/users/user_1/sessions/session_1/interactions/input_1",
   );
 });

@@ -6,8 +6,8 @@ stay on your backend; do not ship it to browsers or devices.
 
 ## Supported scope
 
-This package supports Organization information, End User provisioning, User API
-Key management, Template/model discovery, personal Agent and Session management,
+This package supports Organization information, End User provisioning,
+Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments, Schedulers,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
@@ -16,8 +16,8 @@ Realtime Model/Connection preparation, prerecorded audio and User usage reads fo
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
 default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
-outside this package. Existing resource workflows accept either User authority or
-Organization authority with an explicit owner.
+outside this package. Every resource workflow uses an Organization API Key with
+an explicitly selected End User; User API Keys are not supported.
 
 ## Quick start
 
@@ -29,12 +29,12 @@ npm install --save-exact @tidblink/server@next
 
 An application backend uses its Organization API Key (`ti_org_…`) and explicitly
 selects the ordinary End User with `organization.user(userId)`. The Key remains
-the caller; the User owns the resources. No User API Key is issued by this flow.
+the caller; the User owns the resources.
 
 ```js
 import { randomUUID } from "node:crypto";
 import { OrganizationClient } from "@tidblink/server";
-import { organizationSessionWorkflow } from "@tidblink/server/examples/organization-session.mjs";
+import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
 const baseUrl = process.env.AGENT_SERVICE_URL;
 const organizationApiKey = process.env.ORGANIZATION_API_KEY;
@@ -51,7 +51,7 @@ const creation = {
   agentCreationKey: randomUUID(), sessionCreationKey: randomUUID(),
 };
 // Persist the selected Template, optional model and both creation identities.
-const { session } = await organizationSessionWorkflow(creation);
+const { session } = await createSessionWorkflow(creation);
 const message = { clientEventId: randomUUID(), text: "Help me plan a trip" };
 // Retain the Session, command identity and original input before dispatch.
 const receipt = await session.submitMessage(message);
@@ -66,18 +66,18 @@ const recovered = await session.waitForResult(message.clientEventId);
 inputs. Reading the original message receipt or waiting again does not execute
 another Turn. An HTTP request ID is diagnostic, not a creation identity.
 
-The installed Organization example can run with `AGENT_SERVICE_URL`,
+The installed example can run with `AGENT_SERVICE_URL`,
 `ORGANIZATION_API_KEY`, `END_USER_ID`, `TEMPLATE_ID`, `AGENT_CREATION_KEY` and
 `SESSION_CREATION_KEY` (`MODEL_ID` is optional):
 
 ```sh
-node node_modules/@tidblink/server/examples/organization-session.mjs
+node node_modules/@tidblink/server/examples/create-session.mjs
 ```
 
-`organization.user(userId)` returns an `EndUserClient`. Its Agent, Session, file,
-Scheduler and catalog methods are the same resource methods used by `UserClient`.
-Keep usage reads on `organization.getUserUsage(userId, options)` and
-`getUserUsageDetails`; their range and response shapes differ from User-Key reads.
+`organization.user(userId)` returns an `EndUserClient` with that User's Agent,
+Session, file, Scheduler and catalog methods. Selecting a User sends no request.
+Usage reads stay on `organization.getUserUsage(userId, options)` and
+`getUserUsageDetails`.
 Private MCP registration, general Drive entry management, sandbox preferences,
 Scheduler Plans and native Hardware APIs are not wrapped by this SDK. Use the
 pinned public HTTP contract for those existing service capabilities. Building ToD,
@@ -86,20 +86,7 @@ Artifact APIs remain gated. The SDK prepares Realtime HTTP grants; applications
 own WebSocket/media transport. This change adds neither a generated full API
 client nor a media client.
 
-### User-Key compatibility and migration
-
-Existing `new UserClient({ baseUrl, apiKey: userApiKey })` callers and the existing
-User-Key examples remain supported. To migrate resource workflows, replace that
-client with `new OrganizationClient({ baseUrl, apiKey: organizationApiKey }).user(userId)`.
-Retain the same resource IDs, creation inputs and command identities; do not issue
-a User Key to use Organization authority. The SDK sends the real Organization
-Key only to owner-scoped service endpoints and never as an owner identity header.
-
-The optional `provision-user.mjs` example still creates a User API Key on each
-successful call, including for an existing User. Its CLI requires
-`AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_EXTERNAL_ID` and
-`USER_CREDENTIAL_FILE`; it reserves a new private file and refuses to overwrite it.
-A lost issuance response cannot recover a plaintext key from metadata.
+### Credential rotation
 
 After Organization Key rotation or revocation, create a new `OrganizationClient`
 with fresh valid authority and select the same User. Existing handles retain their
@@ -110,51 +97,23 @@ grants with fresh authority and reconcile the original command before submitting
 new work. Updating retained Schedulers with fresh authority reauthorizes future
 fires. Another valid Key remains usable. Disabled Users cannot start new work;
 Organization authority can still read retained history/files and perform supported
-cleanup. User-Key ticket lifetime remains the service's separate compatibility
-contract. Application policies and K3 spending policy are separate concerns.
-
-## Key management
-
-Use these methods when your application also needs a User-Key client. Organization
-owner-scoped resource access does not require issuing this credential.
-
-```ts
-import { OrganizationClient } from "@tidblink/server";
-const organization = new OrganizationClient({
-  baseUrl, apiKey: process.env.ORGANIZATION_API_KEY,
-});
-const issued = await organization.createUserApiKey(endUser.userId, {
-  name: "Optional User-Key client",
-});
-const keys = await organization.listUserApiKeys(endUser.userId);
-const replacement = await organization.rotateUserApiKey(issued.apiKey.apiKeyId);
-// Save replacement.token; the previous token immediately stops authenticating.
-const revoked = await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
-```
-
-Create and rotate return `{ apiKey, token }`. List and revoke return metadata
-without the token or stored hash. Rotation preserves the key ID; revocation is
-idempotent. Only active ordinary End Users can own keys. Missing, foreign or
-disabled targets preserve the service's refusal.
-
-The returned User API Key (`ti_user_…`) authenticates that User's public APIs.
-It grants no Organization management authority; `OrganizationClient` rejects it.
-An Organization key likewise grants no User identity.
+cleanup. Application policies and K3 spending policy are separate concerns.
 
 ## Templates, Agents and Sessions
 
-Use `organization.user(userId)` or a User-Key `UserClient` to discover available Templates and deployment models. Model
+Use `organization.user(userId)` to discover available Templates and deployment models. Model
 IDs are strings from the deployment catalog, including newly published models.
 `effectiveDefaultModel` is the create-time default; `defaultModel` is the
 service's canonical catalog default and may differ.
 
 ```ts
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
-const customer = new UserClient({
+const organization = new OrganizationClient({
   baseUrl: process.env.AGENT_SERVICE_URL!,
-  apiKey: process.env.USER_API_KEY!,
+  apiKey: process.env.ORGANIZATION_API_KEY!,
 });
+const customer = organization.user(process.env.END_USER_ID!);
 const page = await customer.listAgentTemplates({ limit: 20 });
 const template = page.templates[0];
 if (!template) throw new Error("Select an available Template");
@@ -238,7 +197,8 @@ import { createSessionWorkflow } from "@tidblink/server/examples/create-session.
 
 const { agent, session } = await createSessionWorkflow({
   baseUrl: process.env.AGENT_SERVICE_URL,
-  userApiKey: process.env.USER_API_KEY,
+  organizationApiKey: process.env.ORGANIZATION_API_KEY,
+  userId: process.env.END_USER_ID,
   agentCreationKey: process.env.AGENT_CREATION_KEY,
   sessionCreationKey: process.env.SESSION_CREATION_KEY,
   agentTemplateId: process.env.TEMPLATE_ID,
@@ -246,7 +206,7 @@ const { agent, session } = await createSessionWorkflow({
 });
 ```
 
-For direct execution, set `AGENT_SERVICE_URL`, `USER_API_KEY`,
+For direct execution, set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`,
 `TEMPLATE_ID`, `AGENT_CREATION_KEY` and `SESSION_CREATION_KEY`; `MODEL_ID` is optional.
 Select and persist the Template ID, optional model and both keys before calling.
 The example also returns the current Template page and model catalog. If no model
@@ -324,7 +284,8 @@ The packaged example uses an existing owned Session and a caller-retained input:
 import { sendMessageWorkflow } from "@tidblink/server/examples/send-message.mjs";
 const result = await sendMessageWorkflow({
   baseUrl: process.env.AGENT_SERVICE_URL,
-  userApiKey: process.env.USER_API_KEY,
+  organizationApiKey: process.env.ORGANIZATION_API_KEY,
+  userId: process.env.END_USER_ID,
   sessionId: process.env.SESSION_ID,
   clientEventId: process.env.CLIENT_EVENT_ID,
   text: process.env.MESSAGE_TEXT,
@@ -390,7 +351,7 @@ receipt before reporting a result. A missing/expired cursor is the service's
 A resumed draft is a complete snapshot, usable without earlier frames.
 
 The packaged `observe-message.mjs` example observes an existing input and never
-submits it again. Run it with `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` and
+submits it again. Run it with `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID` and
 `INPUT_ID`; supply `EVENT_CURSOR` to resume:
 
 ```sh
@@ -471,7 +432,7 @@ through this endpoint. Hardware results belong to the device connection and are
 not an SDK Client Tool capability.
 
 The packaged `answer-client-tool.mjs` example submits one already produced result.
-Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
+Set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
 `CLIENT_EVENT_ID` and exactly one of `TOOL_OUTPUT` or `TOOL_ERROR`:
 
 ```sh
@@ -556,7 +517,7 @@ request, not network recovery.
 The installed `@tidblink/server/examples/control-turn.mjs` exports
 `controlTurnWorkflow`. It returns cancellation acceptance for `action: "cancel"`
 and waits for the separate retry result for `action: "retry"`. Run it with
-`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CLIENT_EVENT_ID` and
+`AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID`, `TURN_ID`, `CLIENT_EVENT_ID` and
 `TURN_ACTION` set; retain those identities before dispatch. This example never
 chooses to retry automatically.
 
@@ -567,12 +528,12 @@ owned Session for a terminal. The SDK returns the one-time connect token but doe
 not open or implement the WebSocket transport.
 
 ```ts
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
-const user = new UserClient({
+const user = new OrganizationClient({
   baseUrl: process.env.AGENT_SERVICE_URL!,
-  apiKey: process.env.USER_API_KEY!,
-});
+  apiKey: process.env.ORGANIZATION_API_KEY!,
+}).user(process.env.END_USER_ID!);
 const catalog = await user.listRealtimeModels();
 const session = user.session(process.env.SESSION_ID!);
 const current = await session.getRealtimeModelSelection();
@@ -608,13 +569,14 @@ import { prepareRealtimeConnection } from "@tidblink/server/examples/prepare-rea
 
 const prepared = await prepareRealtimeConnection({
   baseUrl: process.env.AGENT_SERVICE_URL,
-  userApiKey: process.env.USER_API_KEY,
+  organizationApiKey: process.env.ORGANIZATION_API_KEY,
+  userId: process.env.END_USER_ID,
   sessionId: process.env.SESSION_ID,
   realtimeModelId: process.env.REALTIME_MODEL_ID,
 });
 ```
 
-Set `AGENT_SERVICE_URL`, `USER_API_KEY`, and `SESSION_ID` to run the example
+Set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, and `SESSION_ID` to run the example
 directly. `REALTIME_MODEL_ID` is optional.
 
 ## Prerecorded audio
@@ -660,7 +622,7 @@ does not resubmit a recording automatically. A transcription refusal may still
 have consumed provider work; it does not imply a refunded charge.
 
 The installed `submit-audio.mjs` example reads an existing file and prints the
-final answer. Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` and
+final answer. Set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID` and
 `AUDIO_FILE_PATH`; `AUDIO_CONTENT_TYPE` is optional:
 
 ```sh
@@ -731,7 +693,7 @@ API Key. Files are held in memory while hashing or downloading, so size your
 backend's concurrency for the service's advertised maximum.
 
 The packaged `upload-file.mjs` example uploads and attaches one file. Set
-`AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `FILE_PATH`,
+`AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID`, `FILE_PATH`,
 `UPLOAD_IDEMPOTENCY_KEY`, and `CLIENT_EVENT_ID`, then run:
 
 ```sh
@@ -790,8 +752,7 @@ prompt, Agent/delivery target, schedule, enabled state, validity window and
 Disabling or deleting a Scheduler does not roll back completed effects. Deleted
 Schedulers are no longer available through detail or fire-history reads.
 `organization.user(userId).schedulers.list({ status: "deleted" })` returns their
-retained tombstones. User-Key lists accept only `enabled` or `disabled`; both
-list surfaces omit deleted records by default.
+retained tombstones; lists omit deleted records by default.
 
 `list({ status, limit, cursor })` and `fires(id, { limit, cursor })` return
 `nextCursor` rather than `hasMore`. Cursors retain their original owner/filter
@@ -804,7 +765,7 @@ when `messageId` is null.
 
 The installed `schedule-task.mjs` example creates one scheduled task, waits
 locally for a settled fire and reads its associated Turn. Set `AGENT_SERVICE_URL`,
-`USER_API_KEY`, `AGENT_ID`, `SCHEDULER_IDEMPOTENCY_KEY`, `SCHEDULE_RUN_AT` and
+`ORGANIZATION_API_KEY`, `END_USER_ID`, `AGENT_ID`, `SCHEDULER_IDEMPOTENCY_KEY`, `SCHEDULE_RUN_AT` and
 `SCHEDULE_PROMPT`, then run:
 
 ```sh
@@ -823,26 +784,15 @@ Organization, text/progress/history and refreshed Agent/Session lifecycle method
 request identity takes precedence over the one sent.
 
 Safe reads and keyed Agent/Session creation use bounded retries with the same
-request identity and creation key. User creation, key issuance, preference and
+request identity and creation key. User creation, preference and
 Session updates, unlinking, deletion and Realtime mutations are never
 automatically replayed. Disconnects, unusable success responses, HTTP 408 and
 server failures during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
-`cause` retains the `TiDBLinkApiError`. Repeating revoke is safe, but an ambiguous
-failure still reports an unknown outcome. `AbortSignal` stops the local request;
+`cause` retains the `TiDBLinkApiError`. `AbortSignal` stops the local request;
 after dispatch it does not establish whether a mutation happened. Redirects are
 refused.
 
 After uncertain User creation, list and match the original `externalId`.
-After uncertain issuance or rotation, listing keys can confirm metadata but
-**cannot recover the one-time token**. Reconcile metadata and explicitly revoke
-any unwanted key before deciding whether to issue again. The provisioning
-example never repeats an uncertain credential operation.
-
-Credential receipts must match the requested User (creation) or API Key
-(rotation/revocation), with the expected status. Issued tokens must also match
-their key metadata. A mismatched or unusable success receipt raises
-`OutcomeUnknownError` with the request identity; it never triggers an automatic
-credential retry.
 
 After uncertain Agent/Session creation, repeat the original input with the same
 creation key. After an uncertain preference, name, tag or model update, read the
@@ -857,27 +807,20 @@ new token after reconciling the connection state.
 
 ## User usage
 
-A User client reads its own usage. An Organization client must name a target User
-in that Organization. These are distinct response projections and date contracts:
+`organization.getUserUsage(userId, options)` and
+`organization.getUserUsageDetails(userId, options)` read one target User's usage.
 
-| Read | User client | Organization client |
-| --- | --- | --- |
-| Summary | `getUsage(options)` | `getUserUsage(userId, options)` |
-| Details | `getUsageDetails(options)` | `getUserUsageDetails(userId, options)` |
-| Range | Optional inclusive UTC dates, `YYYY-MM-DD`; at most 370 days | Required exact UTC timestamps with milliseconds, inclusive `from` and exclusive `to`; at most 31 days |
-| Buckets | `period: "day"` or `"week"` chooses the default range; series remains daily | `interval: "hour"`, `"day"`, `"week"` or `"month"` |
-| Detail limits | Separate `llm`, `sandbox` and `webSearch` arrays; `limit` applies per kind, with no cursor | Globally ordered `items`; optional `kind`, `limit` and opaque `cursor`; `nextCursor: null` ends the stream |
+| | |
+| --- | --- |
+| Range | Required exact UTC timestamps with milliseconds, inclusive `from` and exclusive `to`; at most 31 days |
+| Buckets | `interval: "hour"`, `"day"`, `"week"` or `"month"` |
+| Details | Globally ordered `items`; optional `kind`, `limit` (1 to 500) and opaque `cursor`; `nextCursor: null` ends the stream |
 
 Both support an exact `tagKey`/`tagValue` pair. Send both or neither. Values retain
 case sensitivity and the service's normalization rules. Preserve the original
-range, kind and tag filters when following an Organization cursor. Details accept
-limits from 1 to 500. The User detail endpoint cannot retrieve older rows beyond
-its limit through a fabricated continuation; Organization details support paging.
+range, kind and tag filters when following a cursor.
 
 ```ts
-const own = await user.getUsage({
-  from: "2030-01-02", to: "2030-01-02", period: "day",
-});
 const page = await organization.getUserUsageDetails(targetUserId, {
   from: "2030-01-02T00:00:00.000Z",
   to: "2030-01-03T00:00:00.000Z",
@@ -892,14 +835,12 @@ an unpriced fact billable. Priced totals exclude unpriced facts. Scalar cost tot
 costs; `costByBearer` preserves the separate platform, customer and unknown
 categories. Public-list estimates are not supplier invoices or known final charges. Fact completeness and
 valuation completeness are independent. Do not display missing costs as zero or
-infer a balance from these reads. Organization projections intentionally omit
-some details available in the User's own projection.
+infer a balance from these reads.
 
 The installed example `@tidblink/server/examples/read-usage.mjs` exports
-`readOwnUsage` and `readUserUsage`, each returning a summary and the first detail
-page. The CLI requires `AGENT_SERVICE_URL` and `USAGE_AUTHORITY=user` with
-`USER_API_KEY`, or `USAGE_AUTHORITY=organization` with `ORGANIZATION_API_KEY` and
-`END_USER_ID`. Supply `USAGE_FROM`/`USAGE_TO` in the corresponding date format;
+`readUserUsage`, returning a summary and the first detail page. The CLI requires
+`AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY` and `END_USER_ID`. Supply
+`USAGE_FROM`/`USAGE_TO` as exact UTC timestamps;
 `TAG_KEY`/`TAG_VALUE` are optional. It performs reads only and does not claim that
 a first detail page is complete history.
 
@@ -944,11 +885,10 @@ The compiled fixture reuses the service system harness, its isolated database,
 controlled model/storage/ASR/voice dependencies and real background runner. A
 separate process installs the tarball in a clean directory and calls only the
 installed SDK and packaged Organization example for its application workflow.
-It verifies Organization provisioning without a User Key, discovery, Agent/Session
+It verifies Organization provisioning, discovery, Agent/Session
 creation replay, owner isolation, file upload/download and message attachment,
 text results, SSE/history, Client Tools, audio, Scheduler fires and deleted history,
-Realtime HTTP grants, rotation/revocation and fresh-authority recovery. A separate
-User-Key control reads the same retained resources. Management credential changes
+Realtime HTTP grants, rotation/revocation and fresh-authority recovery. Management credential changes
 and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
 redemption, live speech suppliers, physical hardware and deployment compatibility
 are outside this SDK proof.
@@ -957,15 +897,15 @@ The remaining fixtures use the service's existing AppModule test seam and reset
 all rows in the selected dedicated test database before and after their runs.
 They use genuine credentials, real TiDB and controlled dependencies. Their scope:
 Fixtures prepare identities, Templates and eligible
-Realtime Sessions. A composed installed quickstart provisions one fresh User/key,
+Realtime Sessions. A composed installed quickstart provisions one fresh User,
 discovers Templates/models, creates an Agent and Session, obtains a final answer
 and recovers the same original result. Public SDK methods also verify ownership,
 lifecycle updates and Realtime operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor
-reconnection/refusal, original-result confirmation, local observation timeout and
-live credential revocation without remote cancellation. Client Tool cases declare and replace tools, resume pending reads, explicitly return
+reconnection/refusal, original-result confirmation and local observation timeout.
+Client Tool cases declare and replace tools, resume pending reads, explicitly return
 application output or errors, and observe those values in real Runtime answers, with
 ownership, stale revision, settled-call and unavailable-call refusals. A forwarding proxy drops only
 an actual service response to prove uncertain-submission recovery. Control cases

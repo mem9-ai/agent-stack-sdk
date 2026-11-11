@@ -23,7 +23,6 @@ import {
 import { createPublishedFixtureAgent } from "../test/support/published-agent-creation";
 import { loadE2eEnv } from "../test/support/e2e-env";
 import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
-import { UserApiKeyService } from "../src/auth/user-api-key.service";
 import { AgentTemplateContentSchema } from "../src/agent-templates/agent-template-content";
 import { createAgentServiceFastifyAdapter } from "../src/common/fastify-adapter";
 import { ENV } from "../src/config/config.module";
@@ -249,10 +248,14 @@ afterAll(async () => {
   if (temporary) await rm(temporary, { recursive: true, force: true });
 });
 
-const createSession = async (token: string, agentId: string) => {
+const createSession = async (
+  token: string,
+  userId: string,
+  agentId: string,
+) => {
   const response = await app.inject({
     method: "POST",
-    url: "/api/v1/user/sessions",
+    url: `/api/v1/org/users/${userId}/sessions`,
     headers: {
       authorization: `Bearer ${token}`,
       "idempotency-key": randomUUID(),
@@ -291,17 +294,6 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
   const stranger = await fixture.arrangeEndUser({
     organizationId: DEFAULT_ORG_ID,
     displayName: "SDK Realtime stranger",
-  });
-  const userKeys = app.get(UserApiKeyService);
-  const ownerKey = await userKeys.create({
-    organizationId: DEFAULT_ORG_ID,
-    userId: owner.userId,
-    name: "SDK Realtime owner",
-  });
-  const strangerKey = await userKeys.create({
-    organizationId: DEFAULT_ORG_ID,
-    userId: stranger.userId,
-    name: "SDK Realtime stranger",
   });
   const billing = app.get(BillingUsageStore);
   const limit = await billing.getUserLlmSpendLimitView({
@@ -486,20 +478,24 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
     agentTemplateId: disabledTemplateId,
   });
   const enabledSessionId = await createSession(
-    ownerKey.token,
+    own.token,
+    owner.userId,
     enabledAgent.agentId,
   );
   const exampleSessionId = await createSession(
-    ownerKey.token,
+    own.token,
+    owner.userId,
     enabledAgent.agentId,
   );
   const disabledSessionId = await createSession(
-    ownerKey.token,
+    own.token,
+    owner.userId,
     disabledAgent.agentId,
   );
 
   const textSessionId = await createSession(
-    ownerKey.token,
+    own.token,
+    owner.userId,
     enabledAgent.agentId,
   );
   await fixture.recordRealtimeExchange({
@@ -574,11 +570,9 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
           SDK_SERVICE_URL: await app.getUrl(),
           SDK_ORGANIZATION_KEY: own.token,
           SDK_FOREIGN_ORGANIZATION_KEY: foreign.token,
-          SDK_USER_KEY: ownerKey.token,
-          SDK_USAGE_USER_ID: owner.userId,
-          SDK_USAGE_STRANGER_ID: stranger.userId,
+          SDK_USER_ID: owner.userId,
+          SDK_FOREIGN_USER_ID: stranger.userId,
           SDK_TEXT_SESSION_ID: textSessionId,
-          SDK_FOREIGN_USER_KEY: strangerKey.token,
           SDK_REALTIME_SESSION_ID: enabledSessionId,
           SDK_TEMPLATE_ID: enabledTemplateId,
           SDK_OTHER_TEMPLATE_ID: disabledTemplateId,

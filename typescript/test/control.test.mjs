@@ -4,7 +4,7 @@ import { after, test } from "node:test";
 import {
   OutcomeUnknownError,
   TiDBLinkApiError,
-  UserClient,
+  OrganizationClient,
 } from "../dist/index.js";
 
 const servers = [];
@@ -20,7 +20,7 @@ const serve = async (handler) => {
   return `http://127.0.0.1:${server.address().port}`;
 };
 const sessionFor = (baseUrl) =>
-  new UserClient({ baseUrl, apiKey: "ti_user_key_" + "x".repeat(43) }).session(
+  new OrganizationClient({ baseUrl, apiKey: "ti_org_key_" + "x".repeat(43) }).user("user_1").session(
     "session_1",
   );
 const json = (res, value, status = 200) =>
@@ -63,7 +63,7 @@ test("cancellation targets one Turn with stable command identity and reports acc
   assert.deepEqual(requests, [
     {
       method: "POST",
-      url: "/api/v1/user/sessions/session_1/events",
+      url: "/api/v1/org/users/user_1/sessions/session_1/events",
       body: {
         type: "agent.session.input.cancel",
         clientEventId: "command_1",

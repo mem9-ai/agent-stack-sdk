@@ -2,18 +2,14 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
 import { test } from "node:test";
-import {
-  UserClient,
-  TiDBLinkApiError,
-  TurnInterruptedError,
-} from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError, TurnInterruptedError } from "@tidblink/server";
 
 import { controlTurnWorkflow } from "@tidblink/server/examples/control-turn.mjs";
 
-const user = new UserClient({
+const user = new OrganizationClient({
   baseUrl: process.env.SDK_SERVICE_URL,
-  apiKey: process.env.SDK_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
 const freshSession = async () => {
   const agent = await user.createAgent({
     agentTemplateId: process.env.SDK_TEMPLATE_ID,
@@ -71,7 +67,8 @@ test("SDK cancellation settles the original Turn and disabled retry remains a re
   const command = { clientEventId: randomUUID(), turnId: started.turnId };
   const accepted = await controlTurnWorkflow({
     baseUrl: process.env.SDK_SERVICE_URL,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     sessionId: session.id,
     ...command,
     action: "cancel",
@@ -101,10 +98,10 @@ test("SDK cancellation settles the original Turn and disabled retry remains a re
       error.code === "checkpoint_runtime_unavailable",
   );
   assert.deepEqual(await session.submitMessage(input), original);
-  const stranger = new UserClient({
-    baseUrl: process.env.SDK_SERVICE_URL,
-    apiKey: process.env.SDK_FOREIGN_USER_KEY,
-  });
+  const stranger = new OrganizationClient({
+  baseUrl: process.env.SDK_SERVICE_URL,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
   await assert.rejects(
     stranger
       .session(session.id)

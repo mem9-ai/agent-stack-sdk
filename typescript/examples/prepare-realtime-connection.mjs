@@ -1,16 +1,20 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** Prepare an existing owned Session for a terminal to connect; this does not open a WebSocket. */
 export async function prepareRealtimeConnection({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   sessionId,
   realtimeModelId,
   audio,
   metadata,
 }) {
-  const client = new UserClient({ baseUrl, apiKey: userApiKey });
+  const client = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId);
   const catalog = await client.listRealtimeModels();
   const session = client.session(sessionId);
   let selection = await session.getRealtimeModelSelection();
@@ -35,18 +39,25 @@ if (
 ) {
   const {
     AGENT_SERVICE_URL,
-    USER_API_KEY,
+    ORGANIZATION_API_KEY,
+    END_USER_ID,
     SESSION_ID,
     REALTIME_MODEL_ID,
   } = process.env;
-  if (!AGENT_SERVICE_URL || !USER_API_KEY || !SESSION_ID) {
+  if (
+    !AGENT_SERVICE_URL ||
+    !ORGANIZATION_API_KEY ||
+    !END_USER_ID ||
+    !SESSION_ID
+  ) {
     throw new Error(
-      "Set AGENT_SERVICE_URL, USER_API_KEY and SESSION_ID; REALTIME_MODEL_ID is optional",
+      "Set AGENT_SERVICE_URL, ORGANIZATION_API_KEY, END_USER_ID and SESSION_ID; REALTIME_MODEL_ID is optional",
     );
   }
   const result = await prepareRealtimeConnection({
     baseUrl: AGENT_SERVICE_URL,
-    userApiKey: USER_API_KEY,
+    organizationApiKey: ORGANIZATION_API_KEY,
+    userId: END_USER_ID,
     sessionId: SESSION_ID,
     ...(REALTIME_MODEL_ID ? { realtimeModelId: REALTIME_MODEL_ID } : {}),
   });

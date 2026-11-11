@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
 
-import { UserClient } from "../dist/index.js";
+import { OrganizationClient } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
+const organizationApiKey = "ti_org_" + "key_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(
@@ -23,10 +23,10 @@ const serve = async (handler) => {
 };
 
 const clientFor = (baseUrl) =>
-  new UserClient({
+  new OrganizationClient({
     baseUrl,
-    apiKey: userApiKey,
-  });
+    apiKey: organizationApiKey,
+  }).user("user_1");
 
 test("a User discovers the published Realtime Models and client capabilities", async () => {
   const calls = [];
@@ -77,8 +77,8 @@ test("a User discovers the published Realtime Models and client capabilities", a
   assert.deepEqual(calls, [
     {
       method: "GET",
-      url: "/api/v1/realtime-models",
-      authorization: `Bearer ${userApiKey}`,
+      url: "/api/v1/org/users/user_1/realtime-models",
+      authorization: `Bearer ${organizationApiKey}`,
     },
   ]);
 });
@@ -167,21 +167,21 @@ test("a Session reads and conditionally changes its independent Realtime Model s
     [
       {
         method: "GET",
-        url: "/api/v1/user/sessions/session_1",
+        url: "/api/v1/org/users/user_1/sessions/session_1",
         ifMatch: undefined,
         idempotencyKey: undefined,
         body: undefined,
       },
       {
         method: "PATCH",
-        url: "/api/v1/user/sessions/session_1/realtime-model",
+        url: "/api/v1/org/users/user_1/sessions/session_1/realtime-model",
         ifMatch: '"session_1-realtime-1"',
         idempotencyKey: undefined,
         body: { realtimeModel: "voice-b" },
       },
       {
         method: "PATCH",
-        url: "/api/v1/user/sessions/session_1/realtime-model",
+        url: "/api/v1/org/users/user_1/sessions/session_1/realtime-model",
         ifMatch: '"session_1-realtime-1"',
         idempotencyKey: undefined,
         body: { realtimeModel: "voice-a" },
@@ -223,7 +223,7 @@ test("a Session prepares a Realtime Connection and returns its one-time connect 
   };
   const result = {
     realtimeConnection: connection,
-    websocketUrl: "wss://voice.example/api/v1/user/sessions/session_1/realtime/ws",
+    websocketUrl: "wss://voice.example/api/v1/org/users/user_1/sessions/session_1/realtime/ws",
     connectToken: "rct_" + "a".repeat(43),
     connectTokenExpiresAt: "2026-10-27T12:01:00.000Z",
   };
@@ -251,7 +251,7 @@ test("a Session prepares a Realtime Connection and returns its one-time connect 
   assert.deepEqual(calls, [
     {
       method: "POST",
-      url: "/api/v1/user/sessions/session_1/realtime",
+      url: "/api/v1/org/users/user_1/sessions/session_1/realtime",
       idempotencyKey: undefined,
       body: {
         audio: { output: connection.audio.output },
@@ -294,14 +294,14 @@ test("a Session inspects its newest Realtime Connection", async () => {
     connection,
   );
   assert.deepEqual(calls, [
-    ["GET", "/api/v1/user/sessions/session_1/realtime"],
+    ["GET", "/api/v1/org/users/user_1/sessions/session_1/realtime"],
   ]);
 });
 
 test("a Session requests a fresh one-time Realtime connect token", async () => {
   const calls = [];
   const grant = {
-    websocketUrl: "wss://voice.example/api/v1/user/sessions/session_1/realtime/ws",
+    websocketUrl: "wss://voice.example/api/v1/org/users/user_1/sessions/session_1/realtime/ws",
     connectToken: "rct_" + "b".repeat(43),
     connectTokenExpiresAt: "2026-10-27T12:01:00.000Z",
   };
@@ -322,7 +322,7 @@ test("a Session requests a fresh one-time Realtime connect token", async () => {
   assert.deepEqual(calls, [
     {
       method: "POST",
-      url: "/api/v1/user/sessions/session_1/realtime/connect-tokens",
+      url: "/api/v1/org/users/user_1/sessions/session_1/realtime/connect-tokens",
       idempotencyKey: undefined,
     },
   ]);
@@ -351,7 +351,7 @@ test("a Session ends and returns its newest Realtime Connection without replayin
   assert.deepEqual(calls, [
     {
       method: "DELETE",
-      url: "/api/v1/user/sessions/session_1/realtime",
+      url: "/api/v1/org/users/user_1/sessions/session_1/realtime",
       idempotencyKey: undefined,
     },
   ]);
@@ -361,22 +361,22 @@ for (const [name, invoke, expected] of [
   [
     "Realtime Model selection",
     (session) => session.setRealtimeModel("voice-b", { ifMatch: '"realtime-v1"' }),
-    ["PATCH", "/api/v1/user/sessions/session_1/realtime-model"],
+    ["PATCH", "/api/v1/org/users/user_1/sessions/session_1/realtime-model"],
   ],
   [
     "Realtime Connection preparation",
     (session) => session.openRealtimeConnection(),
-    ["POST", "/api/v1/user/sessions/session_1/realtime"],
+    ["POST", "/api/v1/org/users/user_1/sessions/session_1/realtime"],
   ],
   [
     "Realtime connect-token issuance",
     (session) => session.createRealtimeConnectToken(),
-    ["POST", "/api/v1/user/sessions/session_1/realtime/connect-tokens"],
+    ["POST", "/api/v1/org/users/user_1/sessions/session_1/realtime/connect-tokens"],
   ],
   [
     "Realtime Connection termination",
     (session) => session.endRealtimeConnection(),
-    ["DELETE", "/api/v1/user/sessions/session_1/realtime"],
+    ["DELETE", "/api/v1/org/users/user_1/sessions/session_1/realtime"],
   ],
 ]) {
   test(`a lost ${name} response is not replayed`, async () => {

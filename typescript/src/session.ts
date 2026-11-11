@@ -31,6 +31,11 @@ import {
   type TurnObservation,
 } from "./progress.js";
 import { OutcomeUnknownError } from "./errors.js";
+import {
+  subscribe,
+  type SubscribeOptions,
+  type SubscriptionItem,
+} from "./subscription.js";
 import type { RequestOptions } from "./organization.js";
 import {
   requestOptions,
@@ -366,8 +371,17 @@ export class Session {
     );
   }
 
+  /** One connection to the event stream. See `subscribe` for a resilient one. */
   events(options?: SessionEventsOptions): AsyncGenerator<SessionEvent> {
     return sessionEvents(this.#http, this.id, options);
+  }
+
+  /**
+   * Follow the event stream until `options.signal` aborts, reconnecting from
+   * the last cursor, and deliver each pending Client Tool call once.
+   */
+  subscribe(options?: SubscribeOptions): AsyncGenerator<SubscriptionItem> {
+    return subscribe(this.#http, this.id, options);
   }
 
   observe(

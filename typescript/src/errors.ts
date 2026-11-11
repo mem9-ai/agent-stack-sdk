@@ -139,3 +139,25 @@ export class ObservationStoppedError extends OutcomeUnknownError {
     this.timedOut = options.timedOut ?? false;
   }
 }
+
+/**
+ * The event stream received no bytes, not even a keep-alive, within the idle
+ * timeout. The connection is treated as dead; reconnect from `cursor`.
+ */
+export class StreamIdleError extends ConnectionError {
+  readonly cursor: string | undefined;
+  readonly idleTimeoutMs: number;
+
+  constructor(options: {
+    idleTimeoutMs: number;
+    cursor?: string;
+    requestId?: string;
+  }) {
+    super(
+      `Session event stream was silent for ${options.idleTimeoutMs} ms; reconnect from the last cursor`,
+      options.requestId === undefined ? undefined : { requestId: options.requestId },
+    );
+    this.cursor = options.cursor;
+    this.idleTimeoutMs = options.idleTimeoutMs;
+  }
+}

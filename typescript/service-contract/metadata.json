@@ -1,6 +1,10 @@
 {
-  "tidbLinkRevision": "882287809f91d9a3fdf60537460431d9f0fc23e7",
+  "tidbLinkRevision": "1c7f98ee12c28e3d1adb656b90324c0b95135e42",
   "tidbLinkApiVersion": "0.0.1",
-  "sourceOpenApiSha256": "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
-  "sha256": "6a6f9c420aa602ec652edc25d9d1d152390870c10df8dcf8aa0d8aa30fc88bda"
+  "sourceOpenApiSha256": "c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6",
+  "snapshots": {
+    "openapi.json": "0c1ce73addca4c80438b7cd27aa2ae2df67a95593fe1ab44ae67d10f62c3cac8",
+    "files.json": "f413ccc003faf5d72ea6ada07f5be8b6288f6003e23e39095f4986bc34ed49e5",
+    "audio.json": "b1c6c31e5a15f7bba431e114dd780932f5ecd14acab4ce38797c0152cb7110d6"
+  }
 }

@@ -123,6 +123,10 @@ export interface SessionRecord {
     startedAt: string;
   } | null;
   createdWithAgentId: string;
+  /** Current Session Configuration Epoch; null for read-only or provider-owned snapshots. */
+  configurationEpoch: number | null;
+  /** True while a Template switch fences new interaction. */
+  switching: boolean;
   modelPolicyStatus: "allowed" | "organization_disallowed";
   status: "active" | "deleted";
   activeTurnId: string | null;

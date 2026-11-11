@@ -11,7 +11,7 @@ Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
-88228780](https://github.com/mem9-ai/agent-stack/commit/882287809f91d9a3fdf60537460431d9f0fc23e7).
+1c7f98ee](https://github.com/mem9-ai/agent-stack/commit/1c7f98ee12c28e3d1adb656b90324c0b95135e42).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
@@ -40,7 +40,7 @@ const baseUrl = process.env.AGENT_SERVICE_URL;
 const organizationApiKey = process.env.ORGANIZATION_API_KEY;
 const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
 const endUser = await organization.createEndUser({ externalId: "your-application-user-id" });
-// Retain this mapping. On later startup, load it instead of repeating creation.
+// Safe to repeat: the same externalId returns the same End User.
 const user = organization.user(endUser.userId);
 const page = await user.listAgentTemplates();
 const template = page.templates[0];
@@ -60,9 +60,12 @@ console.log(result.text);
 const recovered = await session.waitForResult(message.clientEventId);
 ```
 
-`externalId` is unique within an Organization. A repeated `createEndUser` returns
-`resource_conflict`; recover the mapping with `listEndUsers` and the original
-`externalId`. Agent/Session creation replays require the same creation keys and
+`externalId` is unique within an Organization, and creation with it is
+idempotent: a repeated `createEndUser` returns the existing End User unchanged and
+does not apply the other fields, and concurrent calls create one End User. The SDK
+retries such calls automatically. An `externalId` that equals an existing one only
+when case and accents are ignored is refused with `resource_conflict`. Without an
+`externalId`, every call creates a new End User. Agent/Session creation replays require the same creation keys and
 inputs. Reading the original message receipt or waiting again does not execute
 another Turn. An HTTP request ID is diagnostic, not a creation identity.
 
@@ -721,7 +724,7 @@ server failures during these mutations raise `OutcomeUnknownError`. For an HTTP 
 after dispatch it does not establish whether a mutation happened. Redirects are
 refused.
 
-After uncertain User creation, list and match the original `externalId`.
+After uncertain End User creation, repeat it with the same `externalId`.
 
 After uncertain Agent/Session creation, repeat the original input with the same
 creation key. After an uncertain preference, name, tag or model update, read the
@@ -792,7 +795,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/882287809f91d9a3fdf60537460431d9f0fc23e7/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/1c7f98ee12c28e3d1adb656b90324c0b95135e42/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -852,7 +855,7 @@ supplier and budget refusals, model failure, active-response interruption and th
 installed audio example.
 The public Session projection exposes the frozen Template digest but hides stored
 Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/882287809f91d9a3fdf60537460431d9f0fc23e7/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/1c7f98ee12c28e3d1adb656b90324c0b95135e42/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 Usage cases seed controlled facts and verify both public projections, exact filters,
 paging and authority without executing messages to manufacture billing data.

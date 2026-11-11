@@ -10,7 +10,7 @@ import { EndUserClient, type AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
-  isApiKey,
+  isOrganizationApiKey,
   requireKnownKeys,
   requestOptions,
 } from "./http.js";
@@ -48,82 +48,6 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
-export interface UserApiKey {
-  apiKeyId: string;
-  organizationId: string;
-  userId: string;
-  name: string;
-  tokenPrefix: string;
-  status: "active" | "revoked";
-  createdByUserId: string | null;
-  createdByOrganizationApiKeyId: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-}
-
-export interface IssuedUserApiKey {
-  apiKey: UserApiKey;
-  /** Available only in the successful create or rotate response. */
-  token: string;
-}
-
-const unusableCredentialReceipt = (requestId: string): never => {
-  throw new OutcomeUnknownError(
-    "TiDB Link accepted the credential request but returned an unusable receipt",
-    { requestId },
-  );
-};
-
-const userApiKeyReceipt = (
-  value: unknown,
-  requestId: string,
-  expected: Pick<UserApiKey, "status"> &
-    Partial<Pick<UserApiKey, "userId" | "apiKeyId">>,
-): UserApiKey => {
-  const apiKey = value as UserApiKey | null | undefined;
-  if (
-    typeof apiKey !== "object" ||
-    apiKey === null ||
-    Array.isArray(apiKey) ||
-    ![apiKey.apiKeyId, apiKey.userId, apiKey.organizationId].every(
-      (id) => typeof id === "string" && id.length > 0,
-    ) ||
-    (expected.userId !== undefined && apiKey.userId !== expected.userId) ||
-    (expected.apiKeyId !== undefined && apiKey.apiKeyId !== expected.apiKeyId) ||
-    apiKey.status !== expected.status ||
-    (expected.status === "active"
-      ? apiKey.revokedAt !== null
-      : typeof apiKey.revokedAt !== "string" ||
-        !Number.isFinite(Date.parse(apiKey.revokedAt)))
-  )
-    return unusableCredentialReceipt(requestId);
-  return apiKey;
-};
-
-const issuedUserApiKey = (
-  value: unknown,
-  requestId: string,
-  expected: { userId: string } | { apiKeyId: string },
-): IssuedUserApiKey => {
-  const result = value as { apiKey?: unknown; token?: unknown } | null;
-  const apiKey = userApiKeyReceipt(result?.apiKey, requestId, {
-    ...expected,
-    status: "active",
-  });
-  if (!isApiKey(result?.token, "user"))
-    return unusableCredentialReceipt(requestId);
-  // Token bodies omit the persistent row's uak_ marker.
-  const tokenId = result.token.split("_")[2]!;
-  if (
-    apiKey.apiKeyId !== `uak_${tokenId}` ||
-    apiKey.tokenPrefix !== `ti_user_${tokenId}_`
-  )
-    return unusableCredentialReceipt(requestId);
-  return { apiKey, token: result.token };
-};
-
 /** Customer operations authorized by an Organization API Key. */
 export class OrganizationClient {
   readonly #http: HttpClient;
@@ -134,7 +58,7 @@ export class OrganizationClient {
       ["baseUrl", "apiKey"],
       "OrganizationClient options",
     );
-    if (!isApiKey(options.apiKey, "org")) {
+    if (!isOrganizationApiKey(options.apiKey)) {
       throw new TypeError(
         "OrganizationClient requires an Organization API Key",
       );
@@ -142,7 +66,7 @@ export class OrganizationClient {
     this.#http = new HttpClient(options);
   }
 
-  /** Select the ordinary resource owner without issuing or impersonating a User API Key. */
+  /** Select the End User who owns the resources; the Organization API Key remains the caller. */
   user(userId: string): EndUserClient {
     return new EndUserClient(this.#http.forUser(userId));
   }
@@ -242,56 +166,5 @@ export class OrganizationClient {
       requestOptions(options),
     );
     return response.user;
-  }
-
-  async createUserApiKey(
-    userId: string,
-    input: { name: string },
-    options?: RequestOptions,
-  ): Promise<IssuedUserApiKey> {
-    const result = await this.#http.postResponse<unknown>(
-      `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
-      { name: input.name },
-      { ...requestOptions(options), outcomeUnknown: true },
-    );
-    return issuedUserApiKey(result.data, result.requestId, { userId });
-  }
-
-  async listUserApiKeys(
-    userId: string,
-    options?: RequestOptions,
-  ): Promise<UserApiKey[]> {
-    const response = await this.#http.get<{ apiKeys: UserApiKey[] }>(
-      `/api/v1/org/users/${encodeURIComponent(userId)}/api-keys`,
-      requestOptions(options),
-    );
-    return response.apiKeys;
-  }
-
-  async rotateUserApiKey(
-    apiKeyId: string,
-    options?: RequestOptions,
-  ): Promise<IssuedUserApiKey> {
-    const result = await this.#http.postResponse<unknown>(
-      `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/rotate`,
-      undefined,
-      { ...requestOptions(options), outcomeUnknown: true },
-    );
-    return issuedUserApiKey(result.data, result.requestId, { apiKeyId });
-  }
-
-  async revokeUserApiKey(
-    apiKeyId: string,
-    options?: RequestOptions,
-  ): Promise<UserApiKey> {
-    const result = await this.#http.postResponse<{ apiKey?: unknown }>(
-      `/api/v1/org/user-api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
-      undefined,
-      { ...requestOptions(options), outcomeUnknown: true },
-    );
-    return userApiKeyReceipt(result.data?.apiKey, result.requestId, {
-      apiKeyId,
-      status: "revoked",
-    });
   }
 }

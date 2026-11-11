@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import {
-  UserClient,
   OrganizationClient,
   TiDBLinkApiError,
   ObservationStoppedError,
@@ -11,11 +10,10 @@ import {
 } from "@tidblink/server";
 import { observeMessageWorkflow } from "@tidblink/server/examples/observe-message.mjs";
 const baseUrl = process.env.SDK_SERVICE_URL;
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const organization = new OrganizationClient({
+const user = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
-});
+}).user(process.env.SDK_USER_ID);
 const freshSession = async () =>
   (
     await user.createAgent({
@@ -47,7 +45,8 @@ test("actual SDK progress preserves drafts, resumes from a cursor and confirms t
   const resumed = [];
   for await (const update of observeMessageWorkflow({
     baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     sessionId: session.id,
     inputId: accepted.inputId,
     cursor,
@@ -121,47 +120,6 @@ test("actual SDK observation timeout retains identity and does not cancel work",
   assert.equal((await session.listInteractions()).interactions.length, 1);
 });
 
-test("live credential revocation stops observation without stopping the original SDK task", async () => {
-  const session = await freshSession();
-  const issued = await organization.createUserApiKey(session.data.ownerUserId, {
-    name: "SDK temporary progress observer",
-  });
-  const observer = new UserClient({ baseUrl, apiKey: issued.token }).session(
-    session.id,
-  );
-  const accepted = await session.submitMessage({
-    clientEventId: randomUUID(),
-    text: "SDK_FIXTURE_PROGRESS SDK_FIXTURE_PAUSE SDK_FIXTURE_OBSERVE_LONG",
-  });
-  let revoked = false;
-  await assert.rejects(
-    async () => {
-      for await (const update of observer.observe(accepted.inputId, {
-        timeoutMs: 15000,
-      })) {
-        if (!revoked && update.type === "draft") {
-          await organization.revokeUserApiKey(issued.apiKey.apiKeyId);
-          revoked = true;
-        }
-      }
-    },
-    (error) =>
-      error instanceof ObservationStoppedError &&
-      !error.timedOut &&
-      error.inputId === accepted.inputId &&
-      !!error.cursor,
-  );
-  assert(revoked);
-  assert.equal(
-    (await session.getInteraction(accepted.inputId)).result.status,
-    "running",
-  );
-  assert.equal(
-    (await session.waitForResult(accepted.inputId, wait)).text,
-    "SDK final answer.",
-  );
-});
-
 test("actual SDK progress distinguishes cancellation from a successful answer", async () => {
   const session = await freshSession();
   const accepted = await session.submitMessage({
@@ -179,11 +137,11 @@ test("actual SDK progress distinguishes cancellation from a successful answer", 
         if (!cancelled && update.type === "draft") {
           // Arrange remote interruption through the existing public command, not by closing observation.
           const response = await fetch(
-            `${baseUrl}/api/v1/user/sessions/${session.id}/events`,
+            `${baseUrl}/api/v1/org/users/${process.env.SDK_USER_ID}/sessions/${session.id}/events`,
             {
               method: "POST",
               headers: {
-                authorization: `Bearer ${process.env.SDK_USER_KEY}`,
+                authorization: `Bearer ${process.env.SDK_ORGANIZATION_KEY}`,
                 "content-type": "application/json",
               },
               body: JSON.stringify({

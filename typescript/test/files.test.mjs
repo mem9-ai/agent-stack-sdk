@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "../dist/index.js";
+import { OrganizationClient, TiDBLinkApiError } from "../dist/index.js";
 
-const apiKey = "ti_user_file_" + "x".repeat(43);
+const apiKey = "ti_org_file_" + "x".repeat(43);
 const servers = [];
 after(async () =>
   Promise.all(
@@ -20,7 +20,7 @@ const serve = async (handler) => {
 test("file content uses the owned binary endpoint and preserves service refusal", async () => {
   const baseUrl = await serve((request, response) => {
     assert.equal(request.headers.authorization, `Bearer ${apiKey}`);
-    if (request.url === "/api/v1/files/owned/content") {
+    if (request.url === "/api/v1/org/users/user_1/files/owned/content") {
       response
         .writeHead(200, { "content-type": "text/plain" })
         .end("owned bytes");
@@ -37,7 +37,7 @@ test("file content uses the owned binary endpoint and preserves service refusal"
         );
     }
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   const content = await user.files.getContent("owned");
   assert.equal(content.type, "bytes");
   assert.equal(new TextDecoder().decode(content.bytes), "owned bytes");
@@ -124,7 +124,7 @@ test("inline upload sends exact bytes with a complete digest, confirms ready and
       });
     }
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   assert.deepEqual(
     await user.files.upload({
       originalName: "note.txt",
@@ -187,7 +187,7 @@ test("multipart upload follows the service plan, binds each checksum and never s
       json(res, { file: ready("multipart") });
     }
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   assert.equal(
     (
       await user.files.upload({
@@ -247,7 +247,7 @@ test("empty inline uploads use the supplied short-lived URL without an API Key",
     else json(res, { file });
   });
   assert.deepEqual(
-    await new UserClient({ baseUrl, apiKey }).files.upload({
+    await new OrganizationClient({ baseUrl, apiKey }).user("user_1").files.upload({
       originalName: "empty",
       bytes,
       idempotencyKey: "empty-key",
@@ -271,7 +271,7 @@ test("file listing preserves its own cursor/history semantics and verified downl
     sha256: file.sha256,
   };
   const baseUrl = await serve((req, res) => {
-    if (req.url.startsWith("/api/v1/files?")) {
+    if (req.url.startsWith("/api/v1/org/users/user_1/files?")) {
       const query = new URL(req.url, "http://example").searchParams;
       assert.equal(query.get("history"), "true");
       assert.equal(query.get("limit"), "1");
@@ -285,7 +285,7 @@ test("file listing preserves its own cursor/history semantics and verified downl
         .end(JSON.stringify(grant));
     else json(res, { file });
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   assert.deepEqual(
     await user.files.list({ history: true, limit: 1, cursor: "cursor/+" }),
     { files: [file], nextCursor: "next" },
@@ -314,7 +314,7 @@ test("uncertain file creation retains its dispatched key after caller mutation a
     input.idempotencyKey = "changed-after-dispatch";
     req.socket.destroy();
   });
-  const user = new UserClient({ baseUrl, apiKey });
+  const user = new OrganizationClient({ baseUrl, apiKey }).user("user_1");
   await assert.rejects(
     user.files.upload(input),
     (error) =>
@@ -369,7 +369,7 @@ test("uncertain multipart transfers retain upload identity and do not complete o
     }
   });
   await assert.rejects(
-    new UserClient({ baseUrl, apiKey }).files.upload({
+    new OrganizationClient({ baseUrl, apiKey }).user("user_1").files.upload({
       originalName: "x",
       bytes: Buffer.from("abc"),
       idempotencyKey: "retain-me",
@@ -389,7 +389,7 @@ test("expired and mismatched part grants are refused before any bytes are sent",
     transfers++;
     res.end();
   });
-  const files = new UserClient({ baseUrl: url, apiKey }).files;
+  const files = new OrganizationClient({ baseUrl: url, apiKey }).user("user_1").files;
   const part = {
     number: 1,
     size: 3,
@@ -423,7 +423,7 @@ test("upload and authenticated content redirects never send keys to another dest
   const baseUrl = await serve((req, res) =>
     res.writeHead(307, { location: other + "/redirected?ticket=hidden" }).end(),
   );
-  const files = new UserClient({ baseUrl, apiKey }).files;
+  const files = new OrganizationClient({ baseUrl, apiKey }).user("user_1").files;
   await assert.rejects(files.getContent("file"));
   const part = {
     number: 1,
@@ -448,7 +448,7 @@ test("download checks complete content and keeps expired grants unusable", async
     requests++;
     res.end("abd");
   });
-  const files = new UserClient({ baseUrl, apiKey }).files;
+  const files = new OrganizationClient({ baseUrl, apiKey }).user("user_1").files;
   const grant = {
     url: baseUrl,
     expiresAt: "2099-01-01T00:00:00.000Z",

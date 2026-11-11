@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Remove User API Key authority. `UserClient`, `createUserApiKey`,
+  `listUserApiKeys`, `rotateUserApiKey`, `revokeUserApiKey`, the User-Key usage
+  reads (`getUsage`, `getUsageDetails`) and their types are gone. Use
+  `new OrganizationClient({ baseUrl, apiKey }).user(userId)` for resources and
+  `organization.getUserUsage(userId, options)` for usage.
+- Every packaged example now takes `organizationApiKey` and `userId`
+  (`ORGANIZATION_API_KEY` and `END_USER_ID` on the command line). Remove the
+  `provision-user.mjs` example and fold `organization-session.mjs` into
+  `create-session.mjs`; `read-usage.mjs` exports only `readUserUsage`.
 - Release only from release branches. Merging `main` into `release` submits the
   package version to npm; commits on `main` release nothing.
 

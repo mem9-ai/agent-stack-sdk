@@ -1,11 +1,12 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** Persist the exact runAt, prompt and creation key before calling. */
 export async function scheduleTaskWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   agentId,
   idempotencyKey,
   runAt,
@@ -13,7 +14,10 @@ export async function scheduleTaskWorkflow({
   title = "Scheduled task",
   timeoutMs = 30000,
 }) {
-  const user = new UserClient({ baseUrl, apiKey: userApiKey });
+  const user = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId);
   const created = await user.schedulers.create({
     agentId,
     idempotencyKey,
@@ -50,7 +54,8 @@ if (
   try {
     const result = await scheduleTaskWorkflow({
       baseUrl: process.env.AGENT_SERVICE_URL,
-      userApiKey: process.env.USER_API_KEY,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
       agentId: process.env.AGENT_ID,
       idempotencyKey: process.env.SCHEDULER_IDEMPOTENCY_KEY,
       runAt: process.env.SCHEDULE_RUN_AT,

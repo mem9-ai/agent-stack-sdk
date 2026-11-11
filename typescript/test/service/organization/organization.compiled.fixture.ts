@@ -196,11 +196,6 @@ it("an independent installed SDK consumer uses Organization authority against th
             organizationId,
             parseApiKeyTokenId("organization", token)!,
           );
-        } else if (message.stage === "compatibility") {
-          value = await harness.issueEndUserCredential({
-            organizationId,
-            userId: message.userId!,
-          });
         } else throw new Error(`Unknown fixture stage: ${message.stage}`);
         consumer.send({ value });
       })().catch((error) =>

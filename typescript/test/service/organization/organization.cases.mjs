@@ -1,12 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import {
-  OrganizationClient,
-  UserClient,
-  TiDBLinkApiError,
-} from "@tidblink/server";
-import { organizationSessionWorkflow } from "@tidblink/server/examples/organization-session.mjs";
+import { OrganizationClient, TiDBLinkApiError } from "@tidblink/server";
+import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const organization = new OrganizationClient({
@@ -43,7 +39,6 @@ assert.equal(
   (await organization.getEndUser(user.userId)).userId,
   user.userId,
 );
-assert.deepEqual(await organization.listUserApiKeys(user.userId), []);
 const owner = organization.user(user.userId);
 const other = otherOrganization.user(user.userId);
 const creation = {
@@ -54,9 +49,9 @@ const creation = {
   agentCreationKey: randomUUID(),
   sessionCreationKey: randomUUID(),
 };
-const { agent, session } = await organizationSessionWorkflow(creation);
+const { agent, session } = await createSessionWorkflow(creation);
 assert.equal(
-  (await organizationSessionWorkflow(creation)).session.id,
+  (await createSessionWorkflow(creation)).session.id,
   session.id,
 );
 assert.equal(agent.data.ownerUserId, user.userId);
@@ -304,22 +299,10 @@ await freshOrganization.getUserUsageDetails(user.userId, {
   from: new Date(now.getTime() - 3600000).toISOString(),
   to: now.toISOString(),
 });
-assert.deepEqual(
-  await freshOrganization.listUserApiKeys(user.userId),
-  [],
-  "Org journey never issues a hidden User Key",
-);
 await stage("revoke");
 await assert.rejects(fresh.listAgents(), unauthorized);
 assert.equal((await other.getSession(session.id)).id, session.id);
-const userKey = await stage("compatibility", user.userId);
-const legacy = new UserClient({ baseUrl, apiKey: userKey });
-assert.equal((await legacy.getSession(session.id)).id, session.id);
-assert.deepEqual(
-  Buffer.from(await legacy.files.download(file.fileId)),
-  bytes,
-);
 console.log(
-  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, audio, Scheduler fire/deletion history, Realtime HTTP, rotation/revocation recovery and User compatibility.",
+  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, audio, Scheduler fire/deletion history, Realtime HTTP, and rotation/revocation recovery.",
 );
 process.disconnect();

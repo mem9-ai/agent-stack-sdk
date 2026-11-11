@@ -1,10 +1,11 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
 /** The application produces output/error itself and persists this command identity. */
 export async function answerClientToolWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   sessionId,
   turnId,
   callId,
@@ -13,7 +14,10 @@ export async function answerClientToolWorkflow({
   error,
   signal,
 }) {
-  const session = new UserClient({ baseUrl, apiKey: userApiKey }).session(
+  const session = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  }).user(userId).session(
     sessionId,
   );
   const calls = await session.listPendingClientToolCalls(
@@ -47,7 +51,8 @@ if (
   try {
     const receipt = await answerClientToolWorkflow({
       baseUrl: process.env.AGENT_SERVICE_URL,
-      userApiKey: process.env.USER_API_KEY,
+      organizationApiKey: process.env.ORGANIZATION_API_KEY,
+      userId: process.env.END_USER_ID,
       sessionId: process.env.SESSION_ID,
       turnId: process.env.TURN_ID,
       callId: process.env.CALL_ID,

@@ -14,11 +14,6 @@ export type BillingAttributionKind =
   | "user_level"
   | "system"
   | "unattributed";
-export type BillingAuthKind =
-  | "session"
-  | "user-api-key"
-  | "organization-api-key"
-  | "system";
 export type BillingLlmRequestPurpose =
   | "agent_turn"
   | "compaction"
@@ -63,21 +58,6 @@ export interface BillingFactCompleteness extends BillingFactCompletenessCounters
   byKind: Partial<
     Record<BillingUsageFactKind, BillingFactCompletenessCounters>
   >;
-}
-
-export type UserUsageScopeLevel = "user";
-export type UserUsagePeriod = "day" | "week";
-
-export interface UserUsageScope {
-  level: UserUsageScopeLevel;
-  organizationId: string;
-  userId: string;
-}
-
-export interface UserUsageRange {
-  period: UserUsagePeriod;
-  from: string;
-  to: string;
 }
 
 export interface UsageTotals {
@@ -142,27 +122,6 @@ export interface LlmUsageAggregate {
   valuation: BillingValuationSummary;
 }
 
-export interface UserUsageAggregate {
-  costBearer: BillingCostBearer;
-  userId: string;
-  displayName: string | null;
-  currency: "USD";
-  totalCostMicros: number;
-  llmCostMicros: number;
-  sandboxCostMicros: number;
-  webSearchCostMicros: number;
-  llmRequestCount: number;
-  unknownLlmRequestCount: number;
-  sandboxUsageCount: number;
-  webSearchRequestCount: number;
-  unsettledCount: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  outputTokens: number;
-  sandboxDurationSeconds: number;
-  valuation: BillingValuationSummary;
-}
-
 export interface SandboxUsageAggregate {
   costBearer: BillingCostBearer;
   provider: "e2b" | "tencent_ags" | "run9";
@@ -186,17 +145,6 @@ export interface WebSearchUsageAggregate {
   requestedResultCount: number;
   returnedResultCount: number;
   costMicros: number;
-  valuation: BillingValuationSummary;
-}
-
-export interface UsageDayPoint {
-  date: string;
-  costMicros: number;
-  llmCostMicros: number;
-  sandboxCostMicros: number;
-  webSearchCostMicros: number;
-  unknownLlmRequestCount: number;
-  unsettledCount: number;
   valuation: BillingValuationSummary;
 }
 
@@ -259,139 +207,6 @@ export interface BillingUsageSeriesPoint {
   unsettledCount: number;
   breakdown: BillingUsageSeriesBreakdownGroups;
   valuation: BillingValuationSummary;
-}
-
-export interface UserUsageSummary {
-  scope: UserUsageScope;
-  range: UserUsageRange;
-  factCompleteness: BillingFactCompleteness;
-  totals: UsageTotals;
-  users: { aggregates: UserUsageAggregate[] };
-  llm: { aggregates: LlmUsageAggregate[] };
-  sandbox: { aggregates: SandboxUsageAggregate[] };
-  webSearch: { aggregates: WebSearchUsageAggregate[] };
-  series: UsageDayPoint[];
-}
-
-export interface UserLlmUsage {
-  kind: "llm";
-  id: string;
-  occurredAt: string;
-  organizationId: string;
-  sessionId: string;
-  /** Null only for Realtime connection-scoped usage (`requestPurpose: voice_realtime`). */
-  turnId: string | null;
-  /** The Realtime connection of `voice_realtime` usage; null otherwise. */
-  realtimeConnectionId: string | null;
-  agentRunId: string | null;
-  agentId: string | null;
-  attributionKind: BillingAttributionKind;
-  ownerUserId: string | null;
-  authKind: BillingAuthKind;
-  principalBucket: BillingPrincipalBucket;
-  billingTag: BillingTag | null;
-  operationId: string | null;
-  requestPurpose: BillingLlmRequestPurpose;
-  provider: string;
-  requestModel: string;
-  observedResponseModel: string | null;
-  model: string;
-  providerRequestId: string | null;
-  inputTokens: number;
-  cachedInputTokens: number;
-  promptTokensTotal: number | null;
-  uncachedInputTokens: number;
-  cacheReadTokens: number;
-  cacheWrite5mTokens: number;
-  cacheWrite1hTokens: number;
-  cacheWriteUnspecifiedTokens: number;
-  outputTokens: number;
-  inputCostMicros: number | null;
-  cachedInputCostMicros: number | null;
-  cacheWrite5mCostMicros: number | null;
-  cacheWrite1hCostMicros: number | null;
-  cacheWriteUnspecifiedCostMicros: number | null;
-  outputCostMicros: number | null;
-  costMicros: number | null;
-  currency: "USD";
-  ratedAt: string;
-  pricingStatus: LlmPricingStatus;
-  unknownReason: string | null;
-  estimateBasis: "public_list_placeholder" | "contract" | null;
-  estimateLabel: string | null;
-  contextTier: LlmPricingContextTier;
-  pricingVersion: string;
-  rateCardDigest: string | null;
-  pricingSourceUrl: string | null;
-  pricingSourceAsOf: string | null;
-  pricingEffectiveAt: string;
-  pricingEffectiveToExclusive: string | null;
-  deploymentBillingJson: unknown | null;
-  rateSnapshotJson: unknown | null;
-  valuationStatus: BillingValuationStatus;
-}
-
-export interface UserSandboxUsage {
-  kind: "sandbox";
-  id: string;
-  occurredAt: string;
-  organizationId: string;
-  sessionId: string;
-  turnId: string;
-  agentRunId: string | null;
-  agentId: string | null;
-  attributionKind: BillingAttributionKind;
-  ownerUserId: string | null;
-  authKind: BillingAuthKind;
-  principalBucket: BillingPrincipalBucket;
-  billingTag: BillingTag | null;
-  provider: "e2b" | "tencent_ags" | "run9";
-  profileId: string;
-  specKey: string;
-  startedAt: string;
-  lastSeenAt: string;
-  endedAt: string | null;
-  durationSeconds: number | null;
-  status: SandboxUsageStatus;
-  closeReason: string | null;
-  lastError: string | null;
-  costMicros: number | null;
-  currency: "USD";
-  pricingVersion: string;
-  pricingEffectiveAt: string;
-  valuationStatus: BillingValuationStatus;
-}
-
-export interface UserWebSearchUsage {
-  kind: "web_search";
-  id: string;
-  occurredAt: string;
-  organizationId: string;
-  sessionId: string;
-  turnId: string;
-  agentRunId: string | null;
-  agentId: string | null;
-  ownerUserId: string | null;
-  attributionKind: BillingAttributionKind;
-  authKind: BillingAuthKind;
-  principalBucket: BillingPrincipalBucket;
-  billingTag: BillingTag | null;
-  operationId: string;
-  searchType: "auto";
-  requestCount: 1;
-  requestedResultCount: number;
-  returnedResultCount: number | null;
-  pricingStatus: "unpriced";
-  unknownReason: "no_rate_authority";
-  valuationStatus: "unpriced";
-}
-
-export interface UserUsageDetails {
-  scope: UserUsageScope;
-  range: UserUsageRange;
-  llm: UserLlmUsage[];
-  sandbox: UserSandboxUsage[];
-  webSearch: UserWebSearchUsage[];
 }
 
 export interface OrganizationUserUsageSummary {
@@ -489,19 +304,6 @@ export interface OrganizationUserUsageDetails {
   factCompleteness: BillingFactCompleteness;
 }
 
-export interface UserUsageOptions extends RequestOptions {
-  period?: "day" | "week";
-  /** Inclusive UTC date, YYYY-MM-DD. */
-  from?: string;
-  /** Inclusive UTC date, YYYY-MM-DD. */
-  to?: string;
-  tagKey?: string;
-  tagValue?: string;
-}
-export interface UserUsageDetailsOptions extends UserUsageOptions {
-  /** Maximum rows per kind, 1-500; this endpoint has no continuation cursor. */
-  limit?: number;
-}
 export interface OrganizationUserUsageOptions extends RequestOptions {
   /** Exact inclusive UTC timestamp with milliseconds; maximum range is 31 days. */
   from: string;

@@ -1,10 +1,11 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/server";
+import { OrganizationClient } from "@tidblink/server";
 
-/** Save the selected Template, optional model and both keys before calling. */
+/** Retain the owner, selected Template, optional model and both creation keys before calling. */
 export async function createSessionWorkflow({
   baseUrl,
-  userApiKey,
+  organizationApiKey,
+  userId,
   agentTemplateId,
   agentCreationKey,
   sessionCreationKey,
@@ -14,7 +15,11 @@ export async function createSessionWorkflow({
     throw new TypeError(
       "Select and retain an agentTemplateId before creating an Agent",
     );
-  const user = new UserClient({ baseUrl, apiKey: userApiKey });
+  const organization = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  });
+  const user = organization.user(userId);
   const templates = await user.listAgentTemplates();
   const models = await user.listModels();
   const agent = await user.createAgent({
@@ -26,7 +31,7 @@ export async function createSessionWorkflow({
     idempotencyKey: sessionCreationKey,
     ...(model === undefined ? {} : { model }),
   });
-  return { agent, session, templates, models };
+  return { organization, user, agent, session, templates, models };
 }
 
 if (
@@ -35,7 +40,8 @@ if (
 ) {
   const {
     AGENT_SERVICE_URL,
-    USER_API_KEY,
+    ORGANIZATION_API_KEY,
+    END_USER_ID,
     TEMPLATE_ID,
     AGENT_CREATION_KEY,
     SESSION_CREATION_KEY,
@@ -43,17 +49,19 @@ if (
   } = process.env;
   if (
     !AGENT_SERVICE_URL ||
-    !USER_API_KEY ||
+    !ORGANIZATION_API_KEY ||
+    !END_USER_ID ||
     !TEMPLATE_ID ||
     !AGENT_CREATION_KEY ||
     !SESSION_CREATION_KEY
   )
     throw new Error(
-      "Set AGENT_SERVICE_URL, USER_API_KEY, TEMPLATE_ID, AGENT_CREATION_KEY and SESSION_CREATION_KEY; MODEL_ID is optional",
+      "Set AGENT_SERVICE_URL, ORGANIZATION_API_KEY, END_USER_ID, TEMPLATE_ID, AGENT_CREATION_KEY and SESSION_CREATION_KEY; MODEL_ID is optional",
     );
   const result = await createSessionWorkflow({
     baseUrl: AGENT_SERVICE_URL,
-    userApiKey: USER_API_KEY,
+    organizationApiKey: ORGANIZATION_API_KEY,
+    userId: END_USER_ID,
     agentCreationKey: AGENT_CREATION_KEY,
     sessionCreationKey: SESSION_CREATION_KEY,
     agentTemplateId: TEMPLATE_ID,

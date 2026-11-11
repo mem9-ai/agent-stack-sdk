@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { after, test } from "node:test";
-import { OutcomeUnknownError, UserClient } from "../dist/index.js";
+import { OrganizationClient, OutcomeUnknownError } from "../dist/index.js";
 
-const key = "ti_user_key_" + "x".repeat(43);
+const key = "ti_org_key_" + "x".repeat(43);
 const servers = [];
 after(async () =>
   Promise.all(
@@ -40,7 +40,7 @@ test("Agent creation recovers through the caller's stable identity without an Ag
       .writeHead(201, { "content-type": "application/json" })
       .end(JSON.stringify({ agent: record }));
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   const agent = await user.createAgent({
     agentTemplateId: "template_1",
     idempotencyKey: "create-agent-1",
@@ -52,7 +52,7 @@ test("Agent creation recovers through the caller's stable identity without an Ag
     calls[1].headers["x-request-id"],
   );
   for (const call of calls) {
-    assert.equal(call.url, "/api/v1/user/agents");
+    assert.equal(call.url, "/api/v1/org/users/user_1/agents");
     assert.equal(call.headers["idempotency-key"], "create-agent-1");
     assert.deepEqual(call.body, { agentTemplateId: "template_1" });
   }
@@ -71,7 +71,7 @@ test("exhausted Agent creation remains recoverable with the caller's key", async
       .writeHead(201, { "content-type": "application/json" })
       .end(JSON.stringify({ agent: record }));
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   const input = { agentTemplateId: "template_1", idempotencyKey: "recover-1" };
   await assert.rejects(user.createAgent(input), OutcomeUnknownError);
   fail = false;
@@ -103,7 +103,7 @@ test("owner preferences use a partial last-write-wins update and never replay an
       }),
     );
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   const agent = await user.getAgent("agent_1");
   await agent.update({ additionalInstructions: "Concise" });
   assert.equal(agent.data.additionalInstructions, "Concise");
@@ -116,9 +116,9 @@ test("owner preferences use a partial last-write-wins update and never replay an
   assert.deepEqual(
     calls.map((c) => [c.method, c.url]),
     [
-      ["GET", "/api/v1/user/agents/agent_1"],
-      ["PATCH", "/api/v1/user/agents/agent_1"],
-      ["PATCH", "/api/v1/user/agents/agent_1"],
+      ["GET", "/api/v1/org/users/user_1/agents/agent_1"],
+      ["PATCH", "/api/v1/org/users/user_1/agents/agent_1"],
+      ["PATCH", "/api/v1/org/users/user_1/agents/agent_1"],
     ],
   );
   assert(calls.every((c) => c.headers["if-match"] === undefined));
@@ -130,7 +130,7 @@ test("Template discovery preserves empty continuation pages and model discovery 
     urls.push(req.url);
     res.writeHead(200, { "content-type": "application/json" }).end(
       JSON.stringify(
-        req.url.startsWith("/api/v1/agent-models")
+        req.url.startsWith("/api/v1/org/users/user_1/agent-models")
           ? {
               models: [
                 {
@@ -145,7 +145,7 @@ test("Template discovery preserves empty continuation pages and model discovery 
       ),
     );
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   assert.deepEqual(
     await user.listAgentTemplates({ limit: 1, cursor: "opaque+/=" }),
     { templates: [], hasMore: true, nextCursor: "opaque+/=" },
@@ -155,18 +155,18 @@ test("Template discovery preserves empty continuation pages and model discovery 
     "future.model-1",
   );
   assert.deepEqual(urls, [
-    "/api/v1/user/agent-templates?limit=1&cursor=opaque%2B%2F%3D",
-    "/api/v1/agent-models?agentId=agent%2Fa",
+    "/api/v1/org/users/user_1/agent-templates?limit=1&cursor=opaque%2B%2F%3D",
+    "/api/v1/org/users/user_1/agent-models?agentId=agent%2Fa",
   ]);
 });
 
-test("retired creation selectors, missing identities and wrong authority fail before dispatch without exposing credentials", async () => {
+test("retired creation selectors, missing identities and unusable owners fail before dispatch without exposing credentials", async () => {
   let calls = 0;
   const baseUrl = await serve((req, res) => {
     calls++;
     res.end("{}");
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   for (const input of [
     { agentTemplateId: "t" },
     { agentTemplateId: "t", idempotencyKey: "bad key" },
@@ -178,17 +178,11 @@ test("retired creation selectors, missing identities and wrong authority fail be
     },
   ])
     await assert.rejects(user.createAgent(input), TypeError);
+  const organization = new OrganizationClient({ baseUrl, apiKey: key });
+  for (const userId of [undefined, "", "User 1", "a/b", "x".repeat(65)])
+    assert.throws(() => organization.user(userId), TypeError);
   assert.throws(
-    () => new UserClient({ baseUrl, apiKey: "ti_org_key_" + "s".repeat(43) }),
-    (error) =>
-      error instanceof TypeError && !String(error).includes("s".repeat(43)),
-  );
-  assert.throws(
-    () => new UserClient({ baseUrl, apiKey: "ag9_uak.key." + "s".repeat(32) }),
-    TypeError,
-  );
-  assert.throws(
-    () => new UserClient({ baseUrl, apiKey: key, userId: "other" }),
+    () => new OrganizationClient({ baseUrl, apiKey: key, userId: "other" }),
     TypeError,
   );
   assert.equal(calls, 0);
@@ -208,7 +202,7 @@ test("aborting creation after dispatch reports an unknown outcome and keeps the 
     setTimeout(() => controller.abort(), 20);
   });
   await assert.rejects(
-    new UserClient({ baseUrl, apiKey: key }).createAgent({
+    new OrganizationClient({ baseUrl, apiKey: key }).user("user_1").createAgent({
       agentTemplateId: "template_1",
       idempotencyKey: "abort-recover",
       signal: controller.signal,
@@ -235,7 +229,7 @@ test("a truncated retryable response still recovers creation with the original i
       .writeHead(201, { "content-type": "application/json" })
       .end(JSON.stringify({ agent: record }));
   });
-  const user = new UserClient({ baseUrl, apiKey: key });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
   assert.equal(
     (
       await user.createAgent({
@@ -255,7 +249,7 @@ test("the packaged workflow keeps original creation inputs when catalog defaults
     let body = "";
     for await (const chunk of req) body += chunk;
     res.setHeader("content-type", "application/json");
-    if (req.url.startsWith("/api/v1/user/agent-templates")) {
+    if (req.url.startsWith("/api/v1/org/users/user_1/agent-templates")) {
       res.end(
         JSON.stringify({
           templates: [{ agentTemplateId: "changed-template" }],
@@ -263,14 +257,14 @@ test("the packaged workflow keeps original creation inputs when catalog defaults
           nextCursor: null,
         }),
       );
-    } else if (req.url.startsWith("/api/v1/agent-models")) {
+    } else if (req.url.startsWith("/api/v1/org/users/user_1/agent-models")) {
       res.end(
         JSON.stringify({
           effectiveDefaultModel:
             ++catalogReads === 1 ? "first-default" : "new-default",
         }),
       );
-    } else if (req.url === "/api/v1/user/agents") {
+    } else if (req.url === "/api/v1/org/users/user_1/agents") {
       bodies.push(JSON.parse(body));
       res.writeHead(201).end(JSON.stringify({ agent: record }));
     } else {
@@ -293,7 +287,8 @@ test("the packaged workflow keeps original creation inputs when catalog defaults
     await import("../examples/create-session.mjs");
   const input = {
     baseUrl,
-    userApiKey: key,
+    organizationApiKey: key,
+    userId: "user_1",
     agentTemplateId: "template_1",
     agentCreationKey: "example-agent",
     sessionCreationKey: "example-session",

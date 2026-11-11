@@ -4,12 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import {
-  OrganizationClient,
-  UserClient,
-  TiDBLinkApiError,
-  ConflictError,
-} from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError, ConflictError } from "@tidblink/server";
 import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
@@ -19,11 +14,14 @@ assert(
   baseUrl && templateId && otherTemplateId,
   "Run through npm run test:service",
 );
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const stranger = new UserClient({
+const user = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FOREIGN_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
+const stranger = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
 const organization = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
@@ -230,7 +228,8 @@ test("owned Sessions preserve creation identity, paging, conditional model edits
 test("the installed Template-to-Agent-to-Session example is runnable and recoverable without message execution", async () => {
   const options = {
     baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     agentTemplateId: templateId,
     agentCreationKey: randomUUID(),
     sessionCreationKey: randomUUID(),
@@ -253,7 +252,8 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
       env: {
         ...process.env,
         AGENT_SERVICE_URL: baseUrl,
-        USER_API_KEY: options.userApiKey,
+        ORGANIZATION_API_KEY: options.organizationApiKey,
+        END_USER_ID: options.userId,
         TEMPLATE_ID: options.agentTemplateId,
         AGENT_CREATION_KEY: options.agentCreationKey,
         SESSION_CREATION_KEY: options.sessionCreationKey,
@@ -261,5 +261,5 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
     },
   );
   assert.equal(JSON.parse(stdout).sessionId, first.session.id);
-  assert(!(stdout + stderr).includes(options.userApiKey));
+  assert(!(stdout + stderr).includes(options.organizationApiKey));
 });

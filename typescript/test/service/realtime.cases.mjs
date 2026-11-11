@@ -3,24 +3,20 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import {
-  ConflictError,
-  TiDBLinkApiError,
-  UserClient,
-} from "@tidblink/server";
+import { OrganizationClient, ConflictError, TiDBLinkApiError } from "@tidblink/server";
 
 const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
-const userApiKey = process.env.SDK_USER_KEY;
-const foreignUserApiKey = process.env.SDK_FOREIGN_USER_KEY;
+const userId = process.env.SDK_USER_ID;
+const foreignUserId = process.env.SDK_FOREIGN_USER_ID;
 const organizationApiKey = process.env.SDK_ORGANIZATION_KEY;
 const sessionId = process.env.SDK_REALTIME_SESSION_ID;
 const exampleSessionId = process.env.SDK_REALTIME_EXAMPLE_SESSION_ID;
 const disabledSessionId = process.env.SDK_REALTIME_DISABLED_SESSION_ID;
 assert(
   baseUrl &&
-    userApiKey &&
-    foreignUserApiKey &&
+    userId &&
+    foreignUserId &&
     organizationApiKey &&
     sessionId &&
     exampleSessionId &&
@@ -46,8 +42,12 @@ const assertNoConnectToken = (value, ...tokens) => {
 };
 
 test("the installed SDK discovers, selects and manages Realtime Connections", async () => {
-  const user = new UserClient({ baseUrl, apiKey: userApiKey });
-  const foreign = new UserClient({ baseUrl, apiKey: foreignUserApiKey });
+  const organization = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  });
+  const user = organization.user(userId);
+  const foreign = organization.user(foreignUserId);
   const catalog = await user.listRealtimeModels();
   assert.equal(catalog.defaultModel, "voice-a");
   assert.deepEqual(
@@ -167,10 +167,6 @@ test("the installed SDK discovers, selects and manages Realtime Connections", as
     foreign.session(sessionId).endRealtimeConnection(),
     refusal(404, "session_not_found"),
   );
-  assert.throws(
-    () => new UserClient({ baseUrl, apiKey: organizationApiKey }),
-    TypeError,
-  );
 
   const ended = await session.endRealtimeConnection();
   assert.equal(ended.id, opened.realtimeConnection.id);
@@ -205,11 +201,6 @@ test("the installed SDK discovers, selects and manages Realtime Connections", as
     refusal(409, "realtime_not_enabled"),
   );
 
-  const wrongAuthority = await fetch(new URL("/api/v1/realtime-models", baseUrl), {
-    headers: { authorization: `Bearer ${organizationApiKey}` },
-  });
-  assert.equal(wrongAuthority.status, 403);
-  assert.equal((await wrongAuthority.json()).error.code, "user_api_key_required");
 
   const executable = import.meta.resolve(
     "@tidblink/server/examples/prepare-realtime-connection.mjs",
@@ -218,7 +209,8 @@ test("the installed SDK discovers, selects and manages Realtime Connections", as
     env: {
       ...process.env,
       AGENT_SERVICE_URL: baseUrl,
-      USER_API_KEY: userApiKey,
+      ORGANIZATION_API_KEY: organizationApiKey,
+      END_USER_ID: userId,
       SESSION_ID: exampleSessionId,
       REALTIME_MODEL_ID: "voice-b",
     },

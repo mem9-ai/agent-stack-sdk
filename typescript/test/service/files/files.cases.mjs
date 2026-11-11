@@ -1,19 +1,22 @@
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError } from "@tidblink/server";
 import { uploadFileWorkflow } from "@tidblink/server/examples/upload-file.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
-const local = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const remote = new UserClient({
+const local = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FILE_REMOTE_USER_KEY,
-});
-const stranger = new UserClient({
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
+const remote = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FOREIGN_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FILE_REMOTE_USER_ID);
+const stranger = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const metadata = (bytes, originalName = "note.txt") => ({
   originalName,
@@ -193,7 +196,8 @@ test("the installed upload example includes file content in its conversation", a
   const unique = `example-file-${randomUUID()}`;
   const result = await uploadFileWorkflow({
     baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     sessionId: session.id,
     originalName: "example.txt",
     bytes: Buffer.from(unique),

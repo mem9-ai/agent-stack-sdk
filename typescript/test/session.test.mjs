@@ -5,11 +5,11 @@ import { after, test } from "node:test";
 import {
   ConflictError,
   OutcomeUnknownError,
-  UserClient,
+  OrganizationClient,
 } from "../dist/index.js";
 
 const servers = [];
-const userApiKey = "ti_user_" + "key_" + "x".repeat(43);
+const organizationApiKey = "ti_org_" + "key_" + "x".repeat(43);
 
 after(async () => {
   await Promise.all(
@@ -27,10 +27,10 @@ const serve = async (handler) => {
 };
 
 const clientFor = (baseUrl) =>
-  new UserClient({
+  new OrganizationClient({
     baseUrl,
-    apiKey: userApiKey,
-  });
+    apiKey: organizationApiKey,
+  }).user("user_1");
 
 const agent = {
   agentId: "agent_1",
@@ -161,9 +161,9 @@ test("a Session updates the model with its retained ETag and never overwrites a 
   assert.deepEqual(
     calls.map(({ method, url }) => [method, url]),
     [
-      ["GET", "/api/v1/user/sessions/session_1"],
-      ["PATCH", "/api/v1/user/sessions/session_1/model"],
-      ["PATCH", "/api/v1/user/sessions/session_1/model"],
+      ["GET", "/api/v1/org/users/user_1/sessions/session_1"],
+      ["PATCH", "/api/v1/org/users/user_1/sessions/session_1/model"],
+      ["PATCH", "/api/v1/org/users/user_1/sessions/session_1/model"],
     ],
   );
 });
@@ -200,10 +200,10 @@ test("Session metadata updates keep the independent model token and do not repla
   assert.deepEqual(
     calls.slice(1).map((c) => [c.method, c.url]),
     [
-      ["POST", "/api/v1/user/sessions/session_1/name"],
-      ["PATCH", "/api/v1/user/sessions/session_1/billing-tag"],
-      ["PATCH", "/api/v1/user/sessions/session_1/model"],
-      ["POST", "/api/v1/user/sessions/session_1/name"],
+      ["POST", "/api/v1/org/users/user_1/sessions/session_1/name"],
+      ["PATCH", "/api/v1/org/users/user_1/sessions/session_1/billing-tag"],
+      ["PATCH", "/api/v1/org/users/user_1/sessions/session_1/model"],
+      ["POST", "/api/v1/org/users/user_1/sessions/session_1/name"],
     ],
   );
 });

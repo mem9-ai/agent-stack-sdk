@@ -184,16 +184,9 @@ export const requestOptions = (
 };
 
 /** Check the frozen wire grammar without retaining or exposing the credential. */
-export const isApiKey = (
-  value: unknown,
-  kind: "org" | "user",
-): value is string => {
-  if (typeof value !== "string") return false;
-  const match = /^ti_(org|user)_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.exec(
-    value,
-  );
-  return match !== null && match[0] === value && match[1] === kind;
-};
+export const isOrganizationApiKey = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^ti_org_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.test(value);
 
 export class HttpClient {
   readonly #apiKey: string;

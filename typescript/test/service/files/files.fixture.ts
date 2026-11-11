@@ -13,7 +13,7 @@ import {
   getAppPersistencePorts,
 } from "../test/support/app-testing-module";
 import { loadE2eEnv } from "../test/support/e2e-env";
-import { UserApiKeyService } from "../src/auth/user-api-key.service";
+import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
 import { AgentTemplateContentSchema } from "../src/agent-templates/agent-template-content";
 import { createAgentServiceFastifyAdapter } from "../src/common/fastify-adapter";
 import { ENV } from "../src/config/config.module";
@@ -254,20 +254,18 @@ afterAll(async () => {
 it("the installed SDK uploads and reads files through actual service authority, persistence and Runtime", async () => {
   const fixture = app.get(AppTestingPersistenceFixture);
   const ports = getAppPersistencePorts(app);
-  const keys = app.get(UserApiKeyService);
+  const organizationKey = await app.get(OrganizationApiKeyService).create({
+    organizationId: DEFAULT_ORG_ID,
+    name: "SDK fixture",
+    createdByUserId: null,
+  });
   const users = await Promise.all(
-    ["local", "stranger", "remote"].map(async (displayName) => {
-      const user = await fixture.arrangeEndUser({
+    ["local", "stranger", "remote"].map((displayName) =>
+      fixture.arrangeEndUser({
         organizationId: DEFAULT_ORG_ID,
         displayName,
-      });
-      const key = await keys.create({
-        organizationId: DEFAULT_ORG_ID,
-        userId: user.userId,
-        name: "SDK Files",
-      });
-      return { ...user, token: key.token };
-    }),
+      }),
+    ),
   );
   const [local, stranger, remote] = users;
   await ports.userDriveStore.upsertUserDrive({
@@ -335,9 +333,10 @@ it("the installed SDK uploads and reads files through actual service authority, 
         env: {
           ...process.env,
           SDK_SERVICE_URL: await app.getUrl(),
-          SDK_USER_KEY: local!.token,
-          SDK_FOREIGN_USER_KEY: stranger!.token,
-          SDK_FILE_REMOTE_USER_KEY: remote!.token,
+          SDK_ORGANIZATION_KEY: organizationKey.token,
+          SDK_USER_ID: local!.userId,
+          SDK_FOREIGN_USER_ID: stranger!.userId,
+          SDK_FILE_REMOTE_USER_ID: remote!.userId,
           SDK_TEMPLATE_ID: templateId,
         },
         maxBuffer: 4 * 1024 * 1024,

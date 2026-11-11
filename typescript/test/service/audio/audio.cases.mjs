@@ -3,17 +3,20 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError, TurnFailedError } from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError, TurnFailedError } from "@tidblink/server";
 const baseUrl = process.env.SDK_SERVICE_URL;
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const stranger = new UserClient({
+const user = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FOREIGN_USER_KEY,
-});
-const budget = new UserClient({
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
+const stranger = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_AUDIO_BUDGET_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
+const budget = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_AUDIO_BUDGET_USER_ID);
 const wav = () => {
   const bytes = Buffer.alloc(364);
   bytes.write("RIFF", 0);
@@ -149,7 +152,8 @@ test("the installed prerecorded-audio example returns the actual saved answer", 
   const session = await newSession();
   const result = await submitAudioWorkflow({
     baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     sessionId: session.id,
     ...recording(),
   });

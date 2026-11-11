@@ -3,14 +3,17 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError, ConflictError } from "@tidblink/server";
+import { OrganizationClient, TiDBLinkApiError, ConflictError } from "@tidblink/server";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
-const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
-const stranger = new UserClient({
+const user = new OrganizationClient({
   baseUrl,
-  apiKey: process.env.SDK_FOREIGN_USER_KEY,
-});
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_USER_ID);
+const stranger = new OrganizationClient({
+  baseUrl,
+  apiKey: process.env.SDK_ORGANIZATION_KEY,
+}).user(process.env.SDK_FOREIGN_USER_ID);
 const newAgent = () =>
   user.createAgent({
     agentTemplateId: process.env.SDK_TEMPLATE_ID,
@@ -233,7 +236,8 @@ test("the installed Scheduler example reads the actual scheduled outcome", async
   const agent = await newAgent();
   const result = await scheduleTaskWorkflow({
     baseUrl,
-    userApiKey: process.env.SDK_USER_KEY,
+    organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
+    userId: process.env.SDK_USER_ID,
     agentId: agent.id,
     idempotencyKey: randomUUID(),
     runAt: new Date().toISOString(),

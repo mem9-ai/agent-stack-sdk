@@ -1,5 +1,5 @@
 {
-  "name": "@mem9/tidb-link",
+  "name": "@tidblink/server",
   "version": "0.3.0",
   "description": "Official TypeScript SDK for TiDB Link",
   "license": "Apache-2.0",
@@ -57,11 +57,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mem9-ai/agent-stack-sdk.git",
+    "url": "git+https://github.com/mem9-ai/tidblink-sdk.git",
     "directory": "typescript"
   },
   "bugs": {
-    "url": "https://github.com/mem9-ai/agent-stack-sdk/issues"
+    "url": "https://github.com/mem9-ai/tidblink-sdk/issues"
   },
-  "homepage": "https://github.com/mem9-ai/agent-stack-sdk#readme"
+  "homepage": "https://github.com/mem9-ai/tidblink-sdk#readme"
 }

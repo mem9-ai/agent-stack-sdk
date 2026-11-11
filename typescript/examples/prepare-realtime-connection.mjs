@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@mem9/tidb-link";
+import { UserClient } from "@tidblink/server";
 
 /** Prepare an existing owned Session for a terminal to connect; this does not open a WebSocket. */
 export async function prepareRealtimeConnection({

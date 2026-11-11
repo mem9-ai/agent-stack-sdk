@@ -5,8 +5,8 @@ import {
   OrganizationClient,
   UserClient,
   TiDBLinkApiError,
-} from "@mem9/tidb-link";
-import { organizationSessionWorkflow } from "@mem9/tidb-link/examples/organization-session.mjs";
+} from "@tidblink/server";
+import { organizationSessionWorkflow } from "@tidblink/server/examples/organization-session.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const organization = new OrganizationClient({

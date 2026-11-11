@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@mem9/tidb-link";
+import { UserClient } from "@tidblink/server";
 
 /** Persist sessionId, clientEventId and text before calling; reuse them for recovery. */
 export async function sendMessageWorkflow({

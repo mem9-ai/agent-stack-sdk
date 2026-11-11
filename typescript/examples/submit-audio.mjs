@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@mem9/tidb-link";
+import { UserClient } from "@tidblink/server";
 
 /** This recording request owns its response; aborting it may interrupt the Turn. */
 export async function submitAudioWorkflow({

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "@mem9/tidb-link";
-import { uploadFileWorkflow } from "@mem9/tidb-link/examples/upload-file.mjs";
+import { UserClient, TiDBLinkApiError } from "@tidblink/server";
+import { uploadFileWorkflow } from "@tidblink/server/examples/upload-file.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const local = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });

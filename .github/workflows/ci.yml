@@ -19,7 +19,12 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci
+      - run: npm run test:release
       - run: npm run test:service-contract
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
+      - name: Show what merging this commit would release
+        run: node scripts/release-plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

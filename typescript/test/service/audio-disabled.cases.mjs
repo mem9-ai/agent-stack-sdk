@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "@mem9/tidb-link";
+import { UserClient, TiDBLinkApiError } from "@tidblink/server";
 
 test("the actual unconfigured transcription deployment refuses audio explicitly", async () => {
   const user = new UserClient({

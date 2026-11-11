@@ -22,12 +22,24 @@ until the public TiDB Link HTTP contract is declared stable.
 
 Consumers pin an exact version and upgrade through their own change.
 
+## Branches
+
+`main` is the development branch. Nothing is released from it, whatever its
+package version and changelog say.
+
+`release` is the release branch. Its head is the latest commit submitted to npm.
+A release is made by merging `main` into `release` through a pull request. Use
+"Create a merge commit", not squash, so that later releases merge cleanly.
+
+A `release-<minor>` branch, for example `release-0.3`, is created from `release`
+only when an older minor version needs a fix after `main` has moved on. It
+releases the same way.
+
 ## How a release happens
 
-Merging a release pull request to `main` submits the version to npm. A
-maintainer then approves it on npm with two-factor authentication. Nobody pushes
-tags or runs `npm publish` by hand, and automation alone cannot make a version
-public.
+Merging into a release branch submits the version to npm. A maintainer then
+approves it on npm with two-factor authentication. Nobody pushes tags or runs
+`npm publish` by hand, and automation alone cannot make a version public.
 
 1. Confirm `typescript/package.json` declares the supported TiDB Link API
    version and exact service revision, and that its fingerprints, exported values
@@ -38,22 +50,24 @@ public.
    runtime and a dedicated test database as documented in the package README, and
    put that evidence in the pull request. Frozen contracts alone do not replace
    actual-service evidence.
-3. Open a release pull request that sets `version` in `typescript/package.json`
-   and gives that exact version its own `## <version>` section in `CHANGELOG.md`,
-   moving the entries out of the unreleased section. The pull request check
-   "Show what merging this commit would release" prints the outcome.
-4. Merge it. The release workflow repeats the checks and stages the package on
-   npm with provenance, using dist-tag `next` for a prerelease version or `latest`
+3. On `main`, merge a pull request that sets `version` in
+   `typescript/package.json` and gives that exact version its own `## <version>`
+   section in `CHANGELOG.md`, moving the entries out of the unreleased section.
+   This releases nothing.
+4. Open a pull request from `main` into `release`. Its check "Show what this
+   commit would release from a release branch" prints the outcome. Merge it with
+   a merge commit.
+5. The release workflow repeats the checks and stages the package on npm with
+   provenance, using dist-tag `next` for a prerelease version or `latest`
    otherwise. It also creates a draft GitHub Release that holds the changelog
    section, the service compatibility mapping and the released commit. The
    version is not public yet.
-5. A maintainer with publish access reviews the staged version under Staged
+6. A maintainer with publish access reviews the staged version under Staged
    Packages on npmjs.com, or with `npm stage view` and `npm stage download`, and
    approves it there or with `npm stage approve <stage-id>`.
-6. Run the release workflow again from the Actions page, or let the next push to
-   `main` run it. It sees the version on npm, creates the
-   `@tidblink/server@<version>` tag at the staged commit and publishes the GitHub
-   Release.
+7. Run the release workflow again on the release branch from the Actions page.
+   It sees the version on npm, creates the `@tidblink/server@<version>` tag at
+   the staged commit and publishes the GitHub Release.
 
 A version without its own changelog section is treated as still in development
 and is not staged. A staged version is not staged twice while its draft GitHub
@@ -76,13 +90,16 @@ reject the staged version on npm and rerun the workflow.
 
 The package belongs to the `@tidblink` npm organization. The workflow can only
 stage: the `NPM_TOKEN` repository secret is a granular token with "Read and
-write (stage only)" permission for that organization, so a leaked token cannot
-publish a version.
+write (stage only)" permission for that organization. A leaked token cannot
+publish a version, though it can still deprecate versions and move dist-tags.
+Replace the secret before the token expires.
 
 Staged publishing needs npm 11.15.0 or newer. The first staged version of a new
-package name makes npm create a public placeholder version, `0.0.0-stage`.
+package name makes npm create a public placeholder version, `0.0.0-stage`, which
+holds `latest` until the first stable release.
 
-After the package exists, configure npm trusted publishing in the package's npm
-settings for the GitHub repository `mem9-ai/tidblink-sdk` and the workflow file
-`release-typescript.yml`, allowing staged publishing only, then delete the
-`NPM_TOKEN` secret.
+npm trusted publishing is an optional replacement for the token. It is
+configured in the package's npm settings for the GitHub repository
+`mem9-ai/tidblink-sdk` and the workflow file `release-typescript.yml`, allowing
+staged publishing only. It removes the stored secret and its expiry; a
+maintainer's approval is required either way.

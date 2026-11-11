@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      - release
+      - "release-*"
 
 permissions:
   contents: read
@@ -24,7 +26,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
-      - name: Show what merging this commit would release
+      - name: Show what this commit would release from a release branch
         run: node scripts/release-plan.mjs
         env:
           GH_TOKEN: ${{ github.token }}

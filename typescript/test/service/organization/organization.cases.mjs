@@ -201,48 +201,6 @@ await until(
   (current) => current.data.activeTurnId === null,
 );
 
-await stage("schedule");
-let schedule = await owner.schedulers.create({
-  idempotencyKey: randomUUID(),
-  title: "SDK schedule",
-  prompt: "Scheduled work",
-  delivery: { target: "bound_session", sessionId: session.id },
-  schedule: { kind: "once", after: "1s" },
-});
-const schedulerId = schedule.scheduler.schedulerId;
-const fires = await until(
-  () => owner.schedulers.fires(schedulerId),
-  ({ fires }) => fires[0]?.executionStatus === "completed",
-);
-assert.equal(
-  (await session.getTurn(fires.fires[0].result.turnId)).assistantMessage
-    .content,
-  "SDK scheduled answer.",
-);
-schedule = await owner.schedulers.get(schedulerId);
-schedule = await owner.schedulers.update(
-  schedulerId,
-  { enabled: false },
-  { ifMatch: schedule.etag },
-);
-await owner.schedulers.delete(schedulerId, { ifMatch: schedule.etag });
-await assert.rejects(
-  owner.schedulers.get(schedulerId),
-  (error) => error.status === 404,
-);
-assert(
-  (await owner.schedulers.list({ status: "deleted" })).schedulers.some(
-    (item) => item.schedulerId === schedulerId,
-  ),
-);
-await assert.rejects(
-  owner.schedulers.fires(schedulerId),
-  (error) => error.status === 404,
-);
-assert.equal(
-  (await session.getTurn(fires.fires[0].result.turnId)).status,
-  "succeeded",
-);
 
 await until(
   () => session.refresh(),
@@ -285,11 +243,6 @@ assert.notEqual(
   realtime.realtimeConnection.id,
 );
 await recoveredSession.endRealtimeConnection();
-assert(
-  (await fresh.schedulers.list({ status: "deleted" })).schedulers.some(
-    (item) => item.schedulerId === schedulerId,
-  ),
-);
 assert.deepEqual(
   Buffer.from(await fresh.files.download(file.fileId)),
   bytes,
@@ -303,6 +256,6 @@ await stage("revoke");
 await assert.rejects(fresh.listAgents(), unauthorized);
 assert.equal((await other.getSession(session.id)).id, session.id);
 console.log(
-  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, audio, Scheduler fire/deletion history, Realtime HTTP, and rotation/revocation recovery.",
+  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, audio, Realtime HTTP, and rotation/revocation recovery.",
 );
 process.disconnect();

@@ -1,4 +1,3 @@
-import { UserSchedulers, type OrganizationSchedulerListOptions } from "./schedulers.js";
 import { UserFiles } from "./files.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
@@ -144,11 +143,6 @@ export interface SessionPage {
 export class EndUserClient {
   readonly #http: HttpClient;
   readonly #files: UserFiles;
-  readonly #schedulers: UserSchedulers<OrganizationSchedulerListOptions>;
-
-  get schedulers(): UserSchedulers<OrganizationSchedulerListOptions> {
-    return this.#schedulers;
-  }
 
   get files(): UserFiles {
     return this.#files;
@@ -157,7 +151,6 @@ export class EndUserClient {
   constructor(http: HttpClient) {
     this.#http = http;
     this.#files = new UserFiles(http);
-    this.#schedulers = new UserSchedulers(http);
   }
 
   async listAgents(options?: RequestOptions): Promise<Agent[]> {

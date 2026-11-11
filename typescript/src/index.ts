@@ -157,22 +157,6 @@ export type {
   PendingClientToolCall,
   ClientToolOutputInput,
 } from "./client-tools.js";
-export { UserSchedulers } from "./schedulers.js";
-export type {
-  SchedulerSchedule,
-  SchedulerDelivery,
-  CreateSchedulerInput,
-  UpdateSchedulerInput,
-  Scheduler,
-  SchedulerResponse,
-  SchedulerPage,
-  SchedulerListOptions,
-  OrganizationSchedulerListOptions,
-  SchedulerMutationOptions,
-  SchedulerFire,
-  SchedulerFirePage,
-} from "./schedulers.js";
-
 export { AudioTurnStoppedError } from "./audio.js";
 export type {
   AudioTurnInput,

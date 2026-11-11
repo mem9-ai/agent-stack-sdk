@@ -350,7 +350,7 @@ test("Organization authority selects an explicit owner across existing resource 
     response.setHeader("content-type", "application/json");
     response.setHeader("etag", '"revision-1"');
     response.end(JSON.stringify({
-      agents: [], sessions: [], templates: [], models: [], files: [], schedulers: [],
+      agents: [], sessions: [], templates: [], models: [], files: [],
       agent: { agentId: "agent_1" }, session: { sessionId: "session_1" },
       capabilities: {}, hasMore: false, nextCursor: null,
     }));
@@ -369,7 +369,6 @@ test("Organization authority selects an explicit owner across existing resource 
   await owner.listRealtimeModels();
   await owner.files.list();
   await owner.files.capabilities();
-  await owner.schedulers.list({ status: "deleted" });
   assert.deepEqual(calls.map(({ url }) => url), [
     "/api/v1/org/users/user_1/agents",
     "/api/v1/org/users/user_1/agents/agent_1",
@@ -381,7 +380,6 @@ test("Organization authority selects an explicit owner across existing resource 
     "/api/v1/org/users/user_1/realtime-models",
     "/api/v1/org/users/user_1/files",
     "/api/v1/org/users/user_1/drive/upload-capabilities",
-    "/api/v1/org/users/user_1/schedulers?status=deleted",
   ]);
   assert(calls.every(({ authorization }) => authorization === `Bearer ${organizationApiKey}`));
   assert(!inspect(owner).includes(organizationApiKey));

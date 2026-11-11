@@ -33,7 +33,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
-  assert(files.includes("examples/schedule-task.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
   assert(files.includes("examples/answer-client-tool.mjs"));
@@ -50,7 +49,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/read-usage.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
-        file === "examples/schedule-task.mjs" ||
         file === "examples/submit-audio.mjs" ||
         file === "examples/observe-message.mjs" ||
         file === "examples/answer-client-tool.mjs" ||
@@ -76,7 +74,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     path.join(temporary, "consumer.ts"),
     `import type {
       AudioTurnInput, AudioTurnEvent, AudioTurnResult,
-      Scheduler, SchedulerResponse, SchedulerFirePage, SchedulerPage, CreateSchedulerInput,
       UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
       FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
       Agent, EndUserClient, BillingPrincipalBucket,
@@ -133,7 +130,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
     const owner: EndUserClient = organization.user("user_1");
     const orgAgent: Promise<Agent> = owner.getAgent("agent_1");
-    const deleted: Promise<SchedulerPage> = owner.schedulers.list({ status: "deleted" });
+    // @ts-expect-error Schedulers are not part of the supported SDK.
+    owner.schedulers.list();
     const principal: BillingPrincipalBucket = "organization_user";
     // @ts-expect-error User API Key management was removed with User authority.
     organization.createUserApiKey("user_1", { name: "backend" });
@@ -177,21 +175,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       // @ts-expect-error Audio does not accept ordinary input identities or promise text replay.
       session.audio({...input,clientEventId:"text-only"});
       return session.audio(input);
-    }
-    async function schedulerWorkflow(user: EndUserClient): Promise<Scheduler> {
-      const input: CreateSchedulerInput = {agentId:"agent-1",title:"Report",prompt:"Summarize",schedule:{kind:"once",after:"1h"},idempotencyKey:"scheduler-1"};
-      const created: SchedulerResponse = await user.schedulers.create(input);
-      const bound: CreateSchedulerInput = {delivery:{target:"bound_session",sessionId:"session-1"},title:"Report",prompt:"Summarize",schedule:{kind:"cron",cronExpr:"0 9 * * *",timezone:"Asia/Shanghai"},idempotencyKey:"scheduler-2"};
-      await user.schedulers.create(bound);
-      // @ts-expect-error A once schedule takes exactly one time form.
-      const invalid: CreateSchedulerInput = {...input,schedule:{kind:"once",after:"1h",runAt:"2099-01-01T00:00:00.000Z"}};
-      const current = await user.schedulers.get(created.scheduler.schedulerId);
-      const updated = await user.schedulers.update(current.scheduler.schedulerId,{enabled:false,validUntil:null},{ifMatch:current.etag});
-      const list: SchedulerPage = await user.schedulers.list({status:"disabled",limit:1});
-      const fires: SchedulerFirePage = await user.schedulers.fires(current.scheduler.schedulerId,{limit:1});
-      await user.schedulers.delete(current.scheduler.schedulerId,{ifMatch:updated.etag});
-      void invalid; void list; void fires;
-      return current.scheduler;
     }
     async function fileWorkflow(user: EndUserClient): Promise<UserFile> {
       const capabilities: FileUploadCapabilities = await user.files.capabilities();
@@ -418,8 +401,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof sendMessageWorkflow,"function");
     const { uploadFileWorkflow } = await import("@tidblink/server/examples/upload-file.mjs");
     assert.equal(typeof uploadFileWorkflow,"function");
-    const { scheduleTaskWorkflow } = await import("@tidblink/server/examples/schedule-task.mjs");
-    assert.equal(typeof scheduleTaskWorkflow,"function");
     const { submitAudioWorkflow } = await import("@tidblink/server/examples/submit-audio.mjs");
     assert.equal(typeof submitAudioWorkflow,"function");
     const { observeMessageWorkflow } = await import("@tidblink/server/examples/observe-message.mjs");

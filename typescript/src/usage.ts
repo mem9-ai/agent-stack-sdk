@@ -7,7 +7,8 @@ export type BillingCostBearer = "platform" | "customer" | "unknown";
 export type BillingPrincipalBucket =
   | "human"
   | "user_api_key"
-  | "organization_machine";
+  | "organization_machine"
+  | "organization_user";
 export type BillingAttributionKind =
   | "agent"
   | "user_level"

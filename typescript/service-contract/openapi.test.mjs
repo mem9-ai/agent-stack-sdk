@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const expectedRevision = "0d11f1b231879c735bd53b60ff895ac58ba60d33";
+const expectedRevision = "882287809f91d9a3fdf60537460431d9f0fc23e7";
 const expectedSourceSha256 =
-  "ce6ac6c2b1e2e50461455a85eb4aedffd8958019d15ef95e6b8254eaef54a9dc";
+  "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b";
 const openApiBytes = await readFile(new URL("openapi.json", import.meta.url));
 const document = JSON.parse(openApiBytes);
 const metadata = JSON.parse(
@@ -326,4 +326,17 @@ test("Client Tools preserve declaration replacement, pending deadlines and expli
     variants.some((variant) => properties(variant).output?.maxLength === 65536),
   );
   assert(variants.some((variant) => properties(variant).error));
+});
+
+
+test("supported Organization resources bind the explicit owner and preserve User counterparts", () => {
+  for (const [path, methods] of Object.entries(document.paths)) {
+    if (!path.startsWith("/api/v1/org/users/{userId}/")) continue;
+    for (const operation of Object.values(methods)) {
+      assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
+      assert(operation.parameters.some((p) => p.name === "userId" && p.in === "path" && p.required));
+    }
+  }
+  const details = properties(schema("ConsoleBillingDetailsResponseOpenApiDto"));
+  assert(properties(details.llm.items).principalBucket.enum.includes("organization_user"));
 });

@@ -19,6 +19,8 @@ and Session management, text commands with recoverable final results and continu
 progress, Client Tools, explicit cancellation and checkpoint retry, conversation
 history, verified file attachments and downloads, Schedulers, Realtime
 Model/Connection preparation, prerecorded audio and User usage reads against one exact service revision.
+Resource workflows accept Organization authority with an explicit End User as well
+as existing User API Keys.
 See the TypeScript README for the supported boundaries
 and excluded capabilities.
 

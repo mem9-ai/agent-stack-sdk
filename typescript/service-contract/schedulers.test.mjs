@@ -12,16 +12,16 @@ const manifest = JSON.parse(
 test("Schedulers keep their selected public authority, creation identity, conditional writes and fire projection", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "6a3313637fd70cd5712f2f734aee9b0ffbc2802c003068d498a53a7c1adf71dc",
+    "dbee1f8de5f7c03ed6f62046c24ec2f0662c3221bc2f5b2408db764c8241cab7",
   );
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,
     manifest.tidbLinkOpenApiSha256,
   );
-  for (const methods of Object.values(contract.paths))
+  for (const [path, methods] of Object.entries(contract.paths))
     for (const operation of Object.values(methods))
-      assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+      assert.deepEqual(operation.security, path.includes("/org/users/") ? [{ OrganizationApiKey: [] }] : [{ UserApiKey: [] }]);
   const create = contract.paths["/api/v1/schedulers"].post;
   assert(
     create.parameters.some(
@@ -66,4 +66,13 @@ test("Schedulers keep their selected public authority, creation identity, condit
   assert(
     !schemas.CreateBoundSessionPublicSchedulerOpenApiDto.properties.agentId,
   );
+});
+
+
+test("only Organization Scheduler lists include deleted history", () => {
+  const own = contract.paths["/api/v1/schedulers"].get;
+  const organization = contract.paths["/api/v1/org/users/{userId}/schedulers"].get;
+  assert.deepEqual(own.parameters.find((p) => p.name === "status").schema.enum, ["enabled", "disabled"]);
+  assert.deepEqual(organization.parameters.find((p) => p.name === "status").schema.enum, ["enabled", "disabled", "deleted"]);
+  assert.deepEqual(contract.components.schemas.OrganizationSchedulerListResponseOpenApiDto.properties.schedulers.items.properties.status.enum, ["enabled", "disabled", "deleted"]);
 });

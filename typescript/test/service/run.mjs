@@ -77,7 +77,13 @@ for (const name of entries.filter((name) => name.endsWith(".cases.mjs")))
 
 await mkdir(path.join(serviceRoot, ".agent9"), { recursive: true });
 // Each fixture owns a distinct dependency lifecycle and its neighboring cases.
-for (const fixtureName of fixtures) {
+const selectedFixtures = process.argv[2]
+  ? fixtures.filter((name) => name === process.argv[2])
+  : fixtures;
+assert(selectedFixtures.length > 0, "The selected service fixture does not exist");
+if (selectedFixtures.some((name) => name.endsWith(".compiled.fixture.ts")))
+  execFileSync("pnpm", ["run", "build"], { cwd: serviceRoot, stdio: "inherit" });
+for (const fixtureName of selectedFixtures) {
   const serviceCases = entries
     .filter(
       (name) =>
@@ -91,8 +97,11 @@ for (const fixtureName of fixtures) {
     path.join(serviceRoot, ".agent9", "sdk-service-"),
   );
   try {
+    const testName = fixtureName.endsWith(".compiled.fixture.ts")
+      ? "sdk.system.spec.ts"
+      : "sdk.e2e-spec.ts";
     await writeFile(
-      path.join(temporary, "sdk.e2e-spec.ts"),
+      path.join(temporary, testName),
       (await readFile(path.join(serviceCaseDirectory, fixtureName), "utf8"))
         .replaceAll('"../test/', '"../../test/')
         .replaceAll('"../src/', '"../../src/'),
@@ -100,7 +109,7 @@ for (const fixtureName of fixtures) {
     const config = path.join(temporary, "vitest.config.mjs");
     await writeFile(
       config,
-      `import base from "../../vitest.config.ts";\nexport default { ...base, test: { ...base.test, include: [${JSON.stringify(path.relative(serviceRoot, path.join(temporary, "sdk.e2e-spec.ts")))}] } };\n`,
+      `import base from "../../${fixtureName.endsWith(".compiled.fixture.ts") ? "vitest.system.config.ts" : "vitest.config.ts"}";\nexport default { ...base, test: { ...base.test, include: [${JSON.stringify(path.relative(serviceRoot, path.join(temporary, testName)))}] } };\n`,
     );
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(

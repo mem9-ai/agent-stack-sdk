@@ -8,7 +8,7 @@ const contract = JSON.parse(bytes);
 const manifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url)),
 );
-const upload = "/api/v1/user/drive/uploads";
+const upload = "/api/v1/org/users/{userId}/drive/uploads";
 
 test("file transfers retain the exact selected service contract and separate User and ticket authority", () => {
   assert.equal(

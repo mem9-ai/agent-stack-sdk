@@ -175,7 +175,7 @@ export class Session {
   async refresh(options?: RequestOptions): Promise<this> {
     options = requestOptions(options);
     const result = await this.#http.getResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
+      `/sessions/${encodeURIComponent(this.id)}`,
       options,
     );
     const etag = requireEtag(result);
@@ -191,7 +191,7 @@ export class Session {
     options = requestOptions(options);
     if (!this.#etag) await this.refresh(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/model`,
+      `/sessions/${encodeURIComponent(this.id)}/model`,
       { model },
       {
         ifMatch: this.#etag as string,
@@ -213,7 +213,7 @@ export class Session {
   async rename(name: string, options?: RequestOptions): Promise<this> {
     options = requestOptions(options);
     const result = await this.#http.postResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name`,
+      `/sessions/${encodeURIComponent(this.id)}/name`,
       { name },
       { ...options, outcomeUnknown: true },
     );
@@ -232,7 +232,7 @@ export class Session {
       "Session naming input",
     );
     const result = await this.#http.postResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/name/suggest`,
+      `/sessions/${encodeURIComponent(this.id)}/name/suggest`,
       input,
       { ...options, outcomeUnknown: true },
     );
@@ -246,7 +246,7 @@ export class Session {
   ): Promise<this> {
     options = requestOptions(options);
     const result = await this.#http.patchResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/billing-tag`,
+      `/sessions/${encodeURIComponent(this.id)}/billing-tag`,
       { billingTag },
       { ...options, outcomeUnknown: true },
     );
@@ -257,7 +257,7 @@ export class Session {
   async delete(options?: RequestOptions): Promise<this> {
     options = requestOptions(options);
     const result = await this.#http.deleteResponse<{ session: SessionRecord }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}`,
+      `/sessions/${encodeURIComponent(this.id)}`,
       { ...options, outcomeUnknown: true },
     );
     this.#record = sessionReceipt(result.data, result.requestId);
@@ -271,7 +271,7 @@ export class Session {
     options = requestOptions(options);
     requireKnownKeys(input, ["audio", "metadata"], "Realtime Connection input");
     const result = await this.#http.postResponse<unknown>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      `/sessions/${encodeURIComponent(this.id)}/realtime`,
       input,
       {
         outcomeUnknown: true,
@@ -288,7 +288,7 @@ export class Session {
     const response = await this.#http.get<{
       realtimeConnection: RealtimeConnection;
     }>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      `/sessions/${encodeURIComponent(this.id)}/realtime`,
       options,
     );
     return response.realtimeConnection;
@@ -299,7 +299,7 @@ export class Session {
   }): Promise<RealtimeConnectGrant> {
     options = requestOptions(options);
     const result = await this.#http.postResponse<unknown>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime/connect-tokens`,
+      `/sessions/${encodeURIComponent(this.id)}/realtime/connect-tokens`,
       undefined,
       {
         outcomeUnknown: true,
@@ -314,7 +314,7 @@ export class Session {
   }): Promise<RealtimeConnection> {
     options = requestOptions(options);
     const result = await this.#http.deleteResponse<unknown>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime`,
+      `/sessions/${encodeURIComponent(this.id)}/realtime`,
       {
         outcomeUnknown: true,
         ...(options?.signal ? { signal: options.signal } : {}),
@@ -329,7 +329,7 @@ export class Session {
     options = requestOptions(options);
     const response = await this.#http.get<{
       session: RealtimeSessionSelectionFields;
-    }>(`/api/v1/user/sessions/${encodeURIComponent(this.id)}`, options);
+    }>(`/sessions/${encodeURIComponent(this.id)}`, options);
     return realtimeModelSelectionFrom(response.session);
   }
 
@@ -347,7 +347,7 @@ export class Session {
     if (!options.ifMatch)
       throw new TypeError("Realtime Model selection requires ifMatch");
     const result = await this.#http.patchResponse<unknown>(
-      `/api/v1/user/sessions/${encodeURIComponent(this.id)}/realtime-model`,
+      `/sessions/${encodeURIComponent(this.id)}/realtime-model`,
       { realtimeModel: model },
       {
         ifMatch: options.ifMatch,
@@ -507,7 +507,7 @@ export const createSessionForAgent = async (
   if (options.tools !== undefined) validateClientTools(options.tools);
   const { idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
-    "/api/v1/user/sessions",
+    "/sessions",
     { agentId, ...body },
     {
       idempotencyKey,

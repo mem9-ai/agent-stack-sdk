@@ -139,7 +139,7 @@ export const submitMessage = async (
   signal?.throwIfAborted();
   try {
     const result = await http.postResponse<{ interaction?: unknown }>(
-      `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/events`,
+      `/sessions/${encodeURIComponent(sessionId)}/events`,
       { type: "agent.session.input.message", clientEventId, data },
       {
         ...(requestId ? { requestId } : {}),

@@ -145,7 +145,7 @@ export async function* streamAudio(
   let response: Response | undefined;
   try {
     ({ response, requestId } = await http.rawResponse(
-      `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/turns/audio`,
+      `/sessions/${encodeURIComponent(sessionId)}/turns/audio`,
       {
         method: "POST",
         body: upload.body,

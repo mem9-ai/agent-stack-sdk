@@ -20,8 +20,8 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
     manifest.tidbLinkOpenApiSha256,
   );
   const operation =
-    contract.paths["/api/v1/user/sessions/{id}/turns/audio"].post;
-  assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+    contract.paths["/api/v1/org/users/{userId}/sessions/{id}/turns/audio"].post;
+  assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
   const multipart = operation.requestBody.content["multipart/form-data"];
   assert.deepEqual(multipart.schema.required, ["file"]);
   assert.deepEqual(Object.keys(multipart.schema.properties).sort(), [
@@ -32,9 +32,11 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
   assert.equal(multipart.encoding.billingTag.contentType, "application/json");
   assert.equal(multipart.schema.properties.billingTag.nullable, true);
   const success = operation.responses["201"];
-  assert.equal(
-    success.content["text/event-stream"].schema["x-sse-event-schema"].$ref,
-    "#/components/schemas/TurnStreamEvent",
+  // The Organization route names TurnStreamEvent only in prose; it omits the
+  // x-sse-event-schema link that the retired User route carried.
+  assert.match(
+    success.content["text/event-stream"].schema.description,
+    /TurnStreamEvent/,
   );
   assert.deepEqual(success.headers["Cache-Control"].schema.enum, [
     "no-cache, no-transform",

@@ -188,18 +188,20 @@ export const isOrganizationApiKey = (value: unknown): value is string =>
   typeof value === "string" &&
   /^ti_org_[A-Za-z0-9]{1,64}_[A-Za-z0-9_-]{43}$/u.test(value);
 
+/**
+ * Sends requests under one path scope with the Organization API Key. The root
+ * scope is the Organization API; `forUser` narrows it to one End User's
+ * resources. Request paths are relative to the scope.
+ */
 export class HttpClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
-  readonly #ownerPrefix: string | undefined;
+  readonly #scope: string;
 
-  constructor(input: { baseUrl: string; apiKey: string; userId?: string }) {
+  constructor(input: { baseUrl: string; apiKey: string; scope?: string }) {
     this.#baseUrl = normalizeBaseUrl(input.baseUrl);
     this.#apiKey = input.apiKey;
-    this.#ownerPrefix =
-      input.userId === undefined
-        ? undefined
-        : `/api/v1/org/users/${encodeURIComponent(input.userId)}`;
+    this.#scope = input.scope ?? "/api/v1/org";
   }
 
   forUser(userId: string): HttpClient {
@@ -210,21 +212,8 @@ export class HttpClient {
     return new HttpClient({
       baseUrl: this.#baseUrl,
       apiKey: this.#apiKey,
-      userId,
+      scope: `${this.#scope}/users/${encodeURIComponent(userId)}`,
     });
-  }
-
-  private resourcePath(path: string): string {
-    if (this.#ownerPrefix === undefined) return path;
-    if (path.startsWith("/api/v1/user/"))
-      return this.#ownerPrefix + path.slice("/api/v1/user".length);
-    if (
-      /^\/api\/v1\/(files|schedulers|agent-models|realtime-models)([/?]|$)/.test(
-        path,
-      )
-    )
-      return this.#ownerPrefix + path.slice("/api/v1".length);
-    throw new TypeError("Unsupported Organization User resource path");
   }
 
   resolveUrl(value: string): URL {
@@ -358,7 +347,7 @@ export class HttpClient {
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
       try {
-        response = await fetch(`${this.#baseUrl}${this.resourcePath(path)}`, {
+        response = await fetch(`${this.#baseUrl}${this.#scope}${path}`, {
           method: options.method ?? "GET",
           redirect: "error",
           headers: {

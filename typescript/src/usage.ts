@@ -353,5 +353,5 @@ export const userUsagePath = (
     throw new TypeError(
       "Organization usage requires from and to UTC timestamps",
     );
-  return `/api/v1/org/users/${encodeURIComponent(userId)}/billing/usage`;
+  return `/users/${encodeURIComponent(userId)}/billing/usage`;
 };

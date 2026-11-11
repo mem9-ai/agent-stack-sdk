@@ -14,7 +14,7 @@ const metadata = JSON.parse(
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
-const sessionPath = "/api/v1/user/sessions/{id}";
+const sessionPath = "/api/v1/org/users/{userId}/sessions/{id}";
 const schema = (name) => {
   const value = document.components.schemas[name];
   assert(value, `missing schema ${name}`);
@@ -41,7 +41,7 @@ test("text and history keep the selected immutable service contract", () => {
   );
 });
 
-test("the selected commands and history reads require User authority", () => {
+test("the selected commands and history reads require Organization authority", () => {
   const operations = [
     ["/events", "post"],
     ["/interactions", "get"],
@@ -55,9 +55,9 @@ test("the selected commands and history reads require User authority", () => {
   ];
   for (const [route, method] of operations) {
     const operation = document.paths[`${sessionPath}${route}`][method];
-    assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
+    assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
   }
-  const credential = document.components.securitySchemes.UserApiKey;
+  const credential = document.components.securitySchemes.OrganizationApiKey;
   assert.equal(credential.type, "http");
   assert.equal(credential.scheme, "bearer");
   const submission = document.paths[`${sessionPath}/events`].post;
@@ -214,7 +214,7 @@ test("cancel and checkpoint retry keep exact command identities and distinct rec
 
 test("independent observation preserves the declared event position and snapshot contract", () => {
   const subscription = document.paths[`${sessionPath}/events`].get;
-  assert.deepEqual(subscription.security, [{ UserApiKey: [] }]);
+  assert.deepEqual(subscription.security, [{ OrganizationApiKey: [] }]);
   assert(
     subscription.parameters.some(
       (parameter) => parameter.name === "cursor" && parameter.in === "query",
@@ -243,31 +243,18 @@ test("independent observation preserves the declared event position and snapshot
   assert.match(stream.description, /agent\.session\.turn\.requires_action/);
 });
 
-test("usage surfaces preserve separate authority, ranges and result projections", () => {
-  const own = document.paths["/api/v1/billing/usage"].get;
+test("target-User usage preserves Organization authority, exact ranges and its result projection", () => {
   const org = document.paths["/api/v1/org/users/{userId}/billing/usage"].get;
-  const ownDetails = document.paths["/api/v1/billing/usage/details"].get;
   const orgDetails =
     document.paths["/api/v1/org/users/{userId}/billing/usage/details"].get;
-  for (const operation of [own, ownDetails])
-    assert.deepEqual(operation.security, [{ UserApiKey: [] }]);
   for (const operation of [org, orgDetails])
     assert.deepEqual(operation.security, [{ OrganizationApiKey: [] }]);
-  assert.equal(own.parameters.find((p) => p.name === "from").required, false);
   assert.equal(org.parameters.find((p) => p.name === "from").required, true);
-  assert(
-    own.parameters
-      .find((p) => p.name === "from")
-      .schema.pattern.includes("\\d{4}"),
-  );
   assert.equal(
     org.parameters.find((p) => p.name === "from").schema.format,
     "date-time",
   );
-  assert(!ownDetails.parameters.some((p) => p.name === "cursor"));
   assert(orgDetails.parameters.some((p) => p.name === "cursor"));
-  const self = properties(schema("ConsoleBillingDetailsResponseOpenApiDto"));
-  assert(self.llm && self.sandbox && self.webSearch && !self.nextCursor);
   const target = orgDetails.responses["200"].content["application/json"].schema;
   assert.deepEqual(target.required, [
     "items",
@@ -329,7 +316,7 @@ test("Client Tools preserve declaration replacement, pending deadlines and expli
 });
 
 
-test("supported Organization resources bind the explicit owner and preserve User counterparts", () => {
+test("supported Organization resources bind the explicit owner", () => {
   for (const [path, methods] of Object.entries(document.paths)) {
     if (!path.startsWith("/api/v1/org/users/{userId}/")) continue;
     for (const operation of Object.values(methods)) {

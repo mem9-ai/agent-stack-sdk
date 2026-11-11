@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Internal: request paths are written relative to the Organization or End User
+  scope instead of being rewritten from User-Key routes. Requests on the wire are
+  unchanged.
 - Remove User API Key authority. `UserClient`, `createUserApiKey`,
   `listUserApiKeys`, `rotateUserApiKey`, `revokeUserApiKey`, the User-Key usage
   reads (`getUsage`, `getUsageDetails`) and their types are gone. Use

@@ -121,7 +121,7 @@ const requireMatch = (options: SchedulerMutationOptions): void => {
     );
 };
 
-const path = (id: string) => `/api/v1/schedulers/${encodeURIComponent(id)}`;
+const path = (id: string) => `/schedulers/${encodeURIComponent(id)}`;
 const receipt = (
   result: HttpResult<{ scheduler?: Scheduler }>,
   mutation = true,
@@ -176,7 +176,7 @@ export class UserSchedulers<
       );
     const { idempotencyKey, requestId, signal, ...body } = input;
     return receipt(
-      await this.#http.postResponse("/api/v1/schedulers", body, {
+      await this.#http.postResponse("/schedulers", body, {
         idempotencyKey,
         outcomeUnknown: true,
         ...(requestId ? { requestId } : {}),
@@ -248,7 +248,7 @@ export class UserSchedulers<
     const query = new URLSearchParams(paginationQuery(paging).slice(1));
     if (status !== undefined) query.set("status", status);
     return this.#http.get(
-      `/api/v1/schedulers${query.size ? `?${query}` : ""}`,
+      `/schedulers${query.size ? `?${query}` : ""}`,
       options,
     );
   }

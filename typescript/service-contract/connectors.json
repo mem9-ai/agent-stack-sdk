@@ -1,0 +1,1510 @@
+{
+  "revision": "1c7f98ee12c28e3d1adb656b90324c0b95135e42",
+  "sourceOpenApiSha256": "c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6",
+  "paths": {
+    "/api/v1/org/connectors": {
+      "get": {
+        "operationId": "ConnectorsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Connector registrations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectors"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "connectorId",
+                          "organizationId",
+                          "displayName",
+                          "endpointUrl",
+                          "endpointVersion",
+                          "transport",
+                          "status",
+                          "connectorVersion",
+                          "createdAt",
+                          "updatedAt",
+                          "observation"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "connectorId": {
+                            "type": "string",
+                            "pattern": "^conn_[a-f0-9-]{36}$"
+                          },
+                          "organizationId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "endpointUrl": {
+                            "type": "string",
+                            "maxLength": 2048,
+                            "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                          },
+                          "endpointVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "transport": {
+                            "type": "string",
+                            "enum": [
+                              "streamable_http",
+                              "tunnel"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "inactive",
+                              "active"
+                            ]
+                          },
+                          "connectorVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "observation": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "era",
+                              "protocolVersion",
+                              "endpointVersion",
+                              "probedAt",
+                              "expiresAt"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "era": {
+                                "type": "string",
+                                "enum": [
+                                  "modern",
+                                  "legacy"
+                                ]
+                              },
+                              "protocolVersion": {
+                                "type": "string"
+                              },
+                              "endpointVersion": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "probedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "List the Organization’s Connector registrations.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      },
+      "post": {
+        "operationId": "ConnectorsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "displayName"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "transport": {
+                    "type": "string",
+                    "enum": [
+                      "streamable_http",
+                      "tunnel"
+                    ],
+                    "default": "streamable_http",
+                    "description": "streamable_http requires endpointUrl; tunnel takes no endpointUrl and serves tools over its own outbound WebSocket."
+                  },
+                  "endpointUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "pattern": "^https:\\/\\/(?![^/?#]*@)[^#]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inactive Connector registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectorId",
+                    "organizationId",
+                    "displayName",
+                    "endpointUrl",
+                    "endpointVersion",
+                    "transport",
+                    "status",
+                    "connectorVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "observation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectorId": {
+                      "type": "string",
+                      "pattern": "^conn_[a-f0-9-]{36}$"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "endpointUrl": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                    },
+                    "endpointVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "streamable_http",
+                        "tunnel"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "inactive",
+                        "active"
+                      ]
+                    },
+                    "connectorVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "observation": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "era",
+                        "protocolVersion",
+                        "endpointVersion",
+                        "probedAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "era": {
+                          "type": "string",
+                          "enum": [
+                            "modern",
+                            "legacy"
+                          ]
+                        },
+                        "protocolVersion": {
+                          "type": "string"
+                        },
+                        "endpointVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "probedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A Connector with this display name already exists in the Organization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Register an inactive Connector without a dedicated credential.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      }
+    },
+    "/api/v1/org/connectors/{connectorId}": {
+      "get": {
+        "operationId": "ConnectorsController_get",
+        "parameters": [
+          {
+            "name": "connectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^conn_[a-f0-9-]{36}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connector registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectorId",
+                    "organizationId",
+                    "displayName",
+                    "endpointUrl",
+                    "endpointVersion",
+                    "transport",
+                    "status",
+                    "connectorVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "observation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectorId": {
+                      "type": "string",
+                      "pattern": "^conn_[a-f0-9-]{36}$"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "endpointUrl": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                    },
+                    "endpointVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "streamable_http",
+                        "tunnel"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "inactive",
+                        "active"
+                      ]
+                    },
+                    "connectorVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "observation": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "era",
+                        "protocolVersion",
+                        "endpointVersion",
+                        "probedAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "era": {
+                          "type": "string",
+                          "enum": [
+                            "modern",
+                            "legacy"
+                          ]
+                        },
+                        "protocolVersion": {
+                          "type": "string"
+                        },
+                        "endpointVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "probedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connector not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Get one Connector registration.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      },
+      "patch": {
+        "operationId": "ConnectorsController_update",
+        "parameters": [
+          {
+            "name": "connectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^conn_[a-f0-9-]{36}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expectedConnectorVersion"
+                ],
+                "minProperties": 2,
+                "additionalProperties": false,
+                "properties": {
+                  "expectedConnectorVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "endpointUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "pattern": "^https:\\/\\/(?![^/?#]*@)[^#]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated inactive Connector registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectorId",
+                    "organizationId",
+                    "displayName",
+                    "endpointUrl",
+                    "endpointVersion",
+                    "transport",
+                    "status",
+                    "connectorVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "observation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectorId": {
+                      "type": "string",
+                      "pattern": "^conn_[a-f0-9-]{36}$"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "endpointUrl": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                    },
+                    "endpointVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "streamable_http",
+                        "tunnel"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "inactive",
+                        "active"
+                      ]
+                    },
+                    "connectorVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "observation": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "era",
+                        "protocolVersion",
+                        "endpointVersion",
+                        "probedAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "era": {
+                          "type": "string",
+                          "enum": [
+                            "modern",
+                            "legacy"
+                          ]
+                        },
+                        "protocolVersion": {
+                          "type": "string"
+                        },
+                        "endpointVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "probedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connector not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connector name, active state, or version conflicts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Edit an inactive Connector registration.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      }
+    },
+    "/api/v1/org/connectors/{connectorId}/activate": {
+      "post": {
+        "operationId": "ConnectorsController_activate",
+        "parameters": [
+          {
+            "name": "connectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^conn_[a-f0-9-]{36}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expectedConnectorVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "expectedConnectorVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Activated Connector registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectorId",
+                    "organizationId",
+                    "displayName",
+                    "endpointUrl",
+                    "endpointVersion",
+                    "transport",
+                    "status",
+                    "connectorVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "observation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectorId": {
+                      "type": "string",
+                      "pattern": "^conn_[a-f0-9-]{36}$"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "endpointUrl": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                    },
+                    "endpointVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "streamable_http",
+                        "tunnel"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "inactive",
+                        "active"
+                      ]
+                    },
+                    "connectorVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "observation": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "era",
+                        "protocolVersion",
+                        "endpointVersion",
+                        "probedAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "era": {
+                          "type": "string",
+                          "enum": [
+                            "modern",
+                            "legacy"
+                          ]
+                        },
+                        "protocolVersion": {
+                          "type": "string"
+                        },
+                        "endpointVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "probedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connector not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connector state changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Discover the tool catalog and activate a Connector.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      }
+    },
+    "/api/v1/org/connectors/{connectorId}/deactivate": {
+      "post": {
+        "operationId": "ConnectorsController_deactivate",
+        "parameters": [
+          {
+            "name": "connectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^conn_[a-f0-9-]{36}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expectedConnectorVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "expectedConnectorVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Deactivated Connector registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connectorId",
+                    "organizationId",
+                    "displayName",
+                    "endpointUrl",
+                    "endpointVersion",
+                    "transport",
+                    "status",
+                    "connectorVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "observation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connectorId": {
+                      "type": "string",
+                      "pattern": "^conn_[a-f0-9-]{36}$"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "endpointUrl": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "description": "HTTPS endpoint for a streamable_http Connector; empty for a tunnel Connector, which the platform never dials."
+                    },
+                    "endpointVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "streamable_http",
+                        "tunnel"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "inactive",
+                        "active"
+                      ]
+                    },
+                    "connectorVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "observation": {
+                      "type": "object",
+                      "nullable": true,
+                      "required": [
+                        "era",
+                        "protocolVersion",
+                        "endpointVersion",
+                        "probedAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "era": {
+                          "type": "string",
+                          "enum": [
+                            "modern",
+                            "legacy"
+                          ]
+                        },
+                        "protocolVersion": {
+                          "type": "string"
+                        },
+                        "endpointVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "probedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Connector request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing credentials, or the Organization API Key was revoked or rotated before the change committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connector not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connector version changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Deactivate a Connector.",
+        "tags": [
+          "Connectors"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Changes are attributed to the authentic Organization API Key; User API Keys neither manage nor read Connectors."
+      }
+    },
+    "/api/v1/connectors/jwks": {
+      "get": {
+        "description": "Public deployment-scoped Ed25519 keys only. Pin this deployment’s JWKS origin and require alg EdDSA, iss tidb-link/connector-callback/v1, aud tidb-link/connector, the receiving organizationId and connectorId, and a current exp with exp - iat <= 60 seconds. Cache these public keys for local verification. Tokens may be reused within their scope and expiry; they grant no platform API, tunnel or business-account authority and do not sign Call Context.\n\nAuthorization: public; no credentials required. Verification keys grant no platform authority.",
+        "operationId": "ConnectorJwksController_jwks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "keys"
+                  ],
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kty",
+                          "crv",
+                          "x",
+                          "kid",
+                          "alg",
+                          "use"
+                        ],
+                        "properties": {
+                          "kty": {
+                            "type": "string",
+                            "enum": [
+                              "OKP"
+                            ]
+                          },
+                          "crv": {
+                            "type": "string",
+                            "enum": [
+                              "Ed25519"
+                            ]
+                          },
+                          "x": {
+                            "type": "string"
+                          },
+                          "kid": {
+                            "type": "string"
+                          },
+                          "alg": {
+                            "type": "string",
+                            "enum": [
+                              "EdDSA"
+                            ]
+                          },
+                          "use": {
+                            "type": "string",
+                            "enum": [
+                              "sig"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "provider_unavailable: callback signing material is unavailable; no unsigned or shared-secret fallback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get public verification keys for HTTP Connector callback JWTs.",
+        "tags": [
+          "ConnectorJwks"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent_instructions_too_large",
+                  "hardware_connection_unavailable",
+                  "websocket_required",
+                  "hardware_binding_unavailable",
+                  "hardware_registration_unavailable",
+                  "binding_commit_unknown",
+                  "hardware_credential_unavailable",
+                  "hardware_command_closed",
+                  "hardware_command_outcome_unknown",
+                  "binding_receipt_integrity",
+                  "validation_error",
+                  "template_test_busy",
+                  "template_test_closed",
+                  "template_test_expired",
+                  "template_test_dependency_unavailable",
+                  "template_test_model_unavailable",
+                  "template_test_authority_lost",
+                  "invalid_organization_context",
+                  "authentication_required",
+                  "organization_owner_required",
+                  "organization_last_owner",
+                  "organization_already_joined",
+                  "resource_not_found",
+                  "invalid_cursor",
+                  "console_temporarily_unavailable",
+                  "service_configuration_unavailable",
+                  "human_principal_required",
+                  "user_api_key_required",
+                  "organization_membership_required",
+                  "admin_required",
+                  "org_admin_required",
+                  "agent_not_found",
+                  "agent_template_creation_conflict",
+                  "agent_template_apply_busy",
+                  "agent_template_recall_acknowledgment_required",
+                  "requires_explicit_agent_creation",
+                  "agent_template_application_conflict",
+                  "agent_template_dependency_conflict",
+                  "agent_template_unavailable",
+                  "session_agent_required",
+                  "session_agent_unavailable",
+                  "session_model_not_allowed",
+                  "session_execution_dependency_unavailable",
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "sandbox_validation_pending",
+                  "sandbox_scope_incompatible",
+                  "sandbox_configuration_incompatible",
+                  "sandbox_unavailable",
+                  "vision_model_unsupported",
+                  "vision_image_count_exceeded",
+                  "vision_image_unsupported",
+                  "vision_image_source_too_large",
+                  "vision_image_invalid",
+                  "vision_image_decode_limit_exceeded",
+                  "vision_image_payload_too_large",
+                  "vision_image_processing_unavailable",
+                  "organization_default_agent_unconfigured",
+                  "user_default_agent_mapping_invalid",
+                  "session_not_found",
+                  "session_read_only",
+                  "session_switch_in_progress",
+                  "session_switch_busy",
+                  "session_switch_unsupported",
+                  "session_configuration_epoch_changed",
+                  "provider_unavailable",
+                  "realtime_connection_not_found",
+                  "realtime_connection_live",
+                  "realtime_model_conflict",
+                  "realtime_model_unavailable",
+                  "realtime_not_enabled",
+                  "realtime_language_unsupported",
+                  "realtime_language_unavailable",
+                  "realtime_connection_ended",
+                  "audio_format_unsupported",
+                  "admission_unavailable",
+                  "turn_not_found",
+                  "checkpoint_runtime_unavailable",
+                  "artifact_not_found",
+                  "chat_image_not_found",
+                  "artifact_cursor_invalid",
+                  "artifact_idempotency_conflict",
+                  "artifact_quota_exceeded",
+                  "artifact_not_writable",
+                  "artifact_revision_conflict",
+                  "artifact_source_not_found",
+                  "artifact_source_not_file",
+                  "artifact_source_changed",
+                  "artifact_storage_contract_unavailable",
+                  "artifact_publish_failed",
+                  "artifact_bytes_need_repair",
+                  "drive_file_not_found",
+                  "drive_path_too_long",
+                  "drive_download_rate_limited",
+                  "llm_spend_limit_exhausted",
+                  "drive_download_provider_error",
+                  "drive_download_unavailable",
+                  "invalid_idempotency_key",
+                  "idempotency_key_required",
+                  "session_creation_conflict",
+                  "agent_creation_conflict",
+                  "interaction_input_conflict",
+                  "interaction_not_found",
+                  "interaction_admission_closed",
+                  "interaction_target_conflict",
+                  "client_tool_call_unavailable",
+                  "client_tool_call_settled",
+                  "idempotency_key_reused",
+                  "identity_conversion_command_retired",
+                  "idempotency_in_progress",
+                  "idempotency_key_expired",
+                  "secret_delivery_expired",
+                  "idempotency_completion_failed",
+                  "idempotency_witness_invalid",
+                  "skill_name_conflict",
+                  "skill_delete_blocked",
+                  "invalid_skill_package",
+                  "skill_ingestion_not_found",
+                  "skill_import_job_not_found",
+                  "skill_import_state_conflict",
+                  "skill_ingestion_expired",
+                  "precondition_required",
+                  "precondition_failed",
+                  "resource_conflict",
+                  "hardware_model_conflict",
+                  "hardware_model_in_use",
+                  "agent_template_profile_unavailable",
+                  "agent_template_dependency_unavailable",
+                  "agent_template_archived",
+                  "agent_template_conflict",
+                  "agent_template_list_changed",
+                  "skill_not_found",
+                  "skill_version_not_found",
+                  "skill_file_not_found",
+                  "skill_package_file_rejected",
+                  "skill_package_store_unavailable",
+                  "skill_head_required",
+                  "skill_canonical_name_conflict",
+                  "skill_already_installed",
+                  "skill_installation_not_found",
+                  "skill_upgrade_not_forward",
+                  "unsupported_media_type",
+                  "raw_upload_too_large",
+                  "upload_too_large",
+                  "upload_ticket_invalid",
+                  "upload_failed",
+                  "upload_expired",
+                  "upload_incomplete",
+                  "upload_integrity_failed",
+                  "upload_requires_multipart",
+                  "upload_temporarily_unavailable",
+                  "skill_authoring_forbidden",
+                  "skill_read_forbidden",
+                  "restore_requires_historical_version",
+                  "private_skill_required",
+                  "publication_head_required",
+                  "open_publication_request_exists",
+                  "publication_target_changed",
+                  "publication_conflict",
+                  "publication_request_not_found",
+                  "publication_request_already_decided",
+                  "publication_request_invalidated",
+                  "publication_request_conflict",
+                  "publication_snapshot_not_found",
+                  "scheduler_not_found",
+                  "asr_disabled",
+                  "asr_failed",
+                  "turn_admission_closed",
+                  "session_has_active_turn",
+                  "clarification_source_conflict",
+                  "configuration_unavailable",
+                  "organization_api_key_rotation_conflict",
+                  "auth_kind_forbidden",
+                  "billing_target_not_found",
+                  "invalid_billing_usage_query",
+                  "invalid_billing_usage_cursor",
+                  "billing_audit_unavailable",
+                  "session_observation_audit_unavailable",
+                  "drive9_provision_config_conflict",
+                  "runtime_error",
+                  "invalid_credentials",
+                  "invalid_current_password",
+                  "account_already_exists",
+                  "account_not_found",
+                  "password_already_configured",
+                  "google_identity_already_linked",
+                  "verification_not_found",
+                  "verification_code_invalid",
+                  "verification_replaced",
+                  "verification_already_completed",
+                  "verification_expired",
+                  "verification_attempts_exhausted",
+                  "verification_rate_limited",
+                  "login_rate_limited",
+                  "password_rate_limited",
+                  "auth_temporarily_unavailable",
+                  "auth_outcome_unknown",
+                  "password_changed",
+                  "invalid_origin",
+                  "platform_operator_required",
+                  "personal_organization_eligibility_concurrent_change",
+                  "personal_organization_eligibility_unavailable",
+                  "personal_organization_eligibility_outcome_unknown",
+                  "personal_organization_creation_unavailable",
+                  "onboarding_temporarily_unavailable",
+                  "onboarding_outcome_unknown",
+                  "organization_destination_not_available",
+                  "invitation_not_available",
+                  "invitation_not_actionable",
+                  "invite_delivery_failed",
+                  "access_request_not_available",
+                  "access_requests_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "OrganizationApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
+      }
+    }
+  }
+}

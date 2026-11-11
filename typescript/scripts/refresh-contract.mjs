@@ -92,6 +92,15 @@ const snapshots = {
       "/api/v1/org/skills/uploads/{uploadId}/publish",
     ],
   },
+  "connectors.json": {
+    paths: [
+      "/api/v1/org/connectors",
+      "/api/v1/org/connectors/{connectorId}",
+      "/api/v1/org/connectors/{connectorId}/activate",
+      "/api/v1/org/connectors/{connectorId}/deactivate",
+      "/api/v1/connectors/jwks",
+    ],
+  },
   "audio.json": {
     paths: [`${session}/turns/audio`],
     schemas: ["TurnStreamEvent"],

@@ -9,6 +9,7 @@ import {
 import { EndUserClient, type AgentRecord } from "./user.js";
 import { Templates } from "./templates.js";
 import { Skills } from "./skills.js";
+import { Connectors } from "./connectors.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
@@ -68,6 +69,7 @@ export class OrganizationClient {
   readonly #http: HttpClient;
   readonly #templates: Templates;
   readonly #skills: Skills;
+  readonly #connectors: Connectors;
 
   /** Organization Agent Templates. */
   get templates(): Templates {
@@ -77,6 +79,11 @@ export class OrganizationClient {
   /** Organization Skills that Templates reference. */
   get skills(): Skills {
     return this.#skills;
+  }
+
+  /** Organization Connectors: MCP tool servers that Agents call. */
+  get connectors(): Connectors {
+    return this.#connectors;
   }
 
   constructor(options: OrganizationClientOptions) {
@@ -93,6 +100,7 @@ export class OrganizationClient {
     this.#http = new HttpClient(options);
     this.#templates = new Templates(this.#http);
     this.#skills = new Skills(this.#http);
+    this.#connectors = new Connectors(this.#http);
   }
 
   /** Select the End User who owns the resources; the Organization API Key remains the caller. */

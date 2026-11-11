@@ -50,6 +50,30 @@ export type {
   PublishSkillOptions,
   WaitForSkillUploadOptions,
 } from "./skills.js";
+export { Connectors } from "./connectors.js";
+export type {
+  Connector,
+  ConnectorTransport,
+  RegisterConnectorInput,
+  UpdateConnectorInput,
+  ConnectorVersionOptions,
+} from "./connectors.js";
+export {
+  ConnectorKeySet,
+  ConnectorAuthError,
+  verifyConnectorCallback,
+  readConnectorCallContext,
+  CONNECTOR_CALLBACK_ISSUER,
+  CONNECTOR_CALLBACK_AUDIENCE,
+  CONNECTOR_CALL_CONTEXT_KEY,
+} from "./connector-callback.js";
+export type {
+  ConnectorVerificationKey,
+  ConnectorCallbackClaims,
+  ConnectorCallContext,
+  ConnectorKeySetOptions,
+  VerifyConnectorCallbackOptions,
+} from "./connector-callback.js";
 export { Agent, EndUserClient } from "./user.js";
 export type {
   AgentRecord,

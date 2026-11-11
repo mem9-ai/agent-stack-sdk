@@ -24,7 +24,8 @@
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/answer-client-tool.mjs": "./examples/answer-client-tool.mjs",
     "./examples/submit-audio.mjs": "./examples/submit-audio.mjs",
-    "./examples/device-voice-session.mjs": "./examples/device-voice-session.mjs"
+    "./examples/device-voice-session.mjs": "./examples/device-voice-session.mjs",
+    "./examples/http-connector.mjs": "./examples/http-connector.mjs"
   },
   "files": [
     "dist",
@@ -38,7 +39,8 @@
     "examples/upload-file.mjs",
     "examples/answer-client-tool.mjs",
     "examples/submit-audio.mjs",
-    "examples/device-voice-session.mjs"
+    "examples/device-voice-session.mjs",
+    "examples/http-connector.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

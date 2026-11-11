@@ -5,6 +5,7 @@
   "snapshots": {
     "openapi.json": "0c1ce73addca4c80438b7cd27aa2ae2df67a95593fe1ab44ae67d10f62c3cac8",
     "files.json": "f413ccc003faf5d72ea6ada07f5be8b6288f6003e23e39095f4986bc34ed49e5",
+    "management.json": "6d939d32233d531a752a0ce3c4160f864428d96866cb70a4f47edd26f22fea74",
     "audio.json": "b1c6c31e5a15f7bba431e114dd780932f5ecd14acab4ce38797c0152cb7110d6"
   }
 }

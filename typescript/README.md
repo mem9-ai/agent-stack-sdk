@@ -7,7 +7,7 @@ stay on your backend; do not ship it to browsers or devices.
 ## Supported scope
 
 This package supports Organization information, End User provisioning,
-Template/model discovery, personal Agent and Session management,
+Template and Skill management, Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
@@ -15,7 +15,7 @@ Realtime Model/Connection preparation, prerecorded audio and User usage reads fo
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Browser, MSP, management and device APIs are
+default Agents and general Agent overrides are removed. Browser, MSP, Console and device APIs are
 outside this package. Every resource workflow uses an Organization API Key with
 an explicitly selected End User; User API Keys are not supported.
 
@@ -115,6 +115,60 @@ const organization = new OrganizationClient({
   fetch: (url, init) => fetch(url, { ...init, dispatcher: proxyAgent }),
 });
 ```
+
+## Managing Templates and Skills
+
+A Template defines an Agent: its identity, instructions, Sandbox, voice language
+and Skills. `organization.templates` manages the Organization's Templates, and
+`organization.skills` uploads and publishes the Skills they reference. Both act
+on the Organization; they need no End User.
+
+```js
+const catalog = await organization.templates.catalog();
+const created = await organization.templates.create({
+  displayName: "Support assistant",
+  content: {
+    identity: { agentName: "Ava" },
+    instructions: "Answer support questions briefly.",
+    sandbox: { profileId: catalog.sandboxes[0].id },
+    realtime: { language: "en-US" },
+  },
+  idempotencyKey: templateCreationKey,
+});
+// Replace and archive take the ETag you read; a stale one is a ConflictError.
+await organization.templates.replace(created.template.id, { displayName, content }, {
+  ifMatch: created.template.etag,
+  idempotencyKey: templateChangeKey,
+});
+```
+
+`templates.catalog()` lists the models, Sandbox profiles and published Skills a
+Template may reference. `templates.list()` filters by `lifecycleStatus` and `q`
+and pages with `cursor`. Replacing a Template does not change Sessions already
+created from it; they keep the content snapshot identified by
+`session.data.template.contentDigest`. An archived Template can no longer start
+Sessions. Creation, replacement and archive are retried automatically with their
+idempotency key; after an `OutcomeUnknownError`, repeat the call with the same key
+and input.
+
+A Skill is a ZIP package with a `SKILL.md` at its root. Uploading validates it
+asynchronously; publishing makes it the Skill's next version:
+
+```js
+const upload = await organization.skills.upload({ bytes: zipBytes, idempotencyKey });
+const validated = await organization.skills.waitForUpload(upload.uploadId);
+if (validated.state !== "awaiting_confirmation")
+  throw new Error(validated.validation.failureCode ?? validated.state);
+await organization.skills.publish(upload.uploadId, { idempotencyKey: publishKey });
+const published = await organization.skills.waitForUpload(upload.uploadId, { until: ["done", "failed"] });
+// Reference it from a Template: content.skills = [{ skillId, version }]
+const reference = { skillId: published.skillId, version: published.version };
+```
+
+Each upload creates a new Skill, and an upload is visible only to the Organization
+API Key that created it. Publish before `expiresAt`, or cancel an unpublished
+upload with `cancelUpload`. `skills.list()` and `skills.get(skillId)` read
+published Skills and their versions.
 
 ## Templates, Agents and Sessions
 

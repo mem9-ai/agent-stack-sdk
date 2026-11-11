@@ -58,7 +58,7 @@ tag and GitHub Release.
 
 The package belongs to the `@tidblink` npm organization. The workflow
 authenticates with npm trusted publishing: the package's npm settings name the
-GitHub repository `mem9-ai/agent-stack-sdk` and the workflow file
+GitHub repository `mem9-ai/tidblink-sdk` and the workflow file
 `release-typescript.yml`. No long-lived token is needed once this is configured.
 
 npm configures a trusted publisher on an existing package, so the first

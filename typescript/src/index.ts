@@ -13,6 +13,7 @@ export {
   InputNotAppliedError,
   OutcomeUnknownError,
   ObservationStoppedError,
+  StreamIdleError,
   TurnFailedError,
   TurnInterruptedError,
 } from "./errors.js";
@@ -131,11 +132,31 @@ export type {
   FileContent,
 } from "./files.js";
 export type {
-  SessionEvent,
   SessionEventsOptions,
   ObserveTurnOptions,
   TurnObservation,
 } from "./progress.js";
+export { parseSessionEvent, asKnownSessionEvent } from "./events.js";
+export type {
+  SessionEvent,
+  KnownSessionEvent,
+  TurnEventData,
+  TurnStartedEvent,
+  TurnDraftEvent,
+  TurnProgressEvent,
+  TurnItemAddedEvent,
+  OperationStepPayload,
+  TurnRequiresActionEvent,
+  ClientToolCallPayload,
+  TurnCompletedEvent,
+  TurnCancelledEvent,
+  TurnFailedEvent,
+  RealtimeTranscriptEvent,
+  RealtimeResponseEvent,
+  TemplateSwitchEvent,
+  TemplateSwitchEventData,
+} from "./events.js";
+export type { SubscribeOptions, SubscriptionItem } from "./subscription.js";
 
 export type {
   BillingUsageFactKind,

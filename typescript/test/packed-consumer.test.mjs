@@ -32,6 +32,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/send-message.mjs"));
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
+  assert(files.includes("examples/device-voice-session.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
@@ -47,6 +48,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
+        file === "examples/device-voice-session.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/submit-audio.mjs" ||
@@ -105,6 +107,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
       ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
       Template, TemplateContent, TemplateCatalog, TemplatePage, SkillUpload, SkillDetail,
+      KnownSessionEvent,
     } from "@tidblink/server";
     import {
       TIDB_LINK_API_VERSION,
@@ -118,6 +121,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TiDBLinkApiError,
       TiDBLinkError,
       OrganizationClient,
+      asKnownSessionEvent,
+      parseSessionEvent,
+      StreamIdleError,
     } from "@tidblink/server";
     // @ts-expect-error Previous compatibility constants and error exports have no aliases.
     import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@tidblink/server";
@@ -162,6 +168,18 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const detail: SkillDetail = await organization.skills.get(done.skillId);
       void page; void detail;
       return organization.templates.archive(created.template.id, { ifMatch: created.template.etag, idempotencyKey: "archive-1" });
+    }
+    async function subscriptionWorkflow(session: Session, signal: AbortSignal) {
+      for await (const item of session.subscribe({ cursor: "saved", signal, idleTimeoutMs: 30_000 })) {
+        if (item.type === "client_tool_call") { const deadline: string = item.call.deadlineAt; void deadline; }
+        if (item.type === "event") {
+          const known: KnownSessionEvent | undefined = asKnownSessionEvent(item.event);
+          if (known?.type === "agent.session.turn.requires_action") { const callId: string = known.data.payload.calls[0]!.callId; void callId; }
+          if (known?.type === "agent.session.realtime.input_transcript.completed") { const text: string = known.data.text; void text; }
+        }
+      }
+      const parsed: SessionEvent = parseSessionEvent({ id: "c", data: "{}" });
+      void parsed;
     }
     async function clientToolsWorkflow(session: Session, agent: Agent) {
       const tool: ClientToolDeclaration = {type:"function",name:"lookup_order",description:"Read an order",parameters:{type:"object",properties:{orderId:{type:"string"}}}};

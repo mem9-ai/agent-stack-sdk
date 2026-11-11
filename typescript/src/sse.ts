@@ -1,6 +1,10 @@
-/** Decode data frames only. A frame is complete only at its blank line. */
+/**
+ * Decode data frames only. A frame is complete only at its blank line.
+ * `onBytes` runs for every chunk read, including comment-only keep-alives.
+ */
 export async function* decodeSse(
   body: ReadableStream<Uint8Array>,
+  onBytes?: () => void,
 ): AsyncGenerator<{
   id: string;
   event: string;
@@ -15,6 +19,7 @@ export async function* decodeSse(
   try {
     while (true) {
       const chunk = await reader.read();
+      if (!chunk.done) onBytes?.();
       buffer += decoder.decode(chunk.value, { stream: !chunk.done });
       let end: number;
       while ((end = buffer.search(/[\r\n]/)) !== -1) {

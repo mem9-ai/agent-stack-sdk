@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Add `session.subscribe()`: follows the event stream until aborted, reconnects
+  from the last cursor, and delivers each pending Client Tool call once per
+  subscription, skipping replayed calls that are answered or expired.
+- `events()` and `observe()` end with the new `StreamIdleError` when the stream
+  is silent for `idleTimeoutMs` (default 45 seconds, `0` disables). A connection
+  that drops mid-stream now ends `events()` with a `ConnectionError` instead of
+  the runtime's error.
+- Add typed Session events (`KnownSessionEvent` and one type per event),
+  `asKnownSessionEvent` and the standalone `parseSessionEvent`. Unknown events
+  are still delivered unchanged.
+- Add the `device-voice-session.mjs` example.
 - Add `organization.templates` to create, read, list, replace and archive
   Organization Templates, and to read the reference catalog of models, Sandbox
   profiles and Skills they may use.

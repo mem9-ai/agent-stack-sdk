@@ -421,6 +421,59 @@ receipt before reporting a result. A missing/expired cursor is the service's
 `validation_error` refusal; it does not silently start replay from the beginning.
 A resumed draft is a complete snapshot, usable without earlier frames.
 
+Both `events()` and `observe()` detect a dead connection: when no bytes arrive,
+not even the service's keep-alive (sent every 15 seconds), for `idleTimeoutMs`
+(default 45 000; `0` disables it), the stream ends with a `StreamIdleError`
+carrying the last `cursor`. Time your code spends between events does not count.
+
+### Following a Session
+
+`session.subscribe()` is the long-running form of `events()`, for a backend that
+stays attached to a Session, for example the one serving a voice device. It
+reconnects from the last cursor after network failures, server errors, silent
+connections and normal stream ends, reporting each as a `disconnected` item, and
+stops with the error when the service refuses the subscription (a revoked Key, a
+deleted Session, a refused cursor). Abort its `signal` to stop.
+
+```ts
+for await (const item of session.subscribe({ cursor: savedCursor, signal })) {
+  if (item.type === "event") {
+    forward(item.event);
+    await saveCursor(item.event.cursor); // Resume here after a restart.
+  } else if (item.type === "client_tool_call") {
+    const { call } = item;
+    await session.submitClientToolOutput({
+      clientEventId: `tool.${call.callId}`,
+      turnId: call.turnId,
+      callId: call.callId,
+      output: await runTool(call.name, call.arguments),
+    });
+  }
+}
+```
+
+Client Tool calls come from the service's pending list, read on every
+(re)connect and whenever a call event arrives. Each call is delivered once per
+subscription, and calls replayed from history that are already answered or past
+their deadline are not delivered. Two subscriptions on one Session each receive
+every call; answer it from one of them. Without a cursor the service replays the
+Session from its first event, so persist the cursor of each event you finish
+handling.
+
+`asKnownSessionEvent(event)` narrows an event to the types the SDK knows: Turn
+lifecycle, drafts, progress, saved messages and Operation steps, Client Tool
+calls, Realtime transcripts and responses, and Template switches. It returns
+`undefined` for anything else, which the stream still delivers unchanged.
+`parseSessionEvent({ id, data })` parses one raw Server-Sent Events frame, for a
+platform that receives or forwards the stream itself.
+
+The packaged `device-voice-session.mjs` example is the backend of a voice device:
+`connectDevice` prepares the Realtime connection and returns the WebSocket URL and
+short-lived connect token for the device, and `serveDeviceTools` subscribes to the
+Session and answers each Client Tool call through your device channel. Tool calls
+are verified on text-initiated Turns; voice-initiated Turns do not use Session
+Client Tools yet.
+
 The packaged `observe-message.mjs` example observes an existing input and never
 submits it again. Run it with `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID` and
 `INPUT_ID`; supply `EVENT_CURSOR` to resume:

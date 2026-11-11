@@ -1,6 +1,8 @@
 import { getInteraction } from "./history.js";
 import { waitForResult, validateWaitOptions, type TurnResult } from "./turn.js";
 import {
+  ConnectionError,
+  StreamIdleError,
   TiDBLinkError,
   TiDBLinkApiError,
   TurnFailedError,
@@ -11,20 +13,22 @@ import {
 import { HttpClient, requireKnownKeys, requireCreationKey } from "./http.js";
 import type { RequestOptions } from "./organization.js";
 import { decodeSse } from "./sse.js";
+import { parseSessionEvent, type SessionEvent } from "./events.js";
+
+export type { SessionEvent } from "./events.js";
+
+/** Three keep-alive intervals of the service (15 seconds each). */
+export const DEFAULT_IDLE_TIMEOUT_MS = 45_000;
 
 export interface SessionEventsOptions extends RequestOptions {
   /** Opaque position from a previously received event. No automatic replay on refusal. */
   cursor?: string;
-}
-
-/** Display events remain provisional; use the original interaction to establish its result. */
-export interface SessionEvent {
-  cursor: string;
-  type: string;
-  sessionId: string;
-  turnId: string | null;
-  createdAt: string;
-  data: Record<string, unknown>;
+  /**
+   * End the stream with a StreamIdleError when no bytes, not even a
+   * keep-alive, arrive for this long. Time spent in your own code between
+   * events does not count. Default 45 seconds; 0 disables the check.
+   */
+  idleTimeoutMs?: number;
 }
 
 export async function* sessionEvents(
@@ -34,7 +38,7 @@ export async function* sessionEvents(
 ): AsyncGenerator<SessionEvent> {
   requireKnownKeys(
     options,
-    ["cursor", "signal", "requestId"],
+    ["cursor", "signal", "requestId", "idleTimeoutMs"],
     "Event subscription options",
   );
   if (
@@ -42,57 +46,89 @@ export async function* sessionEvents(
     (typeof options.cursor !== "string" || !options.cursor)
   )
     throw new TypeError("cursor must be a non-empty opaque event position");
+  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+  if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 0)
+    throw new TypeError("idleTimeoutMs must be a non-negative integer");
   const query = new URLSearchParams({ stream: "true" });
   if (options.cursor !== undefined) query.set("cursor", options.cursor);
-  const { response, requestId } = await http.rawResponse(
-    `/sessions/${encodeURIComponent(sessionId)}/events?${query}`,
-    {
-      headers: { accept: "text/event-stream" },
-      ...(options.signal ? { signal: options.signal } : {}),
-      ...(options.requestId ? { requestId: options.requestId } : {}),
-    },
-  );
-  if (
-    response.headers
-      .get("content-type")
-      ?.split(";", 1)[0]
-      ?.trim()
-      .toLowerCase() !== "text/event-stream" ||
-    !response.body
-  ) {
-    await response.body?.cancel();
-    throw new TiDBLinkError("Session subscription returned no event stream", {
-      requestId,
-    });
-  }
-  for await (const frame of decodeSse(response.body)) {
-    let value: unknown;
+
+  const idle = new AbortController();
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, idle.signal])
+    : idle.signal;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pause = () => clearTimeout(timer);
+  const arm = () => {
+    pause();
+    if (idleTimeoutMs > 0) timer = setTimeout(() => idle.abort(), idleTimeoutMs);
+  };
+  let cursor = options.cursor;
+  let requestId = options.requestId;
+  const silent = (cause: unknown) =>
+    idle.signal.aborted && !options.signal?.aborted
+      ? new StreamIdleError({
+          idleTimeoutMs,
+          ...(cursor ? { cursor } : {}),
+          ...(requestId ? { requestId } : {}),
+        })
+      : cause;
+
+  let frames: AsyncGenerator<{ id: string; data: string }> | undefined;
+  arm();
+  try {
+    let response: Response;
     try {
-      value = JSON.parse(frame.data);
+      ({ response, requestId } = await http.rawResponse(
+        `/sessions/${encodeURIComponent(sessionId)}/events?${query}`,
+        {
+          headers: { accept: "text/event-stream" },
+          signal,
+          ...(options.requestId ? { requestId: options.requestId } : {}),
+        },
+      ));
     } catch (cause) {
-      throw new TiDBLinkError(
-        "Session subscription returned invalid event JSON",
-        { requestId, cause },
-      );
+      throw silent(cause);
     }
-    const event = value as Partial<SessionEvent> | null;
     if (
-      !frame.id ||
-      !event ||
-      typeof event.type !== "string" ||
-      !event.type ||
-      event.sessionId !== sessionId ||
-      (event.turnId !== null && typeof event.turnId !== "string") ||
-      typeof event.createdAt !== "string" ||
-      typeof event.data !== "object" ||
-      event.data === null ||
-      Array.isArray(event.data)
-    )
-      throw new TiDBLinkError(
-        "Session subscription returned an invalid event envelope",
-        { requestId },
-      );
-    yield { ...event, cursor: frame.id } as SessionEvent;
+      response.headers
+        .get("content-type")
+        ?.split(";", 1)[0]
+        ?.trim()
+        .toLowerCase() !== "text/event-stream" ||
+      !response.body
+    ) {
+      await response.body?.cancel();
+      throw new TiDBLinkError("Session subscription returned no event stream", {
+        requestId,
+      });
+    }
+    frames = decodeSse(response.body, arm);
+    while (true) {
+      let next: IteratorResult<{ id: string; data: string }>;
+      try {
+        next = await frames.next();
+      } catch (cause) {
+        if (signal.aborted) throw silent(cause);
+        throw new ConnectionError("Session event stream was interrupted", {
+          ...(requestId ? { requestId } : {}),
+          cause,
+        });
+      }
+      if (next.done) return;
+      const event = parseSessionEvent(next.value, {
+        sessionId,
+        ...(requestId ? { requestId } : {}),
+      });
+      cursor = event.cursor;
+      // Time spent by the consumer is not silence on the connection.
+      pause();
+      yield event;
+      arm();
+    }
+  } finally {
+    pause();
+    // Release the connection when the consumer stops early.
+    await frames?.return(undefined);
   }
 }
 
@@ -114,7 +150,7 @@ export async function* observeTurn(
 ): AsyncGenerator<TurnObservation> {
   requireKnownKeys(
     options,
-    ["cursor", "signal", "requestId", "timeoutMs"],
+    ["cursor", "signal", "requestId", "timeoutMs", "idleTimeoutMs"],
     "Turn observation options",
   );
   requireCreationKey(inputId);
@@ -156,6 +192,9 @@ export async function* observeTurn(
     for await (const event of sessionEvents(http, sessionId, {
       ...request,
       ...(cursor ? { cursor } : {}),
+      ...(options.idleTimeoutMs === undefined
+        ? {}
+        : { idleTimeoutMs: options.idleTimeoutMs }),
     })) {
       cursor = event.cursor;
       if (event.turnId !== turnId) continue;

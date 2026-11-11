@@ -10,6 +10,7 @@ import { EndUserClient, type AgentRecord } from "./user.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
+  type FetchFunction,
   isOrganizationApiKey,
   requireKnownKeys,
   requestOptions,
@@ -18,6 +19,12 @@ import {
 export interface OrganizationClientOptions {
   baseUrl: string;
   apiKey: string;
+  /**
+   * Replaces the global `fetch` for every request the client makes, including
+   * event streams and file transfers. Use it for proxies, custom agents,
+   * instrumentation or tests. Defaults to `globalThis.fetch`.
+   */
+  fetch?: FetchFunction;
 }
 
 export interface Organization {
@@ -61,7 +68,7 @@ export class OrganizationClient {
   constructor(options: OrganizationClientOptions) {
     requireKnownKeys(
       options,
-      ["baseUrl", "apiKey"],
+      ["baseUrl", "apiKey", "fetch"],
       "OrganizationClient options",
     );
     if (!isOrganizationApiKey(options.apiKey)) {

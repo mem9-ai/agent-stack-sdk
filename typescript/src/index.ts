@@ -34,7 +34,7 @@ export type {
   UpdateAgentInput,
   SessionPage,
 } from "./user.js";
-export type { ListOptions } from "./http.js";
+export type { ListOptions, FetchFunction } from "./http.js";
 export { Session } from "./session.js";
 export type {
   BillingTag,

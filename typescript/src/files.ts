@@ -396,7 +396,7 @@ export class UserFiles {
     init.signal?.throwIfAborted();
     let response: Response;
     try {
-      response = await fetch(destination, { ...init, redirect: "error" });
+      response = await this.#http.fetch(destination, { ...init, redirect: "error" });
     } catch {
       throw new OutcomeUnknownError(
         "File transfer outcome is unknown; inspect the original upload",
@@ -622,7 +622,7 @@ export class UserFiles {
     options?.signal?.throwIfAborted();
     let response: Response;
     try {
-      response = await fetch(destination, {
+      response = await this.#http.fetch(destination, {
         redirect: "manual",
         ...(options?.signal ? { signal: options.signal } : {}),
       });
@@ -636,7 +636,7 @@ export class UserFiles {
         destination = transferUrl(new URL(location, destination));
         if (destination.protocol !== "https:")
           throw new TiDBLinkError("File download redirect requires HTTPS");
-        response = await fetch(destination, {
+        response = await this.#http.fetch(destination, {
           redirect: "error",
           ...(options?.signal ? { signal: options.signal } : {}),
         });

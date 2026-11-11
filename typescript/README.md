@@ -101,6 +101,21 @@ new work. Another valid Key remains usable. Disabled Users cannot start new work
 Organization authority can still read retained history/files and perform supported
 cleanup. Application policies and K3 spending policy are separate concerns.
 
+### Custom transport
+
+Pass `fetch` to route every request through your own transport, for example a
+proxy, a custom HTTP agent, instrumentation or a test double. It carries all
+requests the client makes: JSON calls, event streams, and file transfers to
+presigned storage URLs (which never receive the API Key).
+
+```js
+const organization = new OrganizationClient({
+  baseUrl,
+  apiKey: organizationApiKey,
+  fetch: (url, init) => fetch(url, { ...init, dispatcher: proxyAgent }),
+});
+```
+
 ## Templates, Agents and Sessions
 
 Use `organization.user(userId)` to discover available Templates and deployment models. Model

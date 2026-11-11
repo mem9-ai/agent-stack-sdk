@@ -148,6 +148,7 @@ it("an independent installed SDK consumer uses Organization authority against th
     });
     let paused: ReturnType<typeof harness.model.enqueueText> | undefined;
     let title: ReturnType<typeof harness.model.enqueueText> | undefined;
+    let connectorTitle: ReturnType<typeof harness.model.enqueueText> | undefined;
     const consumer = child;
     child.on("message", (message: { stage: string; userId?: string }) => {
       void (async () => {
@@ -214,7 +215,15 @@ it("an independent installed SDK consumer uses Organization authority against th
             chunks: ["Connector order shipped."],
             expectRequest: { bodyIncludes: ["SDK_CONNECTOR_RESULT"] },
           });
+          // The new Session's first Turn also requests a background title.
+          connectorTitle = harness.model.enqueueText({
+            chunks: ["SDK Connector journey"],
+            expectRequest: {
+              bodyIncludes: ["Generate exactly one concise session title."],
+            },
+          });
         } else if (message.stage === "audio") {
+          await connectorTitle?.waitUntilRequested();
           harness.model.enqueueText({ chunks: ["SDK audio answer."] });
         } else if (message.stage === "pause") {
           paused = harness.model.enqueueText({

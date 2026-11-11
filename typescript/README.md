@@ -992,7 +992,8 @@ separate process installs the tarball in a clean directory and calls only the
 installed SDK and packaged Organization example for its application workflow.
 It verifies Organization provisioning, discovery, Agent/Session
 creation replay, owner isolation, file upload/download and message attachment,
-text results, SSE/history, Client Tools, audio,
+text results, SSE/history, Client Tools, Connector registration and an Agent call
+to the example HTTP Connector, audio,
 Realtime HTTP grants, rotation/revocation and fresh-authority recovery. Management credential changes
 and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
 redemption, live speech suppliers, physical hardware and deployment compatibility

@@ -341,6 +341,6 @@ await stage("revoke");
 await assert.rejects(fresh.listAgents(), unauthorized);
 assert.equal((await other.getSession(session.id)).id, session.id);
 console.log(
-  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, audio, Realtime HTTP, and rotation/revocation recovery.",
+  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, an HTTP Connector call, audio, Realtime HTTP, and rotation/revocation recovery.",
 );
 process.disconnect();

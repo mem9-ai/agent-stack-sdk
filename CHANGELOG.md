@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `OrganizationClient` accepts a `fetch` option. Every request the client
+  makes goes through it, including event streams and file transfers; the
+  default is the global `fetch`. `FetchFunction` is exported.
 - Pin the supported contract to service
   `1c7f98ee12c28e3d1adb656b90324c0b95135e42` and OpenAPI SHA-256
   `c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6`.

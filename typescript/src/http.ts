@@ -193,15 +193,37 @@ export const isOrganizationApiKey = (value: unknown): value is string =>
  * scope is the Organization API; `forUser` narrows it to one End User's
  * resources. Request paths are relative to the scope.
  */
+export type FetchFunction = (
+  input: string | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
 export class HttpClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
   readonly #scope: string;
+  readonly #fetch: FetchFunction;
 
-  constructor(input: { baseUrl: string; apiKey: string; scope?: string }) {
+  constructor(input: {
+    baseUrl: string;
+    apiKey: string;
+    scope?: string;
+    fetch?: FetchFunction | undefined;
+  }) {
+    if (input.fetch !== undefined && typeof input.fetch !== "function")
+      throw new TypeError("fetch must be a function");
     this.#baseUrl = normalizeBaseUrl(input.baseUrl);
     this.#apiKey = input.apiKey;
     this.#scope = input.scope ?? "/api/v1/org";
+    this.#fetch = input.fetch ?? ((url, init) => fetch(url, init));
+  }
+
+  /**
+   * The transport every request uses, including event streams and file
+   * transfers to presigned URLs. Those transfers carry no API Key.
+   */
+  get fetch(): FetchFunction {
+    return this.#fetch;
   }
 
   forUser(userId: string): HttpClient {
@@ -213,6 +235,7 @@ export class HttpClient {
       baseUrl: this.#baseUrl,
       apiKey: this.#apiKey,
       scope: `${this.#scope}/users/${encodeURIComponent(userId)}`,
+      fetch: this.#fetch,
     });
   }
 
@@ -347,7 +370,7 @@ export class HttpClient {
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
       try {
-        response = await fetch(`${this.#baseUrl}${this.#scope}${path}`, {
+        response = await this.#fetch(`${this.#baseUrl}${this.#scope}${path}`, {
           method: options.method ?? "GET",
           redirect: "error",
           headers: {

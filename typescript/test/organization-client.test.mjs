@@ -207,7 +207,36 @@ test("native End Users can be created, listed and retrieved with their external 
   assert.deepEqual(await client.getEndUser(created.userId), user);
 });
 
-test("a lost User creation response is not replayed", async () => {
+test("End User creation with an externalId is retried with the same request identity", async () => {
+  const requests = [];
+  const user = {
+    userId: "user_1",
+    organizationId: "org_1",
+    displayName: null,
+    externalId: "customer-1",
+    status: "active",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+  const baseUrl = await serve((request, response) => {
+    requests.push(request.headers["x-request-id"]);
+    if (requests.length === 1) return request.socket.destroy();
+    response
+      .writeHead(200, { "content-type": "application/json" })
+      .end(JSON.stringify({ user }));
+  });
+  const client = new OrganizationClient({
+    baseUrl,
+    apiKey: organizationApiKey,
+  });
+  assert.deepEqual(
+    await client.createEndUser({ externalId: "customer-1" }, { requestId: "create_1" }),
+    user,
+  );
+  assert.deepEqual(requests, ["create_1", "create_1"]);
+});
+
+test("a lost End User creation response without an externalId is not replayed", async () => {
   let requests = 0;
   const baseUrl = await serve((request) => {
     requests++;
@@ -218,8 +247,13 @@ test("a lost User creation response is not replayed", async () => {
     apiKey: organizationApiKey,
   });
   await assert.rejects(
-    client.createEndUser({ externalId: "customer-1" }, { requestId: "create_1" }),
+    client.createEndUser({ displayName: "Customer" }, { requestId: "create_1" }),
     OutcomeUnknownError,
+  );
+  assert.equal(requests, 1);
+  await assert.rejects(
+    client.createEndUser({ displayName: "Customer", unexpected: true }),
+    TypeError,
   );
   assert.equal(requests, 1);
   await assert.rejects(client.listEndUsers(), (error) => {

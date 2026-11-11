@@ -1,1369 +1,7 @@
 {
-  "revision": "882287809f91d9a3fdf60537460431d9f0fc23e7",
-  "sourceOpenApiSha256": "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
+  "revision": "1c7f98ee12c28e3d1adb656b90324c0b95135e42",
+  "sourceOpenApiSha256": "c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6",
   "paths": {
-    "/api/v1/files": {
-      "get": {
-        "description": "Sorted by createdAt descending then fileId descending. Only User uploads are exposed. Cursors bind the owner and history choice.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserFilesController_listFiles",
-        "parameters": [
-          {
-            "name": "history",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "false",
-              "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ]
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "exclusiveMaximum": false,
-              "exclusiveMinimum": false,
-              "default": 50,
-              "type": "integer"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minLength": 1,
-              "maxLength": 2048,
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FilesPageDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "List private uploaded Files",
-        "tags": [
-          "UserFiles"
-        ]
-      }
-    },
-    "/api/v1/files/{fileId}": {
-      "get": {
-        "description": "Independent of listing; the File ID identifies one private uploaded file. Published Artifact Files are unavailable.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserFilesController_fileDetails",
-        "parameters": [
-          {
-            "name": "fileId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Get a File by its immutable identity",
-        "tags": [
-          "UserFiles"
-        ]
-      }
-    },
-    "/api/v1/files/{fileId}/content": {
-      "get": {
-        "description": "Files up to the existing 50 MiB bounded-download limit return bytes with a valid, non-reserved stored media type; invalid or parameterized values and the reserved download-information type fall back to application/octet-stream. Larger Files return application/vnd.tidb-link.file-download+json with a short-lived bearer URL. Only the owner User API Key may obtain a URL; its holder can redeem it without a key. A new authorized read issues a fresh download URL without changing the File or upload expiry.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserFilesController_content",
-        "parameters": [
-          {
-            "name": "fileId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/vnd.tidb-link.file-download+json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "url",
-                    "expiresAt",
-                    "byteSize",
-                    "sha256"
-                  ],
-                  "properties": {
-                    "url": {
-                      "type": "string"
-                    },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "byteSize": {
-                      "type": "integer"
-                    },
-                    "sha256": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "drive_download_rate_limited: the existing bounded-download rate or concurrency limit is busy.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "drive_download_provider_error: the byte response is invalid.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Read fixed File content",
-        "tags": [
-          "UserFiles"
-        ]
-      }
-    },
-    "/api/v1/user/drive/upload-capabilities": {
-      "get": {
-        "description": "Returns the current inline threshold and effective maximum. Re-read after a typed 413 before replanning.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_uploadCapabilities",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicUserFileUploadCapabilitiesOpenApiDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Get the effective user-file upload limits",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/user/drive/uploads": {
-      "post": {
-        "description": "The Idempotency-Key binds the exact request. Same-key retries recover the original File and fixed expiry. Expired or failed uploads require a new key and File. The response identifies inline versus multipart transport and the verification expected after settlement. Browsers on any origin may call every upload route with the User API Key in Authorization; responses never admit credentials.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_createUpload",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePublicUserFileUploadBodyOpenApiDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileUploadResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The Idempotency-Key has different input, the attempt is in progress, or the original upload is expired or failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "upload_too_large: the declared byteSize exceeds the current product or Drive9 maximum.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Create or replay an owned Drive upload intent",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/user/drive/uploads/{uploadId}": {
-      "get": {
-        "description": "The opaque uploadId addresses the persisted upload intent, including initialization, cancellation and completion. Expiry stays fixed across recovery; a status read never recreates an upload.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_uploadStatus",
-        "parameters": [
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UploadStatusResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Read the current owned Drive upload state",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      },
-      "delete": {
-        "description": "Aborts remote multipart state when present. A same-key create retry cannot revive an aborted upload.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_abortUpload",
-        "parameters": [
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Abort an upload intent",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/user/drive/uploads/{uploadId}/content": {
-      "put": {
-        "description": "Send exactly Content-Length bytes with an RFC 9530 SHA-256 Content-Digest. A multipart-required 413 requires a new File and Idempotency-Key.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_uploadContent",
-        "parameters": [
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Content-Digest",
-            "in": "header",
-            "description": "RFC 9530 SHA-256 digest, for example sha-256=:base64-value=:",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Content-Length",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "upload_requires_multipart means create a new File with a new Idempotency-Key for an S3 plan; upload_too_large means re-read capabilities and reduce the file size.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "upload_integrity_failed: persisted bytes do not match the whole-file size or SHA-256.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Upload and whole-file verify inline content",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/user/drive/uploads/{uploadId}/parts/{partNumber}/presign": {
-      "post": {
-        "description": "The declared SHA-256 is durably bound to this exact part. PUT exactly the returned size to the returned URL with every returned header, then retain the S3 ETag for completion.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_presignPart",
-        "parameters": [
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "partNumber",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresignPublicUserFileUploadPartBodyOpenApiDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicUserFileUploadPartResponseOpenApiDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Bind a multipart part digest and get its upload URL",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/user/drive/uploads/{uploadId}/complete": {
-      "post": {
-        "description": "Inline uploads accept an empty object. Multipart uploads submit every part in ascending number order with the exact SHA-256 bound at presign time and the S3 ETag. Success requires complete size and SHA-256 verification; repeated confirmation returns the same ready File.\n\nAuthorization: UserApiKey; persisted credentials determine Organization and End User scope.",
-        "operationId": "UserDriveUploadsController_completeUpload",
-        "parameters": [
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FileConfirmationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request input, upload state, or upload metadata.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "A User API Key is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "A User API Key for an ordinary End User is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "File not found for the current Organization and End User.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "upload_incomplete is retryable; upload_expired or upload_failed requires a new File and Idempotency-Key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "upload_integrity_failed: completed bytes differ from the declared whole-file size or SHA-256.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Drive9 or durable upload state is temporarily unavailable; retry as directed by the error details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "UserApiKey": []
-          }
-        ],
-        "summary": "Confirm a whole-file verified upload",
-        "tags": [
-          "UserDriveUploads"
-        ]
-      }
-    },
-    "/api/v1/drive-uploads/{ticket}": {
-      "put": {
-        "description": "No API Key is required. Send every returned uploadUrl header and exactly Content-Length bytes. The ticket is valid for 60 seconds at admission; the upload intent retains its own expiry. An identical repeated PUT returns the same ready File. Replay the original create request and Idempotency-Key to obtain a fresh URL. Responses, including errors, are non-cacheable and allow any browser origin without credentials.\n\nAuthorization: short-lived content-bound upload ticket; no API Key required.",
-        "operationId": "DriveUploadController_redeem",
-        "parameters": [
-          {
-            "name": "ticket",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "maxLength": 444
-            }
-          },
-          {
-            "name": "Content-Digest",
-            "in": "header",
-            "description": "RFC 9530 SHA-256 digest from uploadUrl.headers.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Content-Length",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-store"
-                }
-              },
-              "Referrer-Policy": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-referrer"
-                }
-              },
-              "X-Content-Type-Options": {
-                "schema": {
-                  "type": "string",
-                  "example": "nosniff"
-                }
-              },
-              "Access-Control-Allow-Origin": {
-                "schema": {
-                  "type": "string",
-                  "example": "*"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "validation_error: invalid headers, content, owner scope or upload state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "upload_ticket_invalid: malformed, tampered, expired or unknown-key ticket; drive_file_not_found: the bound file no longer exists.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "upload_requires_multipart or upload_too_large: recreate the upload using current limits.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "unsupported_media_type: Content-Type must be application/octet-stream.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "upload_integrity_failed: persisted bytes differ from the declared content.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "upload_temporarily_unavailable: ticket key, byte budget, provider or persistence is unavailable; also returned when the 16 per-process upload slots are busy or the independent 120-second request deadline expires. Cancellation prevents new writes but cannot roll back an already-started write. Retry according to error.details.retryAfterSeconds.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "summary": "Redeem a short-lived inline upload ticket",
-        "tags": [
-          "Drive"
-        ]
-      }
-    },
-    "/api/v1/drive-downloads/{ticket}": {
-      "get": {
-        "description": "Anonymous, ticket-authorized endpoint for every authenticated download resource kind. Returns complete same-path inline bytes or an HTTPS Drive9 storage redirect with bounded presign exposure. Organization-issued Drive tickets require their exact issuing credential to remain current at new redemption admission; revoked or rotated issuers return 404. An admitted transfer may finish within existing limits. A returned provider URL retains its own expiry and is not revoked by this core check. Legacy unattributed v3.drive tickets are refused; obtain a fresh ticket.\n\nAuthorization: short-lived download ticket; no API Key required.",
-        "operationId": "DriveDownloadController_redeem",
-        "parameters": [
-          {
-            "name": "ticket",
-            "required": true,
-            "in": "path",
-            "description": "Opaque 60-second download ticket; consumers must follow the current maxLength.",
-            "schema": {
-              "type": "string",
-              "maxLength": 538
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Complete bytes currently stored at the ticket-bound path.",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-store"
-                }
-              },
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Content-Length": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Content-Type": {
-                "schema": {
-                  "type": "string",
-                  "example": "application/octet-stream"
-                }
-              },
-              "Referrer-Policy": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-referrer"
-                }
-              },
-              "X-Content-Type-Options": {
-                "schema": {
-                  "type": "string",
-                  "example": "nosniff"
-                }
-              }
-            }
-          },
-          "302": {
-            "description": "HTTPS Drive9 storage redirect with bounded presign exposure.",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-store"
-                }
-              },
-              "Content-Length": {
-                "schema": {
-                  "type": "string",
-                  "example": "0"
-                }
-              },
-              "Location": {
-                "description": "Validated Drive9 storage URL.",
-                "schema": {
-                  "type": "string",
-                  "format": "uri"
-                }
-              },
-              "Referrer-Policy": {
-                "schema": {
-                  "type": "string",
-                  "example": "no-referrer"
-                }
-              },
-              "X-Content-Type-Options": {
-                "schema": {
-                  "type": "string",
-                  "example": "nosniff"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Invalid, expired, or missing file.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Download redemption rate limit exceeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Drive9 returned an invalid response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Download service temporarily unavailable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "summary": "Redeem a short-lived download ticket.",
-        "tags": [
-          "Drive"
-        ]
-      }
-    },
     "/api/v1/org/users/{userId}/files": {
       "get": {
         "operationId": "OrganizationUserFilesController_list",
@@ -2719,131 +1357,338 @@
           "OrganizationUserFiles"
         ]
       }
+    },
+    "/api/v1/drive-uploads/{ticket}": {
+      "put": {
+        "description": "No API Key is required. Send every returned uploadUrl header and exactly Content-Length bytes. The ticket is valid for 60 seconds at admission; the upload intent retains its own expiry. An identical repeated PUT returns the same ready File. Replay the original create request and Idempotency-Key to obtain a fresh URL. Responses, including errors, are non-cacheable and allow any browser origin without credentials.\n\nAuthorization: short-lived content-bound upload ticket; no API Key required.",
+        "operationId": "DriveUploadController_redeem",
+        "parameters": [
+          {
+            "name": "ticket",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "maxLength": 444
+            }
+          },
+          {
+            "name": "Content-Digest",
+            "in": "header",
+            "description": "RFC 9530 SHA-256 digest from uploadUrl.headers.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-referrer"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "example": "nosniff"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "example": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error: invalid headers, content, owner scope or upload state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "upload_ticket_invalid: malformed, tampered, expired or unknown-key ticket; drive_file_not_found: the bound file no longer exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "upload_requires_multipart or upload_too_large: recreate the upload using current limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type: Content-Type must be application/octet-stream.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "upload_integrity_failed: persisted bytes differ from the declared content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "upload_temporarily_unavailable: ticket key, byte budget, provider or persistence is unavailable; also returned when the 16 per-process upload slots are busy or the independent 120-second request deadline expires. Cancellation prevents new writes but cannot roll back an already-started write. Retry according to error.details.retryAfterSeconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Redeem a short-lived inline upload ticket",
+        "tags": [
+          "Drive"
+        ]
+      }
+    },
+    "/api/v1/drive-downloads/{ticket}": {
+      "get": {
+        "description": "Anonymous, ticket-authorized endpoint for every authenticated download resource kind. Returns complete same-path inline bytes or an HTTPS Drive9 storage redirect with bounded presign exposure. Organization-issued Drive tickets require their exact issuing credential to remain current at new redemption admission; revoked or rotated issuers return 404. An admitted transfer may finish within existing limits. A returned provider URL retains its own expiry and is not revoked by this core check. Legacy unattributed v3.drive tickets are refused; obtain a fresh ticket.\n\nAuthorization: short-lived download ticket; no API Key required.",
+        "operationId": "DriveDownloadController_redeem",
+        "parameters": [
+          {
+            "name": "ticket",
+            "required": true,
+            "in": "path",
+            "description": "Opaque 60-second download ticket; consumers must follow the current maxLength.",
+            "schema": {
+              "type": "string",
+              "maxLength": 538
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete bytes currently stored at the ticket-bound path.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Type": {
+                "schema": {
+                  "type": "string",
+                  "example": "application/octet-stream"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-referrer"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "example": "nosniff"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "HTTPS Drive9 storage redirect with bounded presign exposure.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "string",
+                  "example": "0"
+                }
+              },
+              "Location": {
+                "description": "Validated Drive9 storage URL.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-referrer"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "example": "nosniff"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, expired, or missing file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Download redemption rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Drive9 returned an invalid response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Download service temporarily unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Redeem a short-lived download ticket.",
+        "tags": [
+          "Drive"
+        ]
+      }
     }
   },
   "components": {
-    "securitySchemes": {
-      "HardwareCredentialAuth": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Hardware Credential authenticates only one inventoried device on /api/v1/hardware/connect. It grants no User, Session or management authority. Send it in Authorization, never in a URL."
-      },
-      "ConnectorKeyAuth": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Connector Key authenticates only tunnel connections on /api/v1/connectors/ws. It identifies one Organization-owned Connector and grants no End User, Session or management authority. Send it in Authorization, never in a URL."
-      },
-      "UserApiKey": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Opaque ti_user_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates the bound User and Organization. The persisted key owner determines scope."
-      },
-      "OrganizationApiKey": {
-        "scheme": "bearer",
-        "bearerFormat": "opaque",
-        "type": "http",
-        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
-      }
-    },
     "schemas": {
-      "FilesPageDto": {
+      "CreatePublicUserFileUploadBodyOpenApiDto": {
         "type": "object",
         "properties": {
-          "files": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "fileId": {
-                  "type": "string"
-                },
-                "originalName": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "uploading",
-                    "ready",
-                    "failed"
-                  ]
-                },
-                "byteSize": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "exclusiveMinimum": false,
-                  "nullable": true
-                },
-                "sha256": {
-                  "type": "string",
-                  "nullable": true
-                },
-                "checksumVerification": {
-                  "type": "string",
-                  "enum": [
-                    "whole",
-                    "part_only"
-                  ],
-                  "nullable": true,
-                  "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part."
-                },
-                "contentType": {
-                  "type": "string",
-                  "nullable": true
-                },
-                "lastError": {
-                  "type": "string",
-                  "nullable": true
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                "source": {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "user_upload"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "kind"
-                  ]
-                }
-              },
-              "required": [
-                "fileId",
-                "originalName",
-                "status",
-                "byteSize",
-                "sha256",
-                "checksumVerification",
-                "contentType",
-                "lastError",
-                "createdAt",
-                "updatedAt",
-                "source"
-              ]
-            }
-          },
-          "nextCursor": {
+          "originalName": {
+            "description": "Original caller-visible file name.",
             "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "byteSize": {
+            "description": "Declared bytes. Read upload capabilities for the current effective maximum.",
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "sha256": {
+            "description": "Lowercase hexadecimal SHA-256 of the complete file.",
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "contentType": {
+            "description": "Optional media type stored with the ready file.",
+            "type": "string",
+            "maxLength": 255,
             "nullable": true
           }
         },
         "required": [
-          "files",
-          "nextCursor"
+          "originalName",
+          "byteSize",
+          "sha256",
+          "contentType"
         ]
       },
       "ErrorEnvelope": {
@@ -2923,6 +1768,10 @@
                   "user_default_agent_mapping_invalid",
                   "session_not_found",
                   "session_read_only",
+                  "session_switch_in_progress",
+                  "session_switch_busy",
+                  "session_switch_unsupported",
+                  "session_configuration_epoch_changed",
                   "provider_unavailable",
                   "realtime_connection_not_found",
                   "realtime_connection_live",
@@ -3082,6 +1931,38 @@
           }
         }
       },
+      "FileConfirmationDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "etag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "number",
+                "etag",
+                "sha256"
+              ]
+            }
+          }
+        }
+      },
       "FileResponseDto": {
         "type": "object",
         "properties": {
@@ -3169,83 +2050,6 @@
         },
         "required": [
           "file"
-        ]
-      },
-      "PublicUserFileUploadCapabilitiesOpenApiDto": {
-        "type": "object",
-        "properties": {
-          "capabilities": {
-            "type": "object",
-            "properties": {
-              "protocol": {
-                "type": "string",
-                "enum": [
-                  "tidb-link.user-files.v2"
-                ]
-              },
-              "inlineThreshold": {
-                "description": "Files below this current threshold use Agent Service inline transfer.",
-                "type": "integer",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "maxUploadBytes": {
-                "description": "Effective limit: min(200 MiB, the current Drive9 maximum).",
-                "type": "integer",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "checksum": {
-                "type": "string",
-                "enum": [
-                  "sha-256"
-                ]
-              }
-            },
-            "required": [
-              "protocol",
-              "inlineThreshold",
-              "maxUploadBytes",
-              "checksum"
-            ]
-          }
-        },
-        "required": [
-          "capabilities"
-        ]
-      },
-      "CreatePublicUserFileUploadBodyOpenApiDto": {
-        "type": "object",
-        "properties": {
-          "originalName": {
-            "description": "Original caller-visible file name.",
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "byteSize": {
-            "description": "Declared bytes. Read upload capabilities for the current effective maximum.",
-            "type": "integer",
-            "minimum": 0,
-            "exclusiveMinimum": false
-          },
-          "sha256": {
-            "description": "Lowercase hexadecimal SHA-256 of the complete file.",
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "contentType": {
-            "description": "Optional media type stored with the ready file.",
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          }
-        },
-        "required": [
-          "originalName",
-          "byteSize",
-          "sha256",
-          "contentType"
         ]
       },
       "FileUploadResponseDto": {
@@ -3426,6 +2230,204 @@
           "upload"
         ]
       },
+      "FilesPageDto": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileId": {
+                  "type": "string"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "uploading",
+                    "ready",
+                    "failed"
+                  ]
+                },
+                "byteSize": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": false,
+                  "nullable": true
+                },
+                "sha256": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "checksumVerification": {
+                  "type": "string",
+                  "enum": [
+                    "whole",
+                    "part_only"
+                  ],
+                  "nullable": true,
+                  "description": "Verified fact for a ready file; null until settlement. whole verifies the complete file, while part_only verifies every multipart part."
+                },
+                "contentType": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "lastError": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "user_upload"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                }
+              },
+              "required": [
+                "fileId",
+                "originalName",
+                "status",
+                "byteSize",
+                "sha256",
+                "checksumVerification",
+                "contentType",
+                "lastError",
+                "createdAt",
+                "updatedAt",
+                "source"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "files",
+          "nextCursor"
+        ]
+      },
+      "PresignPublicUserFileUploadPartBodyOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "description": "Lowercase hexadecimal SHA-256 of this exact part.",
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "sha256"
+        ]
+      },
+      "PublicUserFileUploadCapabilitiesOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "tidb-link.user-files.v2"
+                ]
+              },
+              "inlineThreshold": {
+                "description": "Files below this current threshold use Agent Service inline transfer.",
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "maxUploadBytes": {
+                "description": "Effective limit: min(200 MiB, the current Drive9 maximum).",
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "checksum": {
+                "type": "string",
+                "enum": [
+                  "sha-256"
+                ]
+              }
+            },
+            "required": [
+              "protocol",
+              "inlineThreshold",
+              "maxUploadBytes",
+              "checksum"
+            ]
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "PublicUserFileUploadPartResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "part": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "size": {
+                "description": "PUT exactly this many bytes to the returned URL.",
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "headers": {
+                "description": "Send every returned header unchanged on the S3 PUT request.",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "expiresAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "number",
+              "url",
+              "size",
+              "headers",
+              "expiresAt"
+            ]
+          }
+        },
+        "required": [
+          "part"
+        ]
+      },
       "UploadStatusResponseDto": {
         "type": "object",
         "properties": {
@@ -3551,96 +2553,14 @@
         "required": [
           "upload"
         ]
-      },
-      "PresignPublicUserFileUploadPartBodyOpenApiDto": {
-        "type": "object",
-        "properties": {
-          "sha256": {
-            "description": "Lowercase hexadecimal SHA-256 of this exact part.",
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "required": [
-          "sha256"
-        ]
-      },
-      "PublicUserFileUploadPartResponseOpenApiDto": {
-        "type": "object",
-        "properties": {
-          "part": {
-            "type": "object",
-            "properties": {
-              "number": {
-                "type": "integer",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "url": {
-                "type": "string",
-                "format": "uri"
-              },
-              "size": {
-                "description": "PUT exactly this many bytes to the returned URL.",
-                "type": "integer",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "headers": {
-                "description": "Send every returned header unchanged on the S3 PUT request.",
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "expiresAt": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "number",
-              "url",
-              "size",
-              "headers",
-              "expiresAt"
-            ]
-          }
-        },
-        "required": [
-          "part"
-        ]
-      },
-      "FileConfirmationDto": {
-        "type": "object",
-        "properties": {
-          "parts": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "number": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "exclusiveMinimum": true
-                },
-                "etag": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 255
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              },
-              "required": [
-                "number",
-                "etag",
-                "sha256"
-              ]
-            }
-          }
-        }
+      }
+    },
+    "securitySchemes": {
+      "OrganizationApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
       }
     }
   }

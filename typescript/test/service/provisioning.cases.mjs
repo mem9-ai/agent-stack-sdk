@@ -43,8 +43,20 @@ test("End User provisioning and Organization-scoped identity work in an installe
     ),
     [user],
   );
+  // Creation is idempotent by externalId: the existing End User comes back
+  // unchanged and the other fields are not applied.
+  assert.deepEqual(
+    await organization.createEndUser({ externalId, displayName: "Other" }),
+    user,
+  );
+  const concurrent = `sdk-${randomUUID()}`;
+  const [first, second] = await Promise.all([
+    organization.createEndUser({ externalId: concurrent }),
+    organization.createEndUser({ externalId: concurrent }),
+  ]);
+  assert.equal(first.userId, second.userId);
   await assert.rejects(
-    organization.createEndUser({ externalId }),
+    organization.createEndUser({ externalId: externalId.toUpperCase() }),
     (error) =>
       error instanceof ConflictError &&
       refusal(409, "resource_conflict")(error),

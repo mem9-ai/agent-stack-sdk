@@ -3,9 +3,6 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const expectedRevision = "882287809f91d9a3fdf60537460431d9f0fc23e7";
-const expectedSourceSha256 =
-  "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b";
 const openApiBytes = await readFile(new URL("openapi.json", import.meta.url));
 const document = JSON.parse(openApiBytes);
 const metadata = JSON.parse(
@@ -26,9 +23,9 @@ const properties = (value) => {
 };
 
 test("text and history keep the selected immutable service contract", () => {
-  assert.equal(metadata.tidbLinkRevision, expectedRevision);
+  assert.match(metadata.tidbLinkRevision, /^[0-9a-f]{40}$/);
   assert.equal(metadata.tidbLinkApiVersion, "0.0.1");
-  assert.equal(metadata.sourceOpenApiSha256, expectedSourceSha256);
+  assert.equal(document.info.version, metadata.tidbLinkApiVersion);
   assert.equal(packageJson.tidbLinkRevision, metadata.tidbLinkRevision);
   assert.equal(
     packageJson.tidbLinkOpenApiSha256,
@@ -37,7 +34,7 @@ test("text and history keep the selected immutable service contract", () => {
   assert.equal(packageJson.tidbLinkApiVersion, metadata.tidbLinkApiVersion);
   assert.equal(
     createHash("sha256").update(openApiBytes).digest("hex"),
-    metadata.sha256,
+    metadata.snapshots["openapi.json"],
   );
 });
 
@@ -162,8 +159,17 @@ test("history pages preserve Full Agent and Realtime projections", () => {
     .entries.items.oneOf;
   assert.deepEqual(
     entries.map((variant) => properties(variant).type.enum[0]),
-    ["turn", "realtime"],
+    ["turn", "realtime", "template_switch"],
   );
+  assert.deepEqual(properties(entries[2]).templateSwitch.required, [
+    "id",
+    "commandId",
+    "status",
+    "configurationEpoch",
+    "agentTemplateId",
+    "contentDigest",
+    "createdAt",
+  ]);
   const facts = properties(entries[1]).realtime.oneOf;
   assert.deepEqual(
     facts.map((variant) => properties(variant).type.enum[0]),
@@ -324,6 +330,25 @@ test("supported Organization resources bind the explicit owner", () => {
       assert(operation.parameters.some((p) => p.name === "userId" && p.in === "path" && p.required));
     }
   }
-  const details = properties(schema("ConsoleBillingDetailsResponseOpenApiDto"));
-  assert(properties(details.llm.items).principalBucket.enum.includes("organization_user"));
+});
+
+test("End User creation is idempotent by externalId", () => {
+  const create = document.paths["/api/v1/org/users"].post;
+  assert.deepEqual(create.security, [{ OrganizationApiKey: [] }]);
+  assert(create.responses["200"]);
+  assert(create.responses["201"]);
+  assert(create.responses["409"]);
+  assert.match(create.description, /Retrying a creation with the same externalId is safe/);
+  assert.deepEqual(
+    Object.keys(properties(schema("CreateEndUserRequestDto"))).sort(),
+    ["displayName", "externalId"],
+  );
+});
+
+test("Session reads expose the Configuration Epoch and Template-switch fence", () => {
+  const session = properties(schema("SessionResponseOpenApiDto")).session;
+  assert(session.required.includes("configurationEpoch"));
+  assert(session.required.includes("switching"));
+  assert.equal(properties(session).configurationEpoch.nullable, true);
+  assert.equal(properties(session).switching.type, "boolean");
 });

@@ -8,12 +8,16 @@ const contract = JSON.parse(bytes);
 const manifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url)),
 );
+const metadata = JSON.parse(
+  await readFile(new URL("metadata.json", import.meta.url)),
+);
 
 test("prerecorded audio keeps its multipart request and distinct response-owned event contract", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "e665909822a7b71d87e43d62518545ebc17298a18716f7b3daf34b25115a79bf",
+    metadata.snapshots["audio.json"],
   );
+  assert.equal(metadata.tidbLinkRevision, manifest.tidbLinkRevision);
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,

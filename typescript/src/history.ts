@@ -291,9 +291,22 @@ export type SessionRealtimeEvent = {
     }
 );
 
+/** A completed switch of the Session to another Template. */
+export interface SessionTemplateSwitch {
+  id: string;
+  commandId: string;
+  status: "succeeded";
+  /** The Session Configuration Epoch the switch started. */
+  configurationEpoch: number;
+  agentTemplateId: string;
+  contentDigest: string;
+  createdAt: string;
+}
+
 export type SessionTimelineEntry =
   | { type: "turn"; turn: TurnRecord }
-  | { type: "realtime"; realtime: SessionRealtimeEvent };
+  | { type: "realtime"; realtime: SessionRealtimeEvent }
+  | { type: "template_switch"; templateSwitch: SessionTemplateSwitch };
 
 export interface SessionTimelinePage {
   entries: SessionTimelineEntry[];

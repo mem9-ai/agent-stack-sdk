@@ -223,7 +223,7 @@ interface OrganizationUsageCommon {
   id: string;
   occurredAt: string;
   sessionId: string;
-  /** Null only when `kind=llm` and `requestPurpose=voice_realtime`. */
+  /** Null for `voice_realtime` usage and standalone Template-switch compaction. */
   turnId: string | null;
   /** The Realtime connection of `voice_realtime` usage; null otherwise. */
   realtimeConnectionId?: string | null;
@@ -243,6 +243,11 @@ interface OrganizationUsageCommon {
 export interface OrganizationLlmUsage extends OrganizationUsageCommon {
   kind: "llm";
   realtimeConnectionId: string | null;
+  /**
+   * For `voice_realtime` usage, whether its Realtime connection was still live
+   * when read; a live connection reports usage in interim items. Null otherwise.
+   */
+  realtimeConnectionLive: boolean | null;
   operationId: string | null;
   requestPurpose: BillingLlmRequestPurpose;
   provider: string;

@@ -8,13 +8,17 @@ const contract = JSON.parse(bytes);
 const manifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url)),
 );
+const metadata = JSON.parse(
+  await readFile(new URL("metadata.json", import.meta.url)),
+);
 const upload = "/api/v1/org/users/{userId}/drive/uploads";
 
 test("file transfers retain the exact selected service contract and separate User and ticket authority", () => {
   assert.equal(
     createHash("sha256").update(bytes).digest("hex"),
-    "8ac1d127e6beb1de0fa28a31edc6e6e523ef5a090b1a9c2f92fb065e79731a39",
+    metadata.snapshots["files.json"],
   );
+  assert.equal(metadata.tidbLinkRevision, manifest.tidbLinkRevision);
   assert.equal(contract.revision, manifest.tidbLinkRevision);
   assert.equal(
     contract.sourceOpenApiSha256,
@@ -66,9 +70,9 @@ test("file transfers retain the exact selected service contract and separate Use
     ["number", "etag", "sha256"],
   );
   const content =
-    contract.paths["/api/v1/files/{fileId}/content"].get.responses["200"]
+    contract.paths["/api/v1/org/users/{userId}/files/{fileId}/content"].get.responses["200"]
       .content;
-  assert.equal(content["application/octet-stream"].schema.format, "binary");
+  assert.equal(content["*/*"].schema.format, "binary");
   assert.deepEqual(
     content["application/vnd.tidb-link.file-download+json"].schema.required,
     ["url", "expiresAt", "byteSize", "sha256"],

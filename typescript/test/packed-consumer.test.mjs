@@ -347,13 +347,17 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   );
   assert.equal(installedPackage.dependencies, undefined);
   assert.equal(installedPackage.tidbLinkApiVersion, "0.0.1");
+  const sourcePackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(installedPackage.tidbLinkRevision, /^[0-9a-f]{40}$/);
   assert.equal(
     installedPackage.tidbLinkRevision,
-    "882287809f91d9a3fdf60537460431d9f0fc23e7",
+    sourcePackage.tidbLinkRevision,
   );
   assert.equal(
     installedPackage.tidbLinkOpenApiSha256,
-    "906515e4c8d38c5ac9fce6390d9d646220b2d06100fbcb64e180419899989a5b",
+    sourcePackage.tidbLinkOpenApiSha256,
   );
   for (const prefix of ["Provisioning", "Realtime", "Lifecycle", "Text"]) {
     assert.equal("tidbLink" + prefix + "Revision" in installedPackage, false);

@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "882287809f91d9a3fdf60537460431d9f0fc23e7" as const;
+  "1c7f98ee12c28e3d1adb656b90324c0b95135e42" as const;
 
 export {
   TiDBLinkApiError,
@@ -85,6 +85,7 @@ export type {
   SessionRealtimeEvent,
   RealtimeResponseKind,
   SessionTimelineEntry,
+  SessionTemplateSwitch,
   SessionTimelinePage,
 } from "./history.js";
 

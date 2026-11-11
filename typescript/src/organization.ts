@@ -40,6 +40,12 @@ export interface EndUser {
 
 export interface CreateEndUserInput {
   displayName?: string;
+  /**
+   * Your application's identity for this End User. Creation with an
+   * externalId is idempotent: when an End User of this Organization already
+   * has exactly this externalId, the service returns it unchanged and ignores
+   * the other fields. Without one, every call creates a new End User.
+   */
   externalId?: string;
 }
 
@@ -121,10 +127,17 @@ export class OrganizationClient {
     return response.organization;
   }
 
+  /**
+   * Create an End User, or return the existing one with the same externalId.
+   * Calls with an externalId are retried automatically and are safe to repeat
+   * after an uncertain outcome. An externalId that only differs by case or
+   * accents from an existing one is refused with a ConflictError.
+   */
   async createEndUser(
     input: CreateEndUserInput = {},
     options?: RequestOptions,
   ): Promise<EndUser> {
+    requireKnownKeys(input, ["displayName", "externalId"], "End User input");
     const result = await this.#http.postResponse<{ user?: EndUser }>(
       "/users",
       {
@@ -135,7 +148,11 @@ export class OrganizationClient {
           ? {}
           : { externalId: input.externalId }),
       },
-      { ...requestOptions(options), outcomeUnknown: true },
+      {
+        ...requestOptions(options),
+        outcomeUnknown: true,
+        idempotent: input.externalId !== undefined,
+      },
     );
     if (
       !result.data?.user ||
@@ -143,7 +160,7 @@ export class OrganizationClient {
       !result.data.user.userId
     ) {
       throw new OutcomeUnknownError(
-        "End User creation returned no usable User; reconcile by externalId",
+        "End User creation returned no usable User; repeat it with the same externalId",
         {
           requestId: result.requestId,
         },

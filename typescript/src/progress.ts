@@ -45,7 +45,7 @@ export async function* sessionEvents(
   const query = new URLSearchParams({ stream: "true" });
   if (options.cursor !== undefined) query.set("cursor", options.cursor);
   const { response, requestId } = await http.rawResponse(
-    `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/events?${query}`,
+    `/sessions/${encodeURIComponent(sessionId)}/events?${query}`,
     {
       headers: { accept: "text/event-stream" },
       ...(options.signal ? { signal: options.signal } : {}),

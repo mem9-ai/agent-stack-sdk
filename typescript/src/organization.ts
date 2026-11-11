@@ -77,7 +77,7 @@ export class OrganizationClient {
     options?: RequestOptions,
   ): Promise<AgentRecord> {
     const result = await this.#http.deleteResponse<{ agent: AgentRecord }>(
-      `/api/v1/org/users/${encodeURIComponent(userId)}/agents/${encodeURIComponent(agentId)}`,
+      `/users/${encodeURIComponent(userId)}/agents/${encodeURIComponent(agentId)}`,
       { ...requestOptions(options), outcomeUnknown: true },
     );
     if (
@@ -115,7 +115,7 @@ export class OrganizationClient {
 
   async getOrganization(options?: RequestOptions): Promise<Organization> {
     const response = await this.#http.get<{ organization: Organization }>(
-      "/api/v1/org",
+      "",
       requestOptions(options),
     );
     return response.organization;
@@ -126,7 +126,7 @@ export class OrganizationClient {
     options?: RequestOptions,
   ): Promise<EndUser> {
     const result = await this.#http.postResponse<{ user?: EndUser }>(
-      "/api/v1/org/users",
+      "/users",
       {
         ...(input.displayName === undefined
           ? {}
@@ -154,7 +154,7 @@ export class OrganizationClient {
 
   async listEndUsers(options?: RequestOptions): Promise<EndUser[]> {
     const response = await this.#http.get<{ users: EndUser[] }>(
-      "/api/v1/org/users",
+      "/users",
       requestOptions(options),
     );
     return response.users;
@@ -162,7 +162,7 @@ export class OrganizationClient {
 
   async getEndUser(userId: string, options?: RequestOptions): Promise<EndUser> {
     const response = await this.#http.get<{ user: EndUser }>(
-      `/api/v1/org/users/${encodeURIComponent(userId)}`,
+      `/users/${encodeURIComponent(userId)}`,
       requestOptions(options),
     );
     return response.user;

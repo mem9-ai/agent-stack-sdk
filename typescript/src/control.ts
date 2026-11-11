@@ -55,7 +55,7 @@ export async function submitTurnCommand(
       interaction?: unknown;
       event?: RetryReceipt;
     }>(
-      `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/events`,
+      `/sessions/${encodeURIComponent(sessionId)}/events`,
       { type: `agent.session.input.${kind}`, clientEventId, data: { turnId } },
       {
         outcomeUnknown: true,

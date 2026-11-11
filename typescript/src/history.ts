@@ -302,7 +302,7 @@ export interface SessionTimelinePage {
 }
 
 const sessionPath = (sessionId: string): string =>
-  `/api/v1/user/sessions/${encodeURIComponent(sessionId)}`;
+  `/sessions/${encodeURIComponent(sessionId)}`;
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

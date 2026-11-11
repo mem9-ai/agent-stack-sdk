@@ -68,7 +68,7 @@ const toolSet = (
   return { ...result.data, etag: requireEtag(result) };
 };
 const toolsPath = (sessionId: string) =>
-  `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/tools`;
+  `/sessions/${encodeURIComponent(sessionId)}/tools`;
 
 export async function getClientTools(
   http: HttpClient,
@@ -143,7 +143,7 @@ export async function listPendingClientToolCalls(
       "Pending Client Tool call options",
     );
   const result = await http.get<{ calls: PendingClientToolCall[] }>(
-    `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/client-tool-calls`,
+    `/sessions/${encodeURIComponent(sessionId)}/client-tool-calls`,
     options,
   );
   return result.calls;
@@ -196,7 +196,7 @@ export async function submitClientToolOutput(
   signal?.throwIfAborted();
   try {
     const result = await http.postResponse<{ interaction?: unknown }>(
-      `/api/v1/user/sessions/${encodeURIComponent(sessionId)}/events`,
+      `/sessions/${encodeURIComponent(sessionId)}/events`,
       { type: "agent.session.input.client_tool_output", clientEventId, data },
       {
         outcomeUnknown: true,

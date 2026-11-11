@@ -102,7 +102,7 @@ export class Agent {
   async refresh(options?: RequestOptions): Promise<this> {
     options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
-      `/api/v1/user/agents/${encodeURIComponent(this.id)}`,
+      `/agents/${encodeURIComponent(this.id)}`,
       options,
     );
     this.#record = response.agent;
@@ -121,7 +121,7 @@ export class Agent {
     )
       throw new TypeError("Agent preferences require additionalInstructions");
     const result = await this.#http.patchResponse<{ agent: AgentRecord }>(
-      `/api/v1/user/agents/${encodeURIComponent(this.id)}`,
+      `/agents/${encodeURIComponent(this.id)}`,
       input,
       { ...options, outcomeUnknown: true },
     );
@@ -163,7 +163,7 @@ export class EndUserClient {
   async listAgents(options?: RequestOptions): Promise<Agent[]> {
     options = requestOptions(options);
     const response = await this.#http.get<{ agents: AgentRecord[] }>(
-      "/api/v1/user/agents",
+      "/agents",
       options,
     );
     return response.agents.map((agent) => new Agent(this.#http, agent));
@@ -182,7 +182,7 @@ export class EndUserClient {
       throw new TypeError("Agent creation requires a Template ID");
     requireCreationKey(input.idempotencyKey);
     const result = await this.#http.postResponse<{ agent: AgentRecord }>(
-      "/api/v1/user/agents",
+      "/agents",
       { agentTemplateId: input.agentTemplateId },
       {
         idempotencyKey: input.idempotencyKey,
@@ -198,7 +198,7 @@ export class EndUserClient {
   async getAgent(id: string, options?: RequestOptions): Promise<Agent> {
     options = requestOptions(options);
     const response = await this.#http.get<{ agent: AgentRecord }>(
-      `/api/v1/user/agents/${encodeURIComponent(id)}`,
+      `/agents/${encodeURIComponent(id)}`,
       options,
     );
     return new Agent(this.#http, response.agent);
@@ -206,7 +206,7 @@ export class EndUserClient {
 
   listAgentTemplates(options?: ListOptions): Promise<AgentTemplatePage> {
     return this.#http.get(
-      `/api/v1/user/agent-templates${paginationQuery(options)}`,
+      `/agent-templates${paginationQuery(options)}`,
       options,
     );
   }
@@ -224,11 +224,11 @@ export class EndUserClient {
       options?.agentId === undefined
         ? ""
         : `?agentId=${encodeURIComponent(options.agentId)}`;
-    return this.#http.get(`/api/v1/agent-models${query}`, options);
+    return this.#http.get(`/agent-models${query}`, options);
   }
 
   listRealtimeModels(options?: RequestOptions): Promise<RealtimeModelCatalog> {
-    return this.#http.get("/api/v1/realtime-models", requestOptions(options));
+    return this.#http.get("/realtime-models", requestOptions(options));
   }
 
   async listSessions(options?: ListOptions): Promise<SessionPage> {
@@ -236,7 +236,7 @@ export class EndUserClient {
       sessions: SessionRecord[];
       hasMore: boolean;
       nextCursor: string | null;
-    }>(`/api/v1/user/sessions${paginationQuery(options)}`, options);
+    }>(`/sessions${paginationQuery(options)}`, options);
     return {
       ...response,
       sessions: response.sessions.map(

@@ -14,14 +14,30 @@ import {
 import { parseApiKeyTokenId } from "../src/auth/api-key-token";
 
 const exec = promisify(execFile);
+import { createServer as createNetServer, type AddressInfo } from "node:net";
 
 it("an independent installed SDK consumer uses Organization authority against the compiled backend", async () => {
+  // The consumer serves the example HTTP Connector on this loopback port; the
+  // harness routes the fictional HTTPS endpoint to it.
+  const connectorPort = await new Promise<number>((resolve, reject) => {
+    const probe = createNetServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+  const connectorEndpoint = "https://sdk-connector.example.test/mcp";
   const harness = await startSystemHarness({
     databaseAdminUrl: process.env.TEST_TIDB_DATABASE_URL!,
     tidbSsl: process.env.TIDB_SSL ?? "off",
     controlledDrive9: true,
     controlledAudioTranscription: true,
     controlledVoiceProvider: true,
+    controlledMcpEndpoint: {
+      endpointUrl: connectorEndpoint,
+      loopbackUrl: `http://127.0.0.1:${connectorPort}/mcp`,
+    },
   });
   const temporary = await mkdtemp(
     path.join(tmpdir(), "tidb-link-org-consumer-"),
@@ -119,6 +135,8 @@ it("an independent installed SDK consumer uses Organization authority against th
         SDK_ORGANIZATION_KEY: token,
         SDK_OTHER_ORGANIZATION_KEY: other,
         SDK_TEMPLATE_ID: template.templateId,
+        SDK_CONNECTOR_ENDPOINT: connectorEndpoint,
+        SDK_CONNECTOR_PORT: String(connectorPort),
       },
     });
     let output = "";
@@ -171,6 +189,30 @@ it("an independent installed SDK consumer uses Organization authority against th
           harness.model.enqueueText({
             chunks: ["Order shipped."],
             expectRequest: { bodyIncludes: ["SDK_ORDER_SHIPPED"] },
+          });
+        } else if (message.stage === "connector") {
+          // Templates reference Connectors through Console-only tool settings.
+          value = (
+            await harness.publishAgentTemplateFixture({
+              name: "SDK Connector journey",
+              content: {
+                realtime: { language: "en-US" },
+                tools: { mcp: [{ serverId: message.userId! }] },
+              },
+            })
+          ).templateId;
+          harness.model.enqueueToolCalls({
+            toolCalls: [
+              {
+                id: "sdk_connector_call",
+                name: "mcp_sdk_orders__lookup_order",
+                arguments: { orderId: "order_7" },
+              },
+            ],
+          });
+          harness.model.enqueueText({
+            chunks: ["Connector order shipped."],
+            expectRequest: { bodyIncludes: ["SDK_CONNECTOR_RESULT"] },
           });
         } else if (message.stage === "audio") {
           harness.model.enqueueText({ chunks: ["SDK audio answer."] });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { createServer } from "node:http";
 import { OrganizationClient, TiDBLinkApiError } from "@tidblink/server";
 import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
@@ -172,6 +173,89 @@ await until(
   () => session.refresh(),
   (current) => current.data.activeTurnId === null,
 );
+// An Organization registers and activates an HTTP Connector, and an Agent calls it.
+const { createConnectorHandler } = await import(
+  "@tidblink/server/examples/http-connector.mjs"
+);
+const { organizationId } = await organization.getOrganization();
+let connector = await organization.connectors.register({
+  displayName: "SDK Orders",
+  endpointUrl: process.env.SDK_CONNECTOR_ENDPOINT,
+});
+assert.equal(connector.status, "inactive");
+assert.equal(connector.transport, "streamable_http");
+const connectorCalls = [];
+const connectorServer = createServer(
+  createConnectorHandler({
+    baseUrl,
+    organizationId,
+    connectorId: connector.connectorId,
+    name: "SDK Orders",
+    tools: {
+      lookup_order: {
+        description: "Look up one of the user's orders",
+        inputSchema: {
+          type: "object",
+          properties: { orderId: { type: "string" } },
+          required: ["orderId"],
+        },
+        run: async ({ orderId }, context) => {
+          connectorCalls.push({ orderId, context });
+          return `SDK_CONNECTOR_RESULT ${orderId}`;
+        },
+      },
+    },
+  }),
+);
+await new Promise((resolve) =>
+  connectorServer.listen(Number(process.env.SDK_CONNECTOR_PORT), "127.0.0.1", resolve),
+);
+try {
+  connector = await organization.connectors.activate(connector.connectorId, {
+    expectedConnectorVersion: connector.connectorVersion,
+  });
+  assert.equal(connector.status, "active");
+  assert(connector.observation);
+  assert(
+    (await organization.connectors.list()).some(
+      (item) => item.connectorId === connector.connectorId,
+    ),
+  );
+  await assert.rejects(
+    otherOrganization.connectors.get(connector.connectorId),
+    (error) => error.status === 404 || error.status === 401,
+  );
+  const connectorTemplateId = await stage("connector", connector.connectorId);
+  const connectorAgent = await owner.createAgent({
+    agentTemplateId: connectorTemplateId,
+    idempotencyKey: randomUUID(),
+  });
+  const connectorSession = await connectorAgent.createSession({
+    idempotencyKey: randomUUID(),
+  });
+  assert.equal(
+    (
+      await connectorSession.turn(
+        { clientEventId: randomUUID(), text: "Where is order 7?" },
+        { timeoutMs: 20000, pollIntervalMs: 25 },
+      )
+    ).text,
+    "Connector order shipped.",
+  );
+  assert.equal(connectorCalls.length, 1);
+  assert.equal(connectorCalls[0].orderId, "order_7");
+  assert.equal(connectorCalls[0].context.userId, user.userId);
+  assert.equal(connectorCalls[0].context.sessionId, connectorSession.id);
+  assert.equal(connectorCalls[0].context.organizationId, organizationId);
+  connector = await organization.connectors.deactivate(connector.connectorId, {
+    expectedConnectorVersion: connector.connectorVersion,
+  });
+  assert.equal(connector.status, "inactive");
+} finally {
+  connectorServer.closeAllConnections();
+  await new Promise((resolve) => connectorServer.close(resolve));
+}
+
 await stage("audio");
 const wav = Buffer.alloc(364);
 wav.write("RIFF", 0);

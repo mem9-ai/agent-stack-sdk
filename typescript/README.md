@@ -7,7 +7,8 @@ stay on your backend; do not ship it to browsers or devices.
 ## Supported scope
 
 This package supports Organization information, End User provisioning,
-Template and Skill management, Template/model discovery, personal Agent and Session management,
+Template, Skill and Connector management, Connector callback verification,
+Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
@@ -169,6 +170,56 @@ Each upload creates a new Skill, and an upload is visible only to the Organizati
 API Key that created it. Publish before `expiresAt`, or cancel an unpublished
 upload with `cancelUpload`. `skills.list()` and `skills.get(skillId)` read
 published Skills and their versions.
+
+## Connectors
+
+A Connector is an Organization-owned MCP tool server that Agents call. The
+platform calls it for the End User who owns the Session and names that User in
+every call, so your server can act on the right account without trusting model
+arguments.
+
+```js
+let connector = await organization.connectors.register({
+  displayName: "Orders",
+  endpointUrl: "https://orders.example.com/mcp",
+});
+// Activation connects to the endpoint and discovers its tools.
+connector = await organization.connectors.activate(connector.connectorId, {
+  expectedConnectorVersion: connector.connectorVersion,
+});
+```
+
+Edit (`update`) only an inactive Connector, and pass the `connectorVersion` you
+read to every change; a stale one is a `ConflictError`. `deactivate` stops new
+calls. Registration is not retried automatically: after an `OutcomeUnknownError`,
+list the Connectors and match the display name, which is unique. Templates refer
+to Connectors through Console tool settings; this SDK does not set them.
+
+Your Connector verifies every request the platform sends (initialization, tool
+discovery and tool calls) with `verifyConnectorCallback`, and reads who a tool
+call is for with `readConnectorCallContext`:
+
+```js
+import { ConnectorKeySet, verifyConnectorCallback, readConnectorCallContext } from "@tidblink/server";
+
+// Fetch keys only from your trusted deployment URL; they are cached.
+const keys = new ConnectorKeySet({ baseUrl });
+await verifyConnectorCallback(request.headers.authorization, {
+  keys, organizationId, connectorId,
+}); // Throws ConnectorAuthError: answer 401.
+// For tools/call:
+const { callId, userId, sessionId, deadline } = readConnectorCallContext(
+  message.params._meta, { organizationId },
+);
+```
+
+Tokens are Ed25519-signed, valid for at most 60 seconds, scoped to your
+Organization and Connector, and may be reused within that scope. Deduplicate side
+effects by `callId`; the platform never retries a call (`attempt` is always 1).
+Abandon work after `deadline`. The packaged `http-connector.mjs` example is a
+complete Connector over Streamable HTTP without an MCP library. Agents see each
+tool as `mcp_<server name>__<tool>`. This SDK does not include a client for the
+`tunnel` transport.
 
 ## Templates, Agents and Sessions
 

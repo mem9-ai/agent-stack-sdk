@@ -33,6 +33,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/device-voice-session.mjs"));
+  assert(files.includes("examples/http-connector.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
   assert(files.includes("examples/observe-message.mjs"));
@@ -49,6 +50,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
         file === "examples/device-voice-session.mjs" ||
+        file === "examples/http-connector.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/submit-audio.mjs" ||
@@ -108,6 +110,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
       Template, TemplateContent, TemplateCatalog, TemplatePage, SkillUpload, SkillDetail,
       KnownSessionEvent,
+      Connector, ConnectorCallbackClaims, ConnectorCallContext,
     } from "@tidblink/server";
     import {
       TIDB_LINK_API_VERSION,
@@ -124,6 +127,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       asKnownSessionEvent,
       parseSessionEvent,
       StreamIdleError,
+      ConnectorKeySet,
+      verifyConnectorCallback,
+      readConnectorCallContext,
     } from "@tidblink/server";
     // @ts-expect-error Previous compatibility constants and error exports have no aliases.
     import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@tidblink/server";
@@ -168,6 +174,18 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const detail: SkillDetail = await organization.skills.get(done.skillId);
       void page; void detail;
       return organization.templates.archive(created.template.id, { ifMatch: created.template.etag, idempotencyKey: "archive-1" });
+    }
+    async function connectorWorkflow(authorization: string, meta: unknown): Promise<string> {
+      const registered: Connector = await organization.connectors.register({ displayName: "Orders", endpointUrl: "https://orders.example.com/mcp" });
+      const active: Connector = await organization.connectors.activate(registered.connectorId, { expectedConnectorVersion: registered.connectorVersion });
+      // @ts-expect-error Changes require the expected version.
+      await organization.connectors.deactivate(active.connectorId, {});
+      const keys = new ConnectorKeySet({ baseUrl });
+      const claims: ConnectorCallbackClaims = await verifyConnectorCallback(authorization, { keys, organizationId: "org", connectorId: active.connectorId });
+      const context: ConnectorCallContext = readConnectorCallContext(meta, { organizationId: claims.organizationId });
+      const attempt: 1 = context.attempt;
+      void attempt;
+      return context.userId;
     }
     async function subscriptionWorkflow(session: Session, signal: AbortSignal) {
       for await (const item of session.subscribe({ cursor: "saved", signal, idleTimeoutMs: 30_000 })) {

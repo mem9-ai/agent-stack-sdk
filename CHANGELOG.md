@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add `organization.connectors` to register, list, read, edit, activate and
+  deactivate Connectors.
+- Add `verifyConnectorCallback` with a cached `ConnectorKeySet` to verify the
+  platform's signed requests to an HTTP Connector, and `readConnectorCallContext`
+  with the `ConnectorCallContext` type for the End User and Session of a tool
+  call. Add the `http-connector.mjs` example.
 - Add `session.subscribe()`: follows the event stream until aborted, reconnects
   from the last cursor, and delivers each pending Client Tool call once per
   subscription, skipping replayed calls that are answered or expired.

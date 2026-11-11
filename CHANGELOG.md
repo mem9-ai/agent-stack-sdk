@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Release only from release branches. Merging `main` into `release` submits the
+  package version to npm; commits on `main` release nothing.
+
 ## 0.3.0-rc.0
 
 Release candidate on the `next` dist-tag. It verifies the release process and

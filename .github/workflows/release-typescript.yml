@@ -1,14 +1,16 @@
 name: Release TypeScript SDK
 
-# Releases the package version on main once CHANGELOG.md has a section for it
-# and no release tag exists. The version is staged on npm, a maintainer approves
-# it there with two-factor authentication, and a later run records the tag and
-# GitHub Release. See RELEASING.md. npm trusted publishing identifies this
+# Releases the package version on a release branch once CHANGELOG.md has a
+# section for it and no release tag exists. The version is staged on npm, a
+# maintainer approves it there with two-factor authentication, and a later run
+# on the same branch records the tag and GitHub Release. Nothing is released
+# from main. See RELEASING.md. npm trusted publishing identifies this
 # workflow by its filename; update the npm package settings if it is renamed.
 on:
   push:
     branches:
-      - main
+      - release
+      - "release-*"
   workflow_dispatch:
 
 permissions:
@@ -20,7 +22,7 @@ concurrency:
 
 jobs:
   plan:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/release' || startsWith(github.ref, 'refs/heads/release-')
     runs-on: ubuntu-latest
     permissions:
       contents: write # Draft GitHub Releases are visible only with write access.
@@ -88,7 +90,7 @@ jobs:
           {
             echo "Staged \`$NAME@$VERSION\`. It is not public yet."
             echo "A maintainer approves it under Staged Packages on npmjs.com, or with \`npm stage approve\`."
-            echo "Then run this workflow again to create \`$TAG\` and publish the GitHub Release."
+            echo "Then run this workflow again on \`$GITHUB_REF_NAME\` to create \`$TAG\` and publish the GitHub Release."
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           GH_TOKEN: ${{ github.token }}

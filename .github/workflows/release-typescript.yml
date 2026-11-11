@@ -1,8 +1,10 @@
 name: Release TypeScript SDK
 
-# Publishes when main carries a package version that has a CHANGELOG section
-# and no release tag yet. See RELEASING.md. npm trusted publishing identifies
-# this workflow by its filename; update the npm package settings if it is renamed.
+# Releases the package version on main once CHANGELOG.md has a section for it
+# and no release tag exists. The version is staged on npm, a maintainer approves
+# it there with two-factor authentication, and a later run records the tag and
+# GitHub Release. See RELEASING.md. npm trusted publishing identifies this
+# workflow by its filename; update the npm package settings if it is renamed.
 on:
   push:
     branches:
@@ -20,8 +22,14 @@ jobs:
   plan:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Draft GitHub Releases are visible only with write access.
     outputs:
-      release: ${{ steps.plan.outputs.release }}
+      action: ${{ steps.plan.outputs.action }}
+      tag: ${{ steps.plan.outputs.tag }}
+      name: ${{ steps.plan.outputs.name }}
+      version: ${{ steps.plan.outputs.version }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,10 +37,12 @@ jobs:
           node-version: 22.12.0
       - id: plan
         run: node scripts/release-plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-  publish:
+  stage:
     needs: plan
-    if: needs.plan.outputs.release == 'true'
+    if: needs.plan.outputs.action == 'stage'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -52,32 +62,34 @@ jobs:
       - id: plan
         run: node scripts/release-plan.mjs
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
-      # Trusted publishing needs Node.js 22.14 or newer and npm 11.5.1 or newer.
+      # Staged publishing needs Node.js 22.14 or newer and npm 11.15.0 or newer.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - run: npm run build
-      - name: Publish to npm
-        run: |
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION is already on npm; skipping publish."
-          else
-            npm publish --workspace "$NAME" --access public --provenance --tag "$DIST_TAG"
-          fi
+      - name: Stage on npm
+        # `npm stage publish` is unaware of workspaces; run it in the package.
+        working-directory: typescript
+        run: npm stage publish --access public --provenance --tag "$DIST_TAG"
         env:
-          NAME: ${{ steps.plan.outputs.name }}
-          VERSION: ${{ steps.plan.outputs.version }}
           DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
-          # Used only until npm trusted publishing is configured for the package.
+          # Not needed once npm trusted publishing is configured for the package.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Create tag and GitHub Release
+      - name: Create draft GitHub Release
+        # The draft marks this version as staged and pins the released commit.
         run: |
-          flags=(--latest)
+          flags=()
           if [ "$PRERELEASE" = "true" ]; then flags=(--prerelease); fi
-          gh release create "$TAG" --target "$GITHUB_SHA" \
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
             --title "$NAME $VERSION" --notes-file "$RELEASE_NOTES_FILE" "${flags[@]}"
+          {
+            echo "Staged \`$NAME@$VERSION\`. It is not public yet."
+            echo "A maintainer approves it under Staged Packages on npmjs.com, or with \`npm stage approve\`."
+            echo "Then run this workflow again to create \`$TAG\` and publish the GitHub Release."
+          } >> "$GITHUB_STEP_SUMMARY"
         env:
           GH_TOKEN: ${{ github.token }}
           NAME: ${{ steps.plan.outputs.name }}
@@ -85,3 +97,30 @@ jobs:
           TAG: ${{ steps.plan.outputs.tag }}
           PRERELEASE: ${{ steps.plan.outputs.prerelease }}
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+
+  finalize:
+    needs: plan
+    if: needs.plan.outputs.action == 'finalize'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create tag and publish GitHub Release
+        run: |
+          flags=(--latest)
+          if [ "$PRERELEASE" = "true" ]; then flags=(--prerelease); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Publishing the draft creates the tag at the commit that was staged.
+            gh release edit "$TAG" --draft=false "${flags[@]}"
+          else
+            echo "::warning::No draft release for $TAG; tagging $GITHUB_SHA, which may be later than the published commit."
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$NAME $VERSION" \
+              --notes "Published to npm as \`$NAME@$VERSION\`. See CHANGELOG.md." "${flags[@]}"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.plan.outputs.name }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}

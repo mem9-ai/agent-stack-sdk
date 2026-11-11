@@ -19,8 +19,10 @@ Consumers pin an exact version and upgrade through their own change.
 
 ## How a release happens
 
-Merging a release pull request to `main` publishes it. Nobody pushes tags or
-runs `npm publish` by hand.
+Merging a release pull request to `main` submits the version to npm. A
+maintainer then approves it on npm with two-factor authentication. Nobody pushes
+tags or runs `npm publish` by hand, and automation alone cannot make a version
+public.
 
 1. Confirm `typescript/package.json` declares the supported TiDB Link API
    version and exact service revision, and that its fingerprints, exported values
@@ -35,16 +37,26 @@ runs `npm publish` by hand.
    and gives that exact version its own `## <version>` section in `CHANGELOG.md`,
    moving the entries out of the unreleased section. The pull request check
    "Show what merging this commit would release" prints the outcome.
-4. Merge it. The release workflow repeats the checks, publishes the package with
-   provenance to `next` for a prerelease version or `latest` otherwise, creates
-   the `typescript-v<version>` tag, and creates a GitHub Release containing the
-   changelog section and the service compatibility mapping.
+4. Merge it. The release workflow repeats the checks and stages the package on
+   npm with provenance, using dist-tag `next` for a prerelease version or `latest`
+   otherwise. It also creates a draft GitHub Release that holds the changelog
+   section, the service compatibility mapping and the released commit. The
+   version is not public yet.
+5. A maintainer with publish access reviews the staged version under Staged
+   Packages on npmjs.com, or with `npm stage view` and `npm stage download`, and
+   approves it there or with `npm stage approve <stage-id>`.
+6. Run the release workflow again from the Actions page, or let the next push to
+   `main` run it. It sees the version on npm, creates the `typescript-v<version>`
+   tag at the staged commit and publishes the GitHub Release.
 
 A version without its own changelog section is treated as still in development
-and is not published. A version whose tag exists is never published again; fix
-a bad release with a new version and `npm deprecate` the bad one. If a run fails
-after publishing to npm, rerun it: it skips the publish and creates the missing
-tag and GitHub Release.
+and is not staged. A staged version is not staged twice while its draft GitHub
+Release exists. A version whose tag exists is never released again; fix a bad
+release with a new version and `npm deprecate` the bad one.
+
+To abandon a staged version, reject it on npm and delete its draft GitHub
+Release. If the workflow fails after staging but before creating the draft,
+reject the staged version on npm and rerun the workflow.
 
 ## Coordinating a breaking service change
 
@@ -56,11 +68,15 @@ tag and GitHub Release.
 
 ## npm authentication
 
-The package belongs to the `@tidblink` npm organization. The workflow
-authenticates with npm trusted publishing: the package's npm settings name the
-GitHub repository `mem9-ai/tidblink-sdk` and the workflow file
-`release-typescript.yml`. No long-lived token is needed once this is configured.
+The package belongs to the `@tidblink` npm organization. The workflow can only
+stage: the `NPM_TOKEN` repository secret is a granular token with "Read and
+write (stage only)" permission for that organization, so a leaked token cannot
+publish a version.
 
-npm configures a trusted publisher on an existing package, so the first
-publication of a new package name needs an `NPM_TOKEN` repository secret that can
-publish to `@tidblink`. Remove the secret after the trusted publisher is set up.
+Staged publishing needs npm 11.15.0 or newer. The first staged version of a new
+package name makes npm create a public placeholder version, `0.0.0-stage`.
+
+After the package exists, configure npm trusted publishing in the package's npm
+settings for the GitHub repository `mem9-ai/tidblink-sdk` and the workflow file
+`release-typescript.yml`, allowing staged publishing only, then delete the
+`NPM_TOKEN` secret.

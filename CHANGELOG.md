@@ -4,10 +4,11 @@
 
 - Rename the package to `@tidblink/sdk`, published under the `@tidblink` npm
   organization. The earlier `@mem9/tidb-link` name was never published.
-- Publish by merging a release pull request: a package version with its own
-  changelog section and no release tag is published to npm (`next` for
-  prereleases, `latest` otherwise) with a tag and a GitHub Release. Pushing a tag
-  no longer publishes.
+- Release by merging a release pull request: a package version with its own
+  changelog section and no release tag is staged on npm (`next` for prereleases,
+  `latest` otherwise) and becomes public after a maintainer approves it there.
+  The workflow then records a tag and a GitHub Release. Pushing a tag no longer
+  publishes.
 - Add `OrganizationClient.user(userId)` for the existing supported End User
   resource workflows without issuing a User Key. Retain `UserClient` compatibility,
   real authorizing credentials, owner-scoped handles and separate usage projections.

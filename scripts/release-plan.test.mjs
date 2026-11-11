@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   changelogSection,
+  describePlan,
   planRelease,
   releaseNotes,
 } from "./release-plan.mjs";
@@ -30,6 +31,17 @@ const changelog = [
   "",
 ].join("\n");
 
+const plan = (version, state = {}) =>
+  planRelease({
+    name,
+    version,
+    changelog,
+    tagExists: false,
+    published: false,
+    draftExists: false,
+    ...state,
+  });
+
 test("reads only the requested version section", () => {
   assert.equal(
     changelogSection(changelog, "0.3.0"),
@@ -41,55 +53,45 @@ test("reads only the requested version section", () => {
 });
 
 test("a version without its own section is still in development", () => {
-  const plan = planRelease({
-    name,
-    version: "0.5.0",
-    changelog,
-    tagExists: false,
-  });
-  assert.equal(plan.release, false);
-  assert.match(plan.reason, /still in development/);
+  const result = plan("0.5.0");
+  assert.equal(result.action, "none");
+  assert.match(describePlan(result), /^No release: .*still in development/);
 });
 
 test("an existing tag is never released again", () => {
-  const plan = planRelease({
-    name,
-    version: "0.3.0",
-    changelog,
-    tagExists: true,
-  });
-  assert.equal(plan.release, false);
-  assert.match(plan.reason, /typescript-v0\.3\.0 already exists/);
+  const result = plan("0.3.0", { tagExists: true, published: true });
+  assert.equal(result.action, "none");
+  assert.match(result.reason, /typescript-v0\.3\.0 already exists/);
 });
 
-test("stable versions go to latest and prereleases to next", () => {
-  const stable = planRelease({
-    name,
-    version: "0.3.0",
-    changelog,
-    tagExists: false,
-  });
+test("a new version is staged: stable to latest, prerelease to next", () => {
+  const stable = plan("0.3.0");
   assert.deepEqual(
-    [stable.release, stable.distTag, stable.prerelease, stable.tag],
-    [true, "latest", false, "typescript-v0.3.0"],
+    [stable.action, stable.distTag, stable.prerelease, stable.tag],
+    ["stage", "latest", false, "typescript-v0.3.0"],
   );
-  const candidate = planRelease({
-    name,
-    version: "0.4.0-rc.1",
-    changelog,
-    tagExists: false,
-  });
+  const candidate = plan("0.4.0-rc.1");
   assert.deepEqual(
-    [candidate.release, candidate.distTag, candidate.prerelease],
-    [true, "next", true],
+    [candidate.action, candidate.distTag, candidate.prerelease],
+    ["stage", "next", true],
   );
+  assert.match(describePlan(candidate), /only after a maintainer approves/);
+});
+
+test("a staged version waits for approval and is not staged twice", () => {
+  assert.equal(plan("0.3.0", { draftExists: true }).action, "await");
+});
+
+test("an approved version is finalized with or without a draft", () => {
+  assert.equal(
+    plan("0.3.0", { published: true, draftExists: true }).action,
+    "finalize",
+  );
+  assert.equal(plan("0.3.0", { published: true }).action, "finalize");
 });
 
 test("rejects invalid versions and empty sections", () => {
-  assert.throws(
-    () => planRelease({ name, version: "v0.3.0", changelog, tagExists: false }),
-    /not a SemVer version/,
-  );
+  assert.throws(() => plan("v0.3.0"), /not a SemVer version/);
   assert.throws(
     () =>
       planRelease({
@@ -97,20 +99,16 @@ test("rejects invalid versions and empty sections", () => {
         version: "0.6.0",
         changelog: "## 0.6.0\n\n## 0.5.0\n\n- Change.\n",
         tagExists: false,
+        published: false,
+        draftExists: false,
       }),
     /is empty/,
   );
 });
 
 test("release notes record the service compatibility mapping", () => {
-  const plan = planRelease({
-    name,
-    version: "0.3.0",
-    changelog,
-    tagExists: false,
-  });
   const notes = releaseNotes(
-    plan,
+    plan("0.3.0"),
     {
       tidbLinkRevision: "abc123",
       tidbLinkOpenApiSha256: "def456",

@@ -1,6 +1,11 @@
-// Decides whether the TypeScript package on this commit should be published.
-// A version is released when CHANGELOG.md has its own section and the version
-// has no release tag yet. See RELEASING.md.
+// Decides what the release workflow should do with the TypeScript package on
+// this commit. A version is released when CHANGELOG.md has its own section and
+// the version has no release tag yet. See RELEASING.md.
+//
+//   stage     submit the version to npm for a maintainer's approval
+//   await     already submitted; a maintainer has not approved it yet
+//   finalize  approved and public on npm; create the tag and GitHub Release
+//   none      nothing to release
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -22,29 +27,51 @@ export const changelogSection = (changelog, version) => {
   return (end === -1 ? rest : rest.slice(0, end)).join("\n").trim();
 };
 
-export const planRelease = ({ name, version, changelog, tagExists }) => {
+export const planRelease = ({
+  name,
+  version,
+  changelog,
+  tagExists,
+  published,
+  draftExists,
+}) => {
   if (!SEMVER.test(version))
     throw new Error(`Package version "${version}" is not a SemVer version`);
-  const base = { name, version, tag: releaseTag(version) };
+  const prerelease = version.includes("-");
+  const base = {
+    name,
+    version,
+    tag: releaseTag(version),
+    prerelease,
+    distTag: prerelease ? "next" : "latest",
+  };
   if (tagExists)
-    return { ...base, release: false, reason: `${base.tag} already exists` };
+    return { ...base, action: "none", reason: `${base.tag} already exists` };
   const notes = changelogSection(changelog, version);
   if (notes === null)
     return {
       ...base,
-      release: false,
+      action: "none",
       reason: `CHANGELOG.md has no "## ${version}" section, so ${version} is still in development`,
     };
   if (!notes)
     throw new Error(`CHANGELOG.md section "## ${version}" is empty`);
-  const prerelease = version.includes("-");
-  return {
-    ...base,
-    release: true,
-    prerelease,
-    distTag: prerelease ? "next" : "latest",
-    notes,
-  };
+  if (published) return { ...base, action: "finalize", notes };
+  return { ...base, action: draftExists ? "await" : "stage", notes };
+};
+
+export const describePlan = (plan) => {
+  const target = `\`${plan.name}@${plan.version}\``;
+  switch (plan.action) {
+    case "stage":
+      return `Stage ${target} on npm with dist-tag \`${plan.distTag}\`. It becomes public only after a maintainer approves it on npm.`;
+    case "await":
+      return `${target} is staged on npm and waits for a maintainer's approval.`;
+    case "finalize":
+      return `${target} is public on npm. Create \`${plan.tag}\` and publish its GitHub Release.`;
+    default:
+      return `No release: ${plan.reason}.`;
+  }
 };
 
 export const releaseNotes = (plan, manifest, commit) =>
@@ -61,25 +88,56 @@ export const releaseNotes = (plan, manifest, commit) =>
     "",
   ].join("\n");
 
-const remoteTagExists = (tag) =>
-  execFileSync("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`], {
+const run = (command, args) =>
+  execFileSync(command, args, {
     encoding: "utf8",
-  }).trim() !== "";
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+
+const remoteTagExists = (tag) =>
+  run("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`]) !== "";
+
+/** An unknown package fails with E404; an unknown version of a known package prints nothing. */
+const publishedOnNpm = (name, version) => {
+  try {
+    return run("npm", ["view", `${name}@${version}`, "version"]) !== "";
+  } catch (error) {
+    if (String(error.stderr).includes("E404")) return false;
+    throw error;
+  }
+};
+
+/** Draft releases are visible only to tokens that can write repository contents. */
+const draftReleaseExists = (tag) => {
+  try {
+    return (
+      JSON.parse(run("gh", ["release", "view", tag, "--json", "isDraft"]))
+        .isDraft === true
+    );
+  } catch {
+    return false;
+  }
+};
 
 const main = () => {
   const root = new URL("../", import.meta.url);
   const manifest = JSON.parse(
     readFileSync(new URL("typescript/package.json", root), "utf8"),
   );
+  const tag = releaseTag(manifest.version);
+  const changelog = readFileSync(new URL("CHANGELOG.md", root), "utf8");
+  const tagExists = remoteTagExists(tag);
+  const pending =
+    !tagExists && changelogSection(changelog, manifest.version) !== null;
   const plan = planRelease({
     name: manifest.name,
     version: manifest.version,
-    changelog: readFileSync(new URL("CHANGELOG.md", root), "utf8"),
-    tagExists: remoteTagExists(releaseTag(manifest.version)),
+    changelog,
+    tagExists,
+    published: pending && publishedOnNpm(manifest.name, manifest.version),
+    draftExists: pending && draftReleaseExists(tag),
   });
-  const summary = plan.release
-    ? `Release: publish \`${plan.name}@${plan.version}\` to npm dist-tag \`${plan.distTag}\` and create \`${plan.tag}\`.`
-    : `No release: ${plan.reason}.`;
+  const summary = describePlan(plan);
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
@@ -87,16 +145,16 @@ const main = () => {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       [
-        `release=${plan.release}`,
+        `action=${plan.action}`,
         `name=${plan.name}`,
         `version=${plan.version}`,
         `tag=${plan.tag}`,
-        `dist_tag=${plan.distTag ?? ""}`,
-        `prerelease=${plan.prerelease ?? false}`,
+        `dist_tag=${plan.distTag}`,
+        `prerelease=${plan.prerelease}`,
         "",
       ].join("\n"),
     );
-  if (plan.release && process.env.RELEASE_NOTES_FILE)
+  if (plan.notes && process.env.RELEASE_NOTES_FILE)
     writeFileSync(
       process.env.RELEASE_NOTES_FILE,
       releaseNotes(plan, manifest, process.env.GITHUB_SHA ?? "unknown"),

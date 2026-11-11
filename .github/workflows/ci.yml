@@ -26,3 +26,5 @@ jobs:
       - run: npm run pack:check
       - name: Show what merging this commit would release
         run: node scripts/release-plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

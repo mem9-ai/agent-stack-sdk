@@ -21,14 +21,10 @@ Organization authority with an explicit owner.
 
 ## Quick start
 
-Install the package built from this checkout. This change does not publish a new
-npm release:
+Install an exact published version. Prereleases are on the `next` dist-tag:
 
 ```sh
-npm run build
-npm pack --workspace @tidblink/server
-# In your application directory:
-npm install /path/to/tidblink-server-0.3.0.tgz
+npm install --save-exact @tidblink/server@next
 ```
 
 An application backend uses its Organization API Key (`ti_org_…`) and explicitly

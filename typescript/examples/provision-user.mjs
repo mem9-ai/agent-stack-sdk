@@ -4,7 +4,7 @@ import {
   ConflictError,
   OrganizationClient,
   OutcomeUnknownError,
-} from "@mem9/tidb-link";
+} from "@tidblink/sdk";
 
 /** Each successful invocation issues a new credential. Retain it in your secret manager. */
 export async function provisionUser({

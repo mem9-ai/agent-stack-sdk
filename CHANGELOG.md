@@ -2,6 +2,12 @@
 
 ## Unreleased (0.3.0)
 
+- Rename the package to `@tidblink/sdk`, published under the `@tidblink` npm
+  organization. The earlier `@mem9/tidb-link` name was never published.
+- Publish by merging a release pull request: a package version with its own
+  changelog section and no release tag is published to npm (`next` for
+  prereleases, `latest` otherwise) with a tag and a GitHub Release. Pushing a tag
+  no longer publishes.
 - Add `OrganizationClient.user(userId)` for the existing supported End User
   resource workflows without issuing a User Key. Retain `UserClient` compatibility,
   real authorizing credentials, owner-scoped handles and separate usage projections.
@@ -51,7 +57,7 @@
   quickstart using the installed packed SDK against the exact real service;
   independent TypeScript consumers and frozen contracts supplement that evidence.
 - Remove obsolete Workspace/ServiceUser, Template-version/Memory/default-Agent
-  and compatibility exports. Use the current `@mem9/tidb-link` package and typed
+  and compatibility exports. Use the current `@tidblink/sdk` package and typed
   `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credential grammar.
 
 ## 0.2.0

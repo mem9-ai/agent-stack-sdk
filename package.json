@@ -9,12 +9,13 @@
   },
   "packageManager": "npm@11.6.2",
   "scripts": {
-    "build": "npm run build --workspace @mem9/tidb-link",
-    "typecheck": "npm run typecheck --workspace @mem9/tidb-link",
-    "test": "npm run test --workspace @mem9/tidb-link",
-    "test:service-contract": "npm run test:service-contract --workspace @mem9/tidb-link",
-    "pack:check": "npm run pack:check --workspace @mem9/tidb-link",
-    "test:service": "npm run test:service --workspace @mem9/tidb-link"
+    "build": "npm run build --workspace @tidblink/sdk",
+    "typecheck": "npm run typecheck --workspace @tidblink/sdk",
+    "test": "npm run test --workspace @tidblink/sdk",
+    "test:service-contract": "npm run test:service-contract --workspace @tidblink/sdk",
+    "pack:check": "npm run pack:check --workspace @tidblink/sdk",
+    "test:service": "npm run test:service --workspace @tidblink/sdk",
+    "test:release": "node --test scripts/release-plan.test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.2"

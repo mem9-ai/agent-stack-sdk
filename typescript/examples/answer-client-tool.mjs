@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@mem9/tidb-link";
+import { UserClient } from "@tidblink/sdk";
 
 /** The application produces output/error itself and persists this command identity. */
 export async function answerClientToolWorkflow({

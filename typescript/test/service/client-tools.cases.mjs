@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError } from "@mem9/tidb-link";
-import { answerClientToolWorkflow } from "@mem9/tidb-link/examples/answer-client-tool.mjs";
+import { UserClient, TiDBLinkApiError } from "@tidblink/sdk";
+import { answerClientToolWorkflow } from "@tidblink/sdk/examples/answer-client-tool.mjs";
 const baseUrl = process.env.SDK_SERVICE_URL;
 const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
 const stranger = new UserClient({

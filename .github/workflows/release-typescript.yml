@@ -1,41 +1,87 @@
 name: Release TypeScript SDK
 
+# Publishes when main carries a package version that has a CHANGELOG section
+# and no release tag yet. See RELEASING.md. npm trusted publishing identifies
+# this workflow by its filename; update the npm package settings if it is renamed.
 on:
   push:
-    tags:
-      - "typescript-v*"
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: release-typescript
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  plan:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
-          registry-url: https://registry.npmjs.org
+      - id: plan
+        run: node scripts/release-plan.mjs
+
+  publish:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
           cache: npm
       - run: npm ci
+      - run: npm run test:release
       - run: npm run test:service-contract
       - run: npm run typecheck
       - run: npm test
       - run: npm run pack:check
-      - run: test "$GITHUB_REF_NAME" = "typescript-v$(node -p 'require("./typescript/package.json").version')"
-      - run: npm publish --workspace @mem9/tidb-link --access public --provenance
+      - id: plan
+        run: node scripts/release-plan.mjs
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Record compatibility mapping
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+      # Trusted publishing needs Node.js 22.14 or newer and npm 11.5.1 or newer.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm run build
+      - name: Publish to npm
         run: |
-          {
-            echo "## Published TypeScript SDK"
-            echo
-            echo "- Package: \`@mem9/tidb-link@$(node -p 'require("./typescript/package.json").version')\`"
-            echo "- SDK commit: \`$GITHUB_SHA\`"
-            echo "- Agent Service baseline: \`$(node -p 'require("./typescript/package.json").tidbLinkRevision')\`"
-            echo "- Source OpenAPI SHA-256: \`$(node -p 'require("./typescript/package.json").tidbLinkOpenApiSha256')\`"
-            echo "- TiDB Link API: \`$(node -p 'require("./typescript/package.json").tidbLinkApiVersion')\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION is already on npm; skipping publish."
+          else
+            npm publish --workspace "$NAME" --access public --provenance --tag "$DIST_TAG"
+          fi
+        env:
+          NAME: ${{ steps.plan.outputs.name }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
+          # Used only until npm trusted publishing is configured for the package.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create tag and GitHub Release
+        run: |
+          flags=(--latest)
+          if [ "$PRERELEASE" = "true" ]; then flags=(--prerelease); fi
+          gh release create "$TAG" --target "$GITHUB_SHA" \
+            --title "$NAME $VERSION" --notes-file "$RELEASE_NOTES_FILE" "${flags[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.plan.outputs.name }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          PRERELEASE: ${{ steps.plan.outputs.prerelease }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md

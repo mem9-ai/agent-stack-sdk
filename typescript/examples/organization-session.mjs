@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { OrganizationClient } from "@mem9/tidb-link";
+import { OrganizationClient } from "@tidblink/sdk";
 
 /** Retain the owner, selected Template/model and both creation identities before calling. */
 export async function organizationSessionWorkflow({

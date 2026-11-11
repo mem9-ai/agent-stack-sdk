@@ -1,9 +1,9 @@
-import { submitAudioWorkflow } from "@mem9/tidb-link/examples/submit-audio.mjs";
+import { submitAudioWorkflow } from "@tidblink/sdk/examples/submit-audio.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
-import { UserClient, TiDBLinkApiError, TurnFailedError } from "@mem9/tidb-link";
+import { UserClient, TiDBLinkApiError, TurnFailedError } from "@tidblink/sdk";
 const baseUrl = process.env.SDK_SERVICE_URL;
 const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
 const stranger = new UserClient({

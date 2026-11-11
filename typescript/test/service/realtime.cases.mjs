@@ -7,7 +7,7 @@ import {
   ConflictError,
   TiDBLinkApiError,
   UserClient,
-} from "@mem9/tidb-link";
+} from "@tidblink/sdk";
 
 const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
@@ -212,7 +212,7 @@ test("the installed SDK discovers, selects and manages Realtime Connections", as
   assert.equal((await wrongAuthority.json()).error.code, "user_api_key_required");
 
   const executable = import.meta.resolve(
-    "@mem9/tidb-link/examples/prepare-realtime-connection.mjs",
+    "@tidblink/sdk/examples/prepare-realtime-connection.mjs",
   );
   const result = await exec(process.execPath, [fileURLToPath(executable)], {
     env: {

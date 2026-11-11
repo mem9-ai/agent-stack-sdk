@@ -9,6 +9,7 @@
 
 ```sh
 npm ci
+npm run test:release
 npm run typecheck
 npm test
 npm run pack:check
@@ -37,6 +38,8 @@ fingerprint in `typescript/package.json` identify the actual-service baseline.
 Contract snapshots supplement actual-service execution evidence.
 A public API change updates that service contract first, then updates the SDK,
 its compatibility declaration, tests, quick start, and release notes together.
+A change to the public package surface adds an entry to the unreleased section
+of `CHANGELOG.md`. Releases follow [RELEASING.md](RELEASING.md).
 
 Open an issue before adding a new product area. The SDK intentionally exposes a
 narrow supported surface rather than every TiDB Link route.

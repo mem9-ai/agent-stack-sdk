@@ -9,8 +9,8 @@ import {
   UserClient,
   TiDBLinkApiError,
   ConflictError,
-} from "@mem9/tidb-link";
-import { createSessionWorkflow } from "@mem9/tidb-link/examples/create-session.mjs";
+} from "@tidblink/sdk";
+import { createSessionWorkflow } from "@tidblink/sdk/examples/create-session.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const templateId = process.env.SDK_TEMPLATE_ID;
@@ -244,7 +244,7 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
     first.agent.id,
   );
   const executable = fileURLToPath(
-    import.meta.resolve("@mem9/tidb-link/examples/create-session.mjs"),
+    import.meta.resolve("@tidblink/sdk/examples/create-session.mjs"),
   );
   const { stdout, stderr } = await promisify(execFile)(
     process.execPath,

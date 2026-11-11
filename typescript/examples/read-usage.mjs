@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient, OrganizationClient } from "@mem9/tidb-link";
+import { UserClient, OrganizationClient } from "@tidblink/sdk";
 
 export async function readOwnUsage({ baseUrl, userApiKey, options = {} }) {
   const user = new UserClient({ baseUrl, apiKey: userApiKey });

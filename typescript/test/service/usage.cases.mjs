@@ -4,12 +4,12 @@ import {
   UserClient,
   OrganizationClient,
   TiDBLinkApiError,
-} from "@mem9/tidb-link";
+} from "@tidblink/sdk";
 
 import {
   readOwnUsage,
   readUserUsage,
-} from "@mem9/tidb-link/examples/read-usage.mjs";
+} from "@tidblink/sdk/examples/read-usage.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });

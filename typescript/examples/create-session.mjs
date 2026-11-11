@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 /** Save the selected Template, optional model and both keys before calling. */
 export async function createSessionWorkflow({

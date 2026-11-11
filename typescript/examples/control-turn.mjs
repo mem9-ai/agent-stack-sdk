@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 /** Persist the action and both identities before dispatch; recovery reads that command. */
 export async function controlTurnWorkflow({

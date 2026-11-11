@@ -1,7 +1,12 @@
 # Releasing the TypeScript SDK
 
 Applications, including TiDB Link's own DevHub, depend on published versions of
-`@tidblink/sdk` from npm. A commit on `main` is not a release.
+`@tidblink/server` from npm. A commit on `main` is not a release.
+
+`@tidblink/server` is the package for backends that hold an Organization API
+Key. Packages in this repository are maintained together and released
+separately: each has its own version, npm package and `<package>@<version>`
+tags.
 
 ## Versions and channels
 
@@ -46,8 +51,9 @@ public.
    Packages on npmjs.com, or with `npm stage view` and `npm stage download`, and
    approves it there or with `npm stage approve <stage-id>`.
 6. Run the release workflow again from the Actions page, or let the next push to
-   `main` run it. It sees the version on npm, creates the `typescript-v<version>`
-   tag at the staged commit and publishes the GitHub Release.
+   `main` run it. It sees the version on npm, creates the
+   `@tidblink/server@<version>` tag at the staged commit and publishes the GitHub
+   Release.
 
 A version without its own changelog section is treated as still in development
 and is not staged. A staged version is not staged twice while its draft GitHub

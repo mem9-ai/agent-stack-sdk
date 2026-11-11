@@ -1,7 +1,8 @@
-# `@tidblink/sdk`
+# `@tidblink/server`
 
-Official TypeScript SDK for Node.js 22.12 or newer. ESM only, with TypeScript
-declarations and no runtime dependencies.
+Official TiDB Link SDK for backends, for Node.js 22.12 or newer. ESM only, with
+TypeScript declarations and no runtime dependencies. It uses API Keys that must
+stay on your backend; do not ship it to browsers or devices.
 
 ## Supported scope
 
@@ -25,9 +26,9 @@ npm release:
 
 ```sh
 npm run build
-npm pack --workspace @tidblink/sdk
+npm pack --workspace @tidblink/server
 # In your application directory:
-npm install /path/to/tidblink-sdk-0.3.0.tgz
+npm install /path/to/tidblink-server-0.3.0.tgz
 ```
 
 An application backend uses its Organization API Key (`ti_org_…`) and explicitly
@@ -36,8 +37,8 @@ the caller; the User owns the resources. No User API Key is issued by this flow.
 
 ```js
 import { randomUUID } from "node:crypto";
-import { OrganizationClient } from "@tidblink/sdk";
-import { organizationSessionWorkflow } from "@tidblink/sdk/examples/organization-session.mjs";
+import { OrganizationClient } from "@tidblink/server";
+import { organizationSessionWorkflow } from "@tidblink/server/examples/organization-session.mjs";
 
 const baseUrl = process.env.AGENT_SERVICE_URL;
 const organizationApiKey = process.env.ORGANIZATION_API_KEY;
@@ -74,7 +75,7 @@ The installed Organization example can run with `AGENT_SERVICE_URL`,
 `SESSION_CREATION_KEY` (`MODEL_ID` is optional):
 
 ```sh
-node node_modules/@tidblink/sdk/examples/organization-session.mjs
+node node_modules/@tidblink/server/examples/organization-session.mjs
 ```
 
 `organization.user(userId)` returns an `EndUserClient`. Its Agent, Session, file,
@@ -122,7 +123,7 @@ Use these methods when your application also needs a User-Key client. Organizati
 owner-scoped resource access does not require issuing this credential.
 
 ```ts
-import { OrganizationClient } from "@tidblink/sdk";
+import { OrganizationClient } from "@tidblink/server";
 const organization = new OrganizationClient({
   baseUrl, apiKey: process.env.ORGANIZATION_API_KEY,
 });
@@ -152,7 +153,7 @@ IDs are strings from the deployment catalog, including newly published models.
 service's canonical catalog default and may differ.
 
 ```ts
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 const customer = new UserClient({
   baseUrl: process.env.AGENT_SERVICE_URL!,
@@ -237,7 +238,7 @@ clients and the User retain access to saved history under the service rules.
 The packaged example completes discovery and creation without message execution:
 
 ```js
-import { createSessionWorkflow } from "@tidblink/sdk/examples/create-session.mjs";
+import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
 const { agent, session } = await createSessionWorkflow({
   baseUrl: process.env.AGENT_SERVICE_URL,
@@ -324,7 +325,7 @@ establish whether the command was accepted.
 The packaged example uses an existing owned Session and a caller-retained input:
 
 ```js
-import { sendMessageWorkflow } from "@tidblink/sdk/examples/send-message.mjs";
+import { sendMessageWorkflow } from "@tidblink/server/examples/send-message.mjs";
 const result = await sendMessageWorkflow({
   baseUrl: process.env.AGENT_SERVICE_URL,
   userApiKey: process.env.USER_API_KEY,
@@ -335,7 +336,7 @@ const result = await sendMessageWorkflow({
 ```
 
 Set those five environment variables to run the installed example directly:
-`node node_modules/@tidblink/sdk/examples/send-message.mjs`. It prints only the
+`node node_modules/@tidblink/server/examples/send-message.mjs`. It prints only the
 final answer. Preserve the input across invocations; each new command identity
 can start new work. This slice replaces the obsolete response-owned NDJSON
 `streamTurn` API. Use the independent progress subscription below.
@@ -397,7 +398,7 @@ submits it again. Run it with `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` 
 `INPUT_ID`; supply `EVENT_CURSOR` to resume:
 
 ```sh
-node node_modules/@tidblink/sdk/examples/observe-message.mjs
+node node_modules/@tidblink/server/examples/observe-message.mjs
 ```
 
 ## Session Client Tools
@@ -409,7 +410,7 @@ names, schema size/depth and combined tool limits; the `async` argument is reser
 for the platform and is not part of application arguments.
 
 ```ts
-import type { ClientToolDeclaration } from "@tidblink/sdk";
+import type { ClientToolDeclaration } from "@tidblink/server";
 const tools: ClientToolDeclaration[] = [{
   type: "function",
   name: "lookup_order",
@@ -478,7 +479,7 @@ Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
 `CLIENT_EVENT_ID` and exactly one of `TOOL_OUTPUT` or `TOOL_ERROR`:
 
 ```sh
-node node_modules/@tidblink/sdk/examples/answer-client-tool.mjs
+node node_modules/@tidblink/server/examples/answer-client-tool.mjs
 ```
 
 ## Saved conversation history
@@ -556,7 +557,7 @@ Session, command and Turn IDs in `OutcomeUnknownError`. Read the original receip
 before deciding whether to repeat the identical command. A new ID is a new
 request, not network recovery.
 
-The installed `@tidblink/sdk/examples/control-turn.mjs` exports
+The installed `@tidblink/server/examples/control-turn.mjs` exports
 `controlTurnWorkflow`. It returns cancellation acceptance for `action: "cancel"`
 and waits for the separate retry result for `action: "retry"`. Run it with
 `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID`, `TURN_ID`, `CLIENT_EVENT_ID` and
@@ -570,7 +571,7 @@ owned Session for a terminal. The SDK returns the one-time connect token but doe
 not open or implement the WebSocket transport.
 
 ```ts
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 const user = new UserClient({
   baseUrl: process.env.AGENT_SERVICE_URL!,
@@ -607,7 +608,7 @@ support and device connections are outside this package slice.
 The packaged example accepts an existing Session ID and never prints the token:
 
 ```js
-import { prepareRealtimeConnection } from "@tidblink/sdk/examples/prepare-realtime-connection.mjs";
+import { prepareRealtimeConnection } from "@tidblink/server/examples/prepare-realtime-connection.mjs";
 
 const prepared = await prepareRealtimeConnection({
   baseUrl: process.env.AGENT_SERVICE_URL,
@@ -667,7 +668,7 @@ final answer. Set `AGENT_SERVICE_URL`, `USER_API_KEY`, `SESSION_ID` and
 `AUDIO_FILE_PATH`; `AUDIO_CONTENT_TYPE` is optional:
 
 ```sh
-node node_modules/@tidblink/sdk/examples/submit-audio.mjs
+node node_modules/@tidblink/server/examples/submit-audio.mjs
 ```
 
 The exported `submitAudioWorkflow()` accepts bytes and an optional abort signal.
@@ -738,7 +739,7 @@ The packaged `upload-file.mjs` example uploads and attaches one file. Set
 `UPLOAD_IDEMPOTENCY_KEY`, and `CLIENT_EVENT_ID`, then run:
 
 ```sh
-node node_modules/@tidblink/sdk/examples/upload-file.mjs
+node node_modules/@tidblink/server/examples/upload-file.mjs
 ```
 
 The example returns the final conversation result; its exported
@@ -811,7 +812,7 @@ locally for a settled fire and reads its associated Turn. Set `AGENT_SERVICE_URL
 `SCHEDULE_PROMPT`, then run:
 
 ```sh
-node node_modules/@tidblink/sdk/examples/schedule-task.mjs
+node node_modules/@tidblink/server/examples/schedule-task.mjs
 ```
 
 A local example timeout leaves the schedule active and prints its identity for
@@ -898,7 +899,7 @@ valuation completeness are independent. Do not display missing costs as zero or
 infer a balance from these reads. Organization projections intentionally omit
 some details available in the User's own projection.
 
-The installed example `@tidblink/sdk/examples/read-usage.mjs` exports
+The installed example `@tidblink/server/examples/read-usage.mjs` exports
 `readOwnUsage` and `readUserUsage`, each returning a summary and the first detail
 page. The CLI requires `AGENT_SERVICE_URL` and `USAGE_AUTHORITY=user` with
 `USER_API_KEY`, or `USAGE_AUTHORITY=organization` with `ORGANIZATION_API_KEY` and

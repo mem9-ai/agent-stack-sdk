@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 /** Observe an already submitted input. Persist each event cursor for reconnection. */
 export function observeMessageWorkflow({

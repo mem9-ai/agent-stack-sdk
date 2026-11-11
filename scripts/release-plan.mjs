@@ -13,7 +13,8 @@ import { fileURLToPath } from "node:url";
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/;
 
-export const releaseTag = (version) => `typescript-v${version}`;
+/** One tag per package and version, so packages in this repository release independently. */
+export const releaseTag = (name, version) => `${name}@${version}`;
 
 /** Returns the body of the `## <version>` section, or null when it is absent. */
 export const changelogSection = (changelog, version) => {
@@ -41,7 +42,7 @@ export const planRelease = ({
   const base = {
     name,
     version,
-    tag: releaseTag(version),
+    tag: releaseTag(name, version),
     prerelease,
     distTag: prerelease ? "next" : "latest",
   };
@@ -124,7 +125,7 @@ const main = () => {
   const manifest = JSON.parse(
     readFileSync(new URL("typescript/package.json", root), "utf8"),
   );
-  const tag = releaseTag(manifest.version);
+  const tag = releaseTag(manifest.name, manifest.version);
   const changelog = readFileSync(new URL("CHANGELOG.md", root), "utf8");
   const tagExists = remoteTagExists(tag);
   const pending =

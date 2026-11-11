@@ -8,7 +8,7 @@ import {
   releaseNotes,
 } from "./release-plan.mjs";
 
-const name = "@tidblink/sdk";
+const name = "@tidblink/server";
 const changelog = [
   "# Changelog",
   "",
@@ -61,14 +61,14 @@ test("a version without its own section is still in development", () => {
 test("an existing tag is never released again", () => {
   const result = plan("0.3.0", { tagExists: true, published: true });
   assert.equal(result.action, "none");
-  assert.match(result.reason, /typescript-v0\.3\.0 already exists/);
+  assert.match(result.reason, /@tidblink\/server@0\.3\.0 already exists/);
 });
 
 test("a new version is staged: stable to latest, prerelease to next", () => {
   const stable = plan("0.3.0");
   assert.deepEqual(
     [stable.action, stable.distTag, stable.prerelease, stable.tag],
-    ["stage", "latest", false, "typescript-v0.3.0"],
+    ["stage", "latest", false, "@tidblink/server@0.3.0"],
   );
   const candidate = plan("0.4.0-rc.1");
   assert.deepEqual(
@@ -117,7 +117,7 @@ test("release notes record the service compatibility mapping", () => {
     "0123abcd",
   );
   assert.match(notes, /^- First change\.\n- Second change\./);
-  assert.match(notes, /`@tidblink\/sdk@0\.3\.0` \(npm dist-tag `latest`\)/);
+  assert.match(notes, /`@tidblink\/server@0\.3\.0` \(npm dist-tag `latest`\)/);
   assert.match(notes, /SDK commit: `0123abcd`/);
   assert.match(notes, /service baseline: `abc123`/);
   assert.match(notes, /OpenAPI SHA-256: `def456`/);

@@ -9,7 +9,7 @@ stay on your backend; do not ship it to browsers or devices.
 This package supports Organization information, End User provisioning,
 Template/model discovery, personal Agent and Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, Client Tools, conversation history, file attachments, Schedulers,
+continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
 88228780](https://github.com/mem9-ai/agent-stack/commit/882287809f91d9a3fdf60537460431d9f0fc23e7).
 
@@ -75,11 +75,11 @@ node node_modules/@tidblink/server/examples/create-session.mjs
 ```
 
 `organization.user(userId)` returns an `EndUserClient` with that User's Agent,
-Session, file, Scheduler and catalog methods. Selecting a User sends no request.
+Session, file and catalog methods. Selecting a User sends no request.
 Usage reads stay on `organization.getUserUsage(userId, options)` and
 `getUserUsageDetails`.
 Private MCP registration, general Drive entry management, sandbox preferences,
-Scheduler Plans and native Hardware APIs are not wrapped by this SDK. Use the
+Schedulers and native Hardware APIs are not wrapped by this SDK. Use the
 pinned public HTTP contract for those existing service capabilities. Building ToD,
 a device gateway or management integration remains outside this package.
 Artifact APIs remain gated. The SDK prepares Realtime HTTP grants; applications
@@ -90,12 +90,11 @@ client nor a media client.
 
 After Organization Key rotation or revocation, create a new `OrganizationClient`
 with fresh valid authority and select the same User. Existing handles retain their
-old credential. New old-authority requests, subscriptions, Scheduler fires,
+old credential. New old-authority requests, subscriptions,
 Realtime tokens and Organization-issued file tickets lose authority. Accepted
 Turns continue, and admitted file transfers may finish. Reconnect/obtain new
 grants with fresh authority and reconcile the original command before submitting
-new work. Updating retained Schedulers with fresh authority reauthorizes future
-fires. Another valid Key remains usable. Disabled Users cannot start new work;
+new work. Another valid Key remains usable. Disabled Users cannot start new work;
 Organization authority can still read retained history/files and perform supported
 cleanup. Application policies and K3 spending policy are separate concerns.
 
@@ -390,7 +389,7 @@ await session.replaceClientTools(tools, { ifMatch: current.etag });
 Replacement is the complete set, with `[]` clearing it. Its ETag is independent of
 the Session's model ETag. Stale replacement returns `precondition_failed`; read the
 set and decide again. A Turn retains the declarations admitted when it started.
-An identical replacement keeps its revision. Scheduler and audio inputs do not
+An identical replacement keeps its revision. Scheduler-started Turns and audio inputs do not
 use the Session-client declarations under this service baseline.
 
 After submitting a message, retrieve pending calls independently of any progress
@@ -705,76 +704,6 @@ The example returns the final conversation result; its exported
 directories or write Session text files. Organization owner-scoped clients can
 upload, read and attach the same ordinary Files.
 
-## Scheduled work
-
-`user.schedulers` uses the full customer Scheduler API. A new-Session schedule
-requires an owned Agent; a bound-Session schedule supplies only its Session.
-The service resolves the Agent from that Session.
-
-```ts
-const created = await customer.schedulers.create({
-  agentId: agent.id,
-  title: "Morning report",
-  prompt: "Summarize the latest activity.",
-  schedule: { kind: "cron", cronExpr: "0 9 * * *", timezone: "Asia/Shanghai" },
-  idempotencyKey: savedSchedulerKey,
-});
-const current = await customer.schedulers.get(created.scheduler.schedulerId);
-const updated = await customer.schedulers.update(
-  current.scheduler.schedulerId,
-  { enabled: false },
-  { ifMatch: current.etag },
-);
-const history = await customer.schedulers.fires(current.scheduler.schedulerId, {
-  limit: 20,
-});
-```
-
-For one-time work use exactly one of `{ kind: "once", runAt: isoTimestamp }` or
-`{ kind: "once", after: "1h30m" }`. `runAt` includes a timezone offset; cron
-requires an IANA timezone. The service owns timing and validation. Optional
-`validFrom` and `validUntil` restrict the execution window. A bound-Session create
-uses `delivery: { target: "bound_session", sessionId }` and omits `agentId`.
-
-Creation returns `{ scheduler, etag }`. Persist the key and exact input before
-calling. A same-key replay returns the **original creation response and ETag**,
-even if the Scheduler has since changed; use `get()` for current state before an
-edit. A changed input with that key is refused. Uncertain responses raise
-`OutcomeUnknownError` rather than repeating the command automatically.
-`idempotency_in_progress` retains the service's raw `retryAfter` header on the
-error so the application can decide when to replay the original request.
-
-`update(id, changes, { ifMatch })` and `delete(id, { ifMatch })` require a
-previously read ETag. Stale writes retain the service's 412 conflict; the SDK
-never refreshes and overwrites another writer's changes. Updates support title,
-prompt, Agent/delivery target, schedule, enabled state, validity window and
-`snoozeUntil`. Enabling an elapsed one-time schedule requires a future time.
-Disabling or deleting a Scheduler does not roll back completed effects. Deleted
-Schedulers are no longer available through detail or fire-history reads.
-`organization.user(userId).schedulers.list({ status: "deleted" })` returns their
-retained tombstones; lists omit deleted records by default.
-
-`list({ status, limit, cursor })` and `fires(id, { limit, cursor })` return
-`nextCursor` rather than `hasMore`. Cursors retain their original owner/filter
-scope. Each fire preserves its execution prompt and delivery snapshot; later
-Scheduler edits cannot rewrite it. `pending` is not success. A `completed` fire
-or a `failed` fire retains nullable result identities and a nullable failure code.
-When `result.sessionId` and `result.turnId` are present, read the saved Turn with
-`customer.session(sessionId).getTurn(turnId)`; do not invent a message identity
-when `messageId` is null.
-
-The installed `schedule-task.mjs` example creates one scheduled task, waits
-locally for a settled fire and reads its associated Turn. Set `AGENT_SERVICE_URL`,
-`ORGANIZATION_API_KEY`, `END_USER_ID`, `AGENT_ID`, `SCHEDULER_IDEMPOTENCY_KEY`, `SCHEDULE_RUN_AT` and
-`SCHEDULE_PROMPT`, then run:
-
-```sh
-node node_modules/@tidblink/server/examples/schedule-task.mjs
-```
-
-A local example timeout leaves the schedule active and prints its identity for
-later fire-history reads. The separate Scheduler plans API is outside this SDK.
-
 ## Errors and uncertain outcomes
 
 Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
@@ -887,7 +816,7 @@ separate process installs the tarball in a clean directory and calls only the
 installed SDK and packaged Organization example for its application workflow.
 It verifies Organization provisioning, discovery, Agent/Session
 creation replay, owner isolation, file upload/download and message attachment,
-text results, SSE/history, Client Tools, audio, Scheduler fires and deleted history,
+text results, SSE/history, Client Tools, audio,
 Realtime HTTP grants, rotation/revocation and fresh-authority recovery. Management credential changes
 and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
 redemption, live speech suppliers, physical hardware and deployment compatibility
@@ -917,9 +846,6 @@ They verify inline, multipart and empty uploads, cancellation and invalid conten
 large-file download-ticket redemption, and a real Runtime file read whose answer
 contains the uploaded content. The installed upload example exercises the same
 public workflow. Real supplier deployment certification is outside this evidence.
-Scheduler cases enable the real background runner and use SDK-created schedules
-to verify successful and failed execution, delivery changes, retained fire
-snapshots and the installed example.
 Audio cases use the real transcription adapter with a controlled HTTP supplier and
 real spend limits. They cover recorded input, malformed/unsupported recordings,
 supplier and budget refusals, model failure, active-response interruption and the

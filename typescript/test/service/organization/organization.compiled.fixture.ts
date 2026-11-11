@@ -22,7 +22,6 @@ it("an independent installed SDK consumer uses Organization authority against th
     controlledDrive9: true,
     controlledAudioTranscription: true,
     controlledVoiceProvider: true,
-    schedulerRunner: true,
   });
   const temporary = await mkdtemp(
     path.join(tmpdir(), "tidb-link-org-consumer-"),
@@ -175,8 +174,6 @@ it("an independent installed SDK consumer uses Organization authority against th
           });
         } else if (message.stage === "audio") {
           harness.model.enqueueText({ chunks: ["SDK audio answer."] });
-        } else if (message.stage === "schedule") {
-          harness.model.enqueueText({ chunks: ["SDK scheduled answer."] });
         } else if (message.stage === "pause") {
           paused = harness.model.enqueueText({
             chunks: ["Accepted work survived rotation."],

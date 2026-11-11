@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove Scheduler support: `user.schedulers`, its types and the
+  `schedule-task.mjs` example. Schedulers are leaving the core platform; call the
+  HTTP API directly if you still need them.
 - Internal: request paths are written relative to the Organization or End User
   scope instead of being rewritten from User-Key routes. Requests on the wire are
   unchanged.

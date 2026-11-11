@@ -1,0 +1,3599 @@
+{
+  "revision": "1c7f98ee12c28e3d1adb656b90324c0b95135e42",
+  "sourceOpenApiSha256": "c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6",
+  "paths": {
+    "/api/v1/org/agent-templates": {
+      "get": {
+        "operationId": "OrganizationAgentTemplatesController_list",
+        "parameters": [
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "updated_desc",
+                "created_desc",
+                "name_asc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "lifecycleStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "all",
+                "active",
+                "archived"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateListDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The committed Template catalog changed while continuing a cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "List Organization Templates.",
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      },
+      "post": {
+        "operationId": "OrganizationAgentTemplatesController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[!-~]{1,255}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationTemplateCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key conflict, unavailable dependency, or realtime_language_unavailable when the enabled language is not offered by the active Ops release.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      }
+    },
+    "/api/v1/org/agent-templates/{templateId}": {
+      "get": {
+        "operationId": "OrganizationAgentTemplatesController_get",
+        "parameters": [
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      },
+      "put": {
+        "operationId": "OrganizationAgentTemplatesController_replace",
+        "parameters": [
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[!-~]{1,255}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"cvc1\\.[A-Za-z0-9_-]{43}\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationTemplateReplaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Template ETag is stale, the Idempotency-Key conflicts, a dependency is unavailable, or realtime_language_unavailable when the enabled language is not offered by the active Ops release.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      }
+    },
+    "/api/v1/org/agent-templates/{templateId}/archive": {
+      "post": {
+        "operationId": "OrganizationAgentTemplatesController_archive",
+        "parameters": [
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[!-~]{1,255}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"cvc1\\.[A-Za-z0-9_-]{43}\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationTemplateEmptyBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Template ETag is stale or the Idempotency-Key conflicts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      }
+    },
+    "/api/v1/org/agent-template-reference-catalog": {
+      "get": {
+        "operationId": "OrganizationAgentTemplatesController_referenceCatalog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationTemplateCatalogDto"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Strict parameters or body are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, revoked or rotated Organization Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an Organization API Key may use this surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The organization-scoped Template is not visible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Read Organization Template model, Sandbox and published Skill availability.",
+        "tags": [
+          "OrganizationAgentTemplates"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope."
+      }
+    },
+    "/api/v1/org/skills": {
+      "get": {
+        "description": "Only Organization-scope Skills with a loadable published head are returned. Stable created-at/ID keyset pagination; no private or all-scopes selector.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key.",
+        "operationId": "listOrganizationSkills",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "Authenticated conditional GET; weak tags, tag lists and * are supported.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "description": "Opaque signed cursor for this Organization and resource."
+          }
+        ],
+        "responses": {
+          "200": {
+            "headers": {
+              "ETag": {
+                "description": "Representation-specific strong validator.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSkillListDto"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The currently authorized representation matches If-None-Match; no body.",
+            "headers": {
+              "ETag": {
+                "description": "Representation-specific strong validator.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error or invalid_cursor: invalid strict query, identifier, version, relative file path, cursor or conditional header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: current Organization Key authority is missing, revoked, rotated or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource_not_found or skill_file_not_found: shared Skill, published loadable Version or safe file is unavailable; foreign and private resources are indistinguishable from missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "auth_temporarily_unavailable or skill_package_store_unavailable: credential resolution or content storage is temporarily unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "List this Organization’s published, available shared Skills",
+        "tags": [
+          "Organization Skills"
+        ]
+      }
+    },
+    "/api/v1/org/skills/{skillId}": {
+      "get": {
+        "description": "Descending Version pagination. User authors, private publication provenance and installation relations are omitted. ETag covers this entire returned page.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key.",
+        "operationId": "getOrganizationSkill",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "Authenticated conditional GET; weak tags, tag lists and * are supported.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          {
+            "name": "skillId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "description": "Opaque signed cursor for this Organization and resource."
+          }
+        ],
+        "responses": {
+          "200": {
+            "headers": {
+              "ETag": {
+                "description": "Representation-specific strong validator.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSkillDetailDto"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The currently authorized representation matches If-None-Match; no body.",
+            "headers": {
+              "ETag": {
+                "description": "Representation-specific strong validator.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error or invalid_cursor: invalid strict query, identifier, version, relative file path, cursor or conditional header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: current Organization Key authority is missing, revoked, rotated or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: requires an Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource_not_found or skill_file_not_found: shared Skill, published loadable Version or safe file is unavailable; foreign and private resources are indistinguishable from missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "auth_temporarily_unavailable or skill_package_store_unavailable: credential resolution or content storage is temporarily unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Read shared Skill metadata and its published loadable Versions",
+        "tags": [
+          "Organization Skills"
+        ]
+      }
+    },
+    "/api/v1/org/skills/uploads": {
+      "post": {
+        "description": "Retrying the same ZIP with the same Idempotency-Key and Organization Key returns the original upload and its current state, including when requests overlap. A terminal upload is not restarted. Different ZIP bytes with the same key return 409.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key.",
+        "operationId": "createOrganizationSkillUpload",
+        "parameters": [
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 209715200
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Upload accepted for asynchronous validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "upload"
+                  ],
+                  "properties": {
+                    "upload": {
+                      "type": "object",
+                      "required": [
+                        "uploadId",
+                        "skillId",
+                        "state",
+                        "byteSize",
+                        "sha256",
+                        "expiresAt",
+                        "validation",
+                        "version",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "uploadId": {
+                          "type": "string"
+                        },
+                        "skillId": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "uploading",
+                            "pending",
+                            "uploaded",
+                            "fetching",
+                            "validating",
+                            "extracting",
+                            "awaiting_confirmation",
+                            "finalizing",
+                            "done",
+                            "failed",
+                            "aborted"
+                          ]
+                        },
+                        "byteSize": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "validation": {
+                          "type": "object",
+                          "required": [
+                            "entriesTotal",
+                            "fileCount",
+                            "entriesDone",
+                            "declaredBytes",
+                            "bytesDone",
+                            "diagnostics",
+                            "failureCode",
+                            "failurePath"
+                          ],
+                          "properties": {
+                            "entriesTotal": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "fileCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "entriesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "declaredBytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "bytesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "diagnostics": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "failureCode": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "failurePath": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The ZIP body, Content-Length or Idempotency-Key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Organization API Key is absent, revoked or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A User API Key cannot access Organization Skill uploads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The idempotency key conflicts with an existing upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The ZIP exceeds the maximum accepted size.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "upload_temporarily_unavailable: upload storage is temporarily unavailable, the process byte budget cannot hold the declared Content-Length, or the 4 per-process upload slots are busy. A budget or slot refusal reads no body and creates no upload. Retry later with the same Idempotency-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Upload and validate an Organization Skill ZIP without publishing it",
+        "tags": [
+          "Organization Skills"
+        ]
+      }
+    },
+    "/api/v1/org/skills/uploads/{uploadId}": {
+      "get": {
+        "operationId": "getOrganizationSkillUpload",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current upload state and validation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "upload"
+                  ],
+                  "properties": {
+                    "upload": {
+                      "type": "object",
+                      "required": [
+                        "uploadId",
+                        "skillId",
+                        "state",
+                        "byteSize",
+                        "sha256",
+                        "expiresAt",
+                        "validation",
+                        "version",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "uploadId": {
+                          "type": "string"
+                        },
+                        "skillId": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "uploading",
+                            "pending",
+                            "uploaded",
+                            "fetching",
+                            "validating",
+                            "extracting",
+                            "awaiting_confirmation",
+                            "finalizing",
+                            "done",
+                            "failed",
+                            "aborted"
+                          ]
+                        },
+                        "byteSize": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "validation": {
+                          "type": "object",
+                          "required": [
+                            "entriesTotal",
+                            "fileCount",
+                            "entriesDone",
+                            "declaredBytes",
+                            "bytesDone",
+                            "diagnostics",
+                            "failureCode",
+                            "failurePath"
+                          ],
+                          "properties": {
+                            "entriesTotal": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "fileCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "entriesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "declaredBytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "bytesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "diagnostics": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "failureCode": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "failurePath": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The upload representation has not changed.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The If-None-Match value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Organization API Key is absent, revoked or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A User API Key cannot access Organization Skill uploads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The upload is absent or belongs to another Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Read Organization Skill upload validation and staging state",
+        "tags": [
+          "Organization Skills"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key."
+      },
+      "delete": {
+        "operationId": "cancelOrganizationSkillUpload",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The upload was cancelled.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Organization API Key is absent, revoked or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A User API Key cannot access Organization Skill uploads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The upload is absent or belongs to another Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The upload is no longer unpublished and cannot be cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Cancel an unpublished Organization Skill upload",
+        "tags": [
+          "Organization Skills"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key."
+      }
+    },
+    "/api/v1/org/skills/uploads/{uploadId}/publish": {
+      "post": {
+        "operationId": "publishOrganizationSkillUpload",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Publication queued for durable finalization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "upload"
+                  ],
+                  "properties": {
+                    "upload": {
+                      "type": "object",
+                      "required": [
+                        "uploadId",
+                        "skillId",
+                        "state",
+                        "byteSize",
+                        "sha256",
+                        "expiresAt",
+                        "validation",
+                        "version",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "uploadId": {
+                          "type": "string"
+                        },
+                        "skillId": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "uploading",
+                            "pending",
+                            "uploaded",
+                            "fetching",
+                            "validating",
+                            "extracting",
+                            "awaiting_confirmation",
+                            "finalizing",
+                            "done",
+                            "failed",
+                            "aborted"
+                          ]
+                        },
+                        "byteSize": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "validation": {
+                          "type": "object",
+                          "required": [
+                            "entriesTotal",
+                            "fileCount",
+                            "entriesDone",
+                            "declaredBytes",
+                            "bytesDone",
+                            "diagnostics",
+                            "failureCode",
+                            "failurePath"
+                          ],
+                          "properties": {
+                            "entriesTotal": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "fileCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "entriesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "declaredBytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "nullable": true
+                            },
+                            "bytesDone": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "diagnostics": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "failureCode": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "failurePath": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Idempotency-Key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Organization API Key is absent, revoked or inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A User API Key cannot access Organization Skill uploads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The upload is absent or belongs to another Organization API Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The idempotency key or upload state conflicts with this request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The upload has expired and can no longer be published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "summary": "Publish a validated Organization Skill upload as a formal version",
+        "tags": [
+          "Organization Skills"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization scope; no End User scope. Uploads and publication are attributed to the authentic Organization API Key."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "agent_instructions_too_large",
+                  "hardware_connection_unavailable",
+                  "websocket_required",
+                  "hardware_binding_unavailable",
+                  "hardware_registration_unavailable",
+                  "binding_commit_unknown",
+                  "hardware_credential_unavailable",
+                  "hardware_command_closed",
+                  "hardware_command_outcome_unknown",
+                  "binding_receipt_integrity",
+                  "validation_error",
+                  "template_test_busy",
+                  "template_test_closed",
+                  "template_test_expired",
+                  "template_test_dependency_unavailable",
+                  "template_test_model_unavailable",
+                  "template_test_authority_lost",
+                  "invalid_organization_context",
+                  "authentication_required",
+                  "organization_owner_required",
+                  "organization_last_owner",
+                  "organization_already_joined",
+                  "resource_not_found",
+                  "invalid_cursor",
+                  "console_temporarily_unavailable",
+                  "service_configuration_unavailable",
+                  "human_principal_required",
+                  "user_api_key_required",
+                  "organization_membership_required",
+                  "admin_required",
+                  "org_admin_required",
+                  "agent_not_found",
+                  "agent_template_creation_conflict",
+                  "agent_template_apply_busy",
+                  "agent_template_recall_acknowledgment_required",
+                  "requires_explicit_agent_creation",
+                  "agent_template_application_conflict",
+                  "agent_template_dependency_conflict",
+                  "agent_template_unavailable",
+                  "session_agent_required",
+                  "session_agent_unavailable",
+                  "session_model_not_allowed",
+                  "session_execution_dependency_unavailable",
+                  "model_provider_unconfigured",
+                  "sandbox_unconfigured",
+                  "sandbox_validation_pending",
+                  "sandbox_scope_incompatible",
+                  "sandbox_configuration_incompatible",
+                  "sandbox_unavailable",
+                  "vision_model_unsupported",
+                  "vision_image_count_exceeded",
+                  "vision_image_unsupported",
+                  "vision_image_source_too_large",
+                  "vision_image_invalid",
+                  "vision_image_decode_limit_exceeded",
+                  "vision_image_payload_too_large",
+                  "vision_image_processing_unavailable",
+                  "organization_default_agent_unconfigured",
+                  "user_default_agent_mapping_invalid",
+                  "session_not_found",
+                  "session_read_only",
+                  "session_switch_in_progress",
+                  "session_switch_busy",
+                  "session_switch_unsupported",
+                  "session_configuration_epoch_changed",
+                  "provider_unavailable",
+                  "realtime_connection_not_found",
+                  "realtime_connection_live",
+                  "realtime_model_conflict",
+                  "realtime_model_unavailable",
+                  "realtime_not_enabled",
+                  "realtime_language_unsupported",
+                  "realtime_language_unavailable",
+                  "realtime_connection_ended",
+                  "audio_format_unsupported",
+                  "admission_unavailable",
+                  "turn_not_found",
+                  "checkpoint_runtime_unavailable",
+                  "artifact_not_found",
+                  "chat_image_not_found",
+                  "artifact_cursor_invalid",
+                  "artifact_idempotency_conflict",
+                  "artifact_quota_exceeded",
+                  "artifact_not_writable",
+                  "artifact_revision_conflict",
+                  "artifact_source_not_found",
+                  "artifact_source_not_file",
+                  "artifact_source_changed",
+                  "artifact_storage_contract_unavailable",
+                  "artifact_publish_failed",
+                  "artifact_bytes_need_repair",
+                  "drive_file_not_found",
+                  "drive_path_too_long",
+                  "drive_download_rate_limited",
+                  "llm_spend_limit_exhausted",
+                  "drive_download_provider_error",
+                  "drive_download_unavailable",
+                  "invalid_idempotency_key",
+                  "idempotency_key_required",
+                  "session_creation_conflict",
+                  "agent_creation_conflict",
+                  "interaction_input_conflict",
+                  "interaction_not_found",
+                  "interaction_admission_closed",
+                  "interaction_target_conflict",
+                  "client_tool_call_unavailable",
+                  "client_tool_call_settled",
+                  "idempotency_key_reused",
+                  "identity_conversion_command_retired",
+                  "idempotency_in_progress",
+                  "idempotency_key_expired",
+                  "secret_delivery_expired",
+                  "idempotency_completion_failed",
+                  "idempotency_witness_invalid",
+                  "skill_name_conflict",
+                  "skill_delete_blocked",
+                  "invalid_skill_package",
+                  "skill_ingestion_not_found",
+                  "skill_import_job_not_found",
+                  "skill_import_state_conflict",
+                  "skill_ingestion_expired",
+                  "precondition_required",
+                  "precondition_failed",
+                  "resource_conflict",
+                  "hardware_model_conflict",
+                  "hardware_model_in_use",
+                  "agent_template_profile_unavailable",
+                  "agent_template_dependency_unavailable",
+                  "agent_template_archived",
+                  "agent_template_conflict",
+                  "agent_template_list_changed",
+                  "skill_not_found",
+                  "skill_version_not_found",
+                  "skill_file_not_found",
+                  "skill_package_file_rejected",
+                  "skill_package_store_unavailable",
+                  "skill_head_required",
+                  "skill_canonical_name_conflict",
+                  "skill_already_installed",
+                  "skill_installation_not_found",
+                  "skill_upgrade_not_forward",
+                  "unsupported_media_type",
+                  "raw_upload_too_large",
+                  "upload_too_large",
+                  "upload_ticket_invalid",
+                  "upload_failed",
+                  "upload_expired",
+                  "upload_incomplete",
+                  "upload_integrity_failed",
+                  "upload_requires_multipart",
+                  "upload_temporarily_unavailable",
+                  "skill_authoring_forbidden",
+                  "skill_read_forbidden",
+                  "restore_requires_historical_version",
+                  "private_skill_required",
+                  "publication_head_required",
+                  "open_publication_request_exists",
+                  "publication_target_changed",
+                  "publication_conflict",
+                  "publication_request_not_found",
+                  "publication_request_already_decided",
+                  "publication_request_invalidated",
+                  "publication_request_conflict",
+                  "publication_snapshot_not_found",
+                  "scheduler_not_found",
+                  "asr_disabled",
+                  "asr_failed",
+                  "turn_admission_closed",
+                  "session_has_active_turn",
+                  "clarification_source_conflict",
+                  "configuration_unavailable",
+                  "organization_api_key_rotation_conflict",
+                  "auth_kind_forbidden",
+                  "billing_target_not_found",
+                  "invalid_billing_usage_query",
+                  "invalid_billing_usage_cursor",
+                  "billing_audit_unavailable",
+                  "session_observation_audit_unavailable",
+                  "drive9_provision_config_conflict",
+                  "runtime_error",
+                  "invalid_credentials",
+                  "invalid_current_password",
+                  "account_already_exists",
+                  "account_not_found",
+                  "password_already_configured",
+                  "google_identity_already_linked",
+                  "verification_not_found",
+                  "verification_code_invalid",
+                  "verification_replaced",
+                  "verification_already_completed",
+                  "verification_expired",
+                  "verification_attempts_exhausted",
+                  "verification_rate_limited",
+                  "login_rate_limited",
+                  "password_rate_limited",
+                  "auth_temporarily_unavailable",
+                  "auth_outcome_unknown",
+                  "password_changed",
+                  "invalid_origin",
+                  "platform_operator_required",
+                  "personal_organization_eligibility_concurrent_change",
+                  "personal_organization_eligibility_unavailable",
+                  "personal_organization_eligibility_outcome_unknown",
+                  "personal_organization_creation_unavailable",
+                  "onboarding_temporarily_unavailable",
+                  "onboarding_outcome_unknown",
+                  "organization_destination_not_available",
+                  "invitation_not_available",
+                  "invitation_not_actionable",
+                  "invite_delivery_failed",
+                  "access_request_not_available",
+                  "access_requests_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "OrganizationSkillDetailDto": {
+        "type": "object",
+        "properties": {
+          "skill": {
+            "type": "object",
+            "properties": {
+              "skillId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "headVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "skillId",
+              "name",
+              "description",
+              "revision",
+              "headVersion",
+              "createdAt",
+              "updatedAt"
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "packageDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "rawSize": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": false
+                },
+                "extractedSize": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": false
+                },
+                "loadable": {
+                  "type": "boolean"
+                },
+                "portable": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "version",
+                "name",
+                "description",
+                "packageDigest",
+                "rawSize",
+                "extractedSize",
+                "loadable",
+                "portable",
+                "createdAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "skill",
+          "versions",
+          "nextCursor"
+        ]
+      },
+      "OrganizationSkillListDto": {
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "skillId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "headVersion": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "skillId",
+                "name",
+                "description",
+                "revision",
+                "headVersion",
+                "createdAt",
+                "updatedAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "skills",
+          "nextCursor"
+        ]
+      },
+      "OrganizationTemplateCatalogDto": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "available"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sandboxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "label": {
+                  "type": "string"
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "capabilities"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "skillId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "maximum": 2147483647,
+                  "exclusiveMaximum": false
+                },
+                "available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "skillId",
+                "name",
+                "description",
+                "version",
+                "available"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "models",
+          "sandboxes",
+          "skills"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationTemplateCreateDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "realtime": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "zh-CN",
+                      "en-US"
+                    ]
+                  }
+                },
+                "required": [
+                  "language"
+                ],
+                "nullable": true,
+                "additionalProperties": false
+              },
+              "standingTask": {
+                "description": "Optional Realtime Standing Task: a live Realtime Connection of a voice-enabled Session keeps one Full Agent task with this goal running while a client is attached and the Realtime Model has no task of its own. Ignored when realtime is null and by Template Tests.",
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "description": "What the Full Agent does in each Standing Task Turn. Line endings are normalized and surrounding whitespace trimmed; the result must have 1 to 4000 characters, counted as UTF-16 code units.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal"
+                ],
+                "additionalProperties": false
+              },
+              "schemaVersion": {
+                "type": "string",
+                "enum": [
+                  "agent-template-content@7"
+                ],
+                "default": "agent-template-content@7"
+              },
+              "hardware": {
+                "type": "object",
+                "properties": {
+                  "hardwareRequirements": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hardwareRequirementId": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "hardwareModelId": {
+                          "type": "string",
+                          "pattern": "^hmod_[0-9a-f]{32}$"
+                        }
+                      },
+                      "required": [
+                        "hardwareRequirementId",
+                        "label",
+                        "hardwareModelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "default": []
+                  }
+                },
+                "default": {
+                  "hardwareRequirements": []
+                },
+                "additionalProperties": false
+              },
+              "instructions": {
+                "type": "string",
+                "default": ""
+              },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "sessionRecall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "default": {
+                      "enabled": false
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "default": {
+                  "sessionRecall": {
+                    "enabled": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "skillId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "exclusiveMaximum": false
+                    }
+                  },
+                  "required": [
+                    "skillId",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "agentName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "agentName"
+                ],
+                "additionalProperties": false
+              },
+              "sandbox": {
+                "type": "object",
+                "properties": {
+                  "profileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "profileId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "realtime",
+              "identity",
+              "sandbox"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "displayName",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationTemplateEmptyBodyDto": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "OrganizationTemplateListDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "organizationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "sandboxProfile": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "lifecycleStatus": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "archived"
+                  ]
+                },
+                "etag": {
+                  "type": "string",
+                  "pattern": "^\"cvc1\\.[A-Za-z0-9_-]{43}\"$"
+                },
+                "contentDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "organizationId",
+                "name",
+                "displayName",
+                "sandboxProfile",
+                "lifecycleStatus",
+                "etag",
+                "contentDigest",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "data",
+          "hasMore",
+          "nextCursor",
+          "readAt"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationTemplateReplaceDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "realtime": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "zh-CN",
+                      "en-US"
+                    ]
+                  }
+                },
+                "required": [
+                  "language"
+                ],
+                "nullable": true,
+                "additionalProperties": false
+              },
+              "standingTask": {
+                "description": "Optional Realtime Standing Task: a live Realtime Connection of a voice-enabled Session keeps one Full Agent task with this goal running while a client is attached and the Realtime Model has no task of its own. Ignored when realtime is null and by Template Tests.",
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "description": "What the Full Agent does in each Standing Task Turn. Line endings are normalized and surrounding whitespace trimmed; the result must have 1 to 4000 characters, counted as UTF-16 code units.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal"
+                ],
+                "additionalProperties": false
+              },
+              "schemaVersion": {
+                "type": "string",
+                "enum": [
+                  "agent-template-content@7"
+                ],
+                "default": "agent-template-content@7"
+              },
+              "hardware": {
+                "type": "object",
+                "properties": {
+                  "hardwareRequirements": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hardwareRequirementId": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "hardwareModelId": {
+                          "type": "string",
+                          "pattern": "^hmod_[0-9a-f]{32}$"
+                        }
+                      },
+                      "required": [
+                        "hardwareRequirementId",
+                        "label",
+                        "hardwareModelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "default": []
+                  }
+                },
+                "default": {
+                  "hardwareRequirements": []
+                },
+                "additionalProperties": false
+              },
+              "instructions": {
+                "type": "string",
+                "default": ""
+              },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "sessionRecall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "default": {
+                      "enabled": false
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "default": {
+                  "sessionRecall": {
+                    "enabled": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "skillId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "exclusiveMaximum": false
+                    }
+                  },
+                  "required": [
+                    "skillId",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "agentName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "agentName"
+                ],
+                "additionalProperties": false
+              },
+              "sandbox": {
+                "type": "object",
+                "properties": {
+                  "profileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "profileId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "realtime",
+              "identity",
+              "sandbox"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "displayName",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationTemplateResultDto": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "organizationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "sandboxProfile": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "lifecycleStatus": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "archived"
+                ]
+              },
+              "etag": {
+                "type": "string",
+                "pattern": "^\"cvc1\\.[A-Za-z0-9_-]{43}\"$"
+              },
+              "contentDigest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "organizationId",
+              "name",
+              "displayName",
+              "sandboxProfile",
+              "lifecycleStatus",
+              "etag",
+              "contentDigest",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "realtime": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "zh-CN",
+                      "en-US"
+                    ]
+                  }
+                },
+                "required": [
+                  "language"
+                ],
+                "nullable": true,
+                "additionalProperties": false
+              },
+              "standingTask": {
+                "description": "Optional Realtime Standing Task: a live Realtime Connection of a voice-enabled Session keeps one Full Agent task with this goal running while a client is attached and the Realtime Model has no task of its own. Ignored when realtime is null and by Template Tests.",
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "description": "What the Full Agent does in each Standing Task Turn. Line endings are normalized and surrounding whitespace trimmed; the result must have 1 to 4000 characters, counted as UTF-16 code units.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal"
+                ],
+                "additionalProperties": false
+              },
+              "schemaVersion": {
+                "type": "string",
+                "enum": [
+                  "agent-template-content@7"
+                ],
+                "default": "agent-template-content@7"
+              },
+              "hardware": {
+                "type": "object",
+                "properties": {
+                  "hardwareRequirements": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hardwareRequirementId": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_.-]{0,99}$"
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "hardwareModelId": {
+                          "type": "string",
+                          "pattern": "^hmod_[0-9a-f]{32}$"
+                        }
+                      },
+                      "required": [
+                        "hardwareRequirementId",
+                        "label",
+                        "hardwareModelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "default": []
+                  }
+                },
+                "default": {
+                  "hardwareRequirements": []
+                },
+                "additionalProperties": false
+              },
+              "instructions": {
+                "type": "string",
+                "default": ""
+              },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "sessionRecall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "default": {
+                      "enabled": false
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "default": {
+                  "sessionRecall": {
+                    "enabled": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "skillId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "exclusiveMaximum": false
+                    }
+                  },
+                  "required": [
+                    "skillId",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "agentName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "agentName"
+                ],
+                "additionalProperties": false
+              },
+              "sandbox": {
+                "type": "object",
+                "properties": {
+                  "profileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "profileId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "realtime",
+              "identity",
+              "sandbox"
+            ],
+            "nullable": true,
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "template",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "OrganizationApiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "type": "http",
+        "description": "Opaque ti_org_<id>_<secret> credential: ASCII alphanumeric id body (1–64), unpadded base64url secret (43 characters from 32 random bytes). Authenticates an Organization machine principal with no acting User. Each handler explicitly chooses whether to admit this principal kind."
+      }
+    }
+  }
+}

@@ -79,6 +79,19 @@ const snapshots = {
       "/api/v1/drive-downloads/{ticket}",
     ],
   },
+  "management.json": {
+    paths: [
+      "/api/v1/org/agent-templates",
+      "/api/v1/org/agent-templates/{templateId}",
+      "/api/v1/org/agent-templates/{templateId}/archive",
+      "/api/v1/org/agent-template-reference-catalog",
+      "/api/v1/org/skills",
+      "/api/v1/org/skills/{skillId}",
+      "/api/v1/org/skills/uploads",
+      "/api/v1/org/skills/uploads/{uploadId}",
+      "/api/v1/org/skills/uploads/{uploadId}/publish",
+    ],
+  },
   "audio.json": {
     paths: [`${session}/turns/audio`],
     schemas: ["TurnStreamEvent"],

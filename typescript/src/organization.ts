@@ -7,6 +7,8 @@ import {
   type OrganizationUserUsageDetails,
 } from "./usage.js";
 import { EndUserClient, type AgentRecord } from "./user.js";
+import { Templates } from "./templates.js";
+import { Skills } from "./skills.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   HttpClient,
@@ -64,6 +66,18 @@ export interface RequestOptions {
 /** Customer operations authorized by an Organization API Key. */
 export class OrganizationClient {
   readonly #http: HttpClient;
+  readonly #templates: Templates;
+  readonly #skills: Skills;
+
+  /** Organization Agent Templates. */
+  get templates(): Templates {
+    return this.#templates;
+  }
+
+  /** Organization Skills that Templates reference. */
+  get skills(): Skills {
+    return this.#skills;
+  }
 
   constructor(options: OrganizationClientOptions) {
     requireKnownKeys(
@@ -77,6 +91,8 @@ export class OrganizationClient {
       );
     }
     this.#http = new HttpClient(options);
+    this.#templates = new Templates(this.#http);
+    this.#skills = new Skills(this.#http);
   }
 
   /** Select the End User who owns the resources; the Organization API Key remains the caller. */

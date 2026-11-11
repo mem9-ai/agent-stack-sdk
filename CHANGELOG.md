@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add `organization.templates` to create, read, list, replace and archive
+  Organization Templates, and to read the reference catalog of models, Sandbox
+  profiles and Skills they may use.
+- Add `organization.skills` to upload a Skill ZIP, wait for validation, publish
+  or cancel it, and read published Skills and their versions.
 - `OrganizationClient` accepts a `fetch` option. Every request the client
   makes goes through it, including event streams and file transfers; the
   default is the global `fetch`. `FetchFunction` is exported.

@@ -99,6 +99,9 @@ beforeAll(async () => {
         OPS_SERVICE_ALLOWED_HOSTS: "example.test",
         WORKSPACE_KEK: "fictional-sdk-service-test-kek",
         SESSION_SECRET: "fictional-sdk-service-session-secret",
+        // Validate and publish Skill uploads in-process for the management cases.
+        TIDB_LINK_TEST_LOCAL_SKILL_PACKAGE_CAPABILITY: "1",
+        TIDB_LINK_TEST_SKILL_ASSET_IMPORT_WORKER: "1",
       }),
     )
     .overrideProvider(OpsRealtimeModelSource)
@@ -586,4 +589,4 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
       `Packed SDK service verification failed:\n${output.stdout ?? ""}${output.stderr ?? ""}`,
     );
   }
-}, 120_000);
+}, 240_000);

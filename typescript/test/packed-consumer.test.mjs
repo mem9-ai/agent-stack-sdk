@@ -104,6 +104,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       RetryReceipt,
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
       ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
+      Template, TemplateContent, TemplateCatalog, TemplatePage, SkillUpload, SkillDetail,
     } from "@tidblink/server";
     import {
       TIDB_LINK_API_VERSION,
@@ -144,6 +145,23 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const found: EndUser = await organization.getEndUser(created.userId);
       void current; void users;
       return found;
+    }
+    async function managementWorkflow(zipBytes: Uint8Array): Promise<Template> {
+      const catalog: TemplateCatalog = await organization.templates.catalog();
+      const content: TemplateContent = {
+        identity: { agentName: "Ava" },
+        sandbox: { profileId: catalog.sandboxes[0]!.id },
+        realtime: { language: "en-US" },
+      };
+      const created: Template = await organization.templates.create({ displayName: "Ava", content, idempotencyKey: "template-1" });
+      const page: TemplatePage = await organization.templates.list({ lifecycleStatus: "active" });
+      // @ts-expect-error Replacement requires the ETag and an idempotency key.
+      await organization.templates.replace(created.template.id, { displayName: "Ava", content }, {});
+      const upload: SkillUpload = await organization.skills.upload({ bytes: zipBytes, idempotencyKey: "skill-1" });
+      const done: SkillUpload = await organization.skills.waitForUpload(upload.uploadId, { until: ["done"] });
+      const detail: SkillDetail = await organization.skills.get(done.skillId);
+      void page; void detail;
+      return organization.templates.archive(created.template.id, { ifMatch: created.template.etag, idempotencyKey: "archive-1" });
     }
     async function clientToolsWorkflow(session: Session, agent: Agent) {
       const tool: ClientToolDeclaration = {type:"function",name:"lookup_order",description:"Read an order",parameters:{type:"object",properties:{orderId:{type:"string"}}}};

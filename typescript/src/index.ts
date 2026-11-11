@@ -24,6 +24,31 @@ export type {
   RequestOptions,
   OrganizationClientOptions,
 } from "./organization.js";
+export { Templates } from "./templates.js";
+export type {
+  Template,
+  TemplateSummary,
+  TemplateContent,
+  TemplateRealtimeLanguage,
+  TemplatePage,
+  TemplateListOptions,
+  TemplateCatalog,
+  TemplateInput,
+  CreateTemplateInput,
+  TemplateMutationOptions,
+} from "./templates.js";
+export { Skills } from "./skills.js";
+export type {
+  SkillSummary,
+  SkillVersion,
+  SkillPage,
+  SkillDetail,
+  SkillUpload,
+  SkillUploadState,
+  UploadSkillInput,
+  PublishSkillOptions,
+  WaitForSkillUploadOptions,
+} from "./skills.js";
 export { Agent, EndUserClient } from "./user.js";
 export type {
   AgentRecord,

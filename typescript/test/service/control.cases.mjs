@@ -6,9 +6,9 @@ import {
   UserClient,
   TiDBLinkApiError,
   TurnInterruptedError,
-} from "@tidblink/sdk";
+} from "@tidblink/server";
 
-import { controlTurnWorkflow } from "@tidblink/sdk/examples/control-turn.mjs";
+import { controlTurnWorkflow } from "@tidblink/server/examples/control-turn.mjs";
 
 const user = new UserClient({
   baseUrl: process.env.SDK_SERVICE_URL,

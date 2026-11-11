@@ -12,8 +12,8 @@ import {
   TurnFailedError,
   TurnInterruptedError,
   TiDBLinkApiError,
-} from "@tidblink/sdk";
-import { sendMessageWorkflow } from "@tidblink/sdk/examples/send-message.mjs";
+} from "@tidblink/server";
+import { sendMessageWorkflow } from "@tidblink/server/examples/send-message.mjs";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const apiKey = process.env.SDK_USER_KEY;
@@ -314,7 +314,7 @@ test("the installed message example waits for a real final result and recovers i
   const replay = await sendMessageWorkflow(input);
   assert.equal(replay.turnId, result.turnId);
   const executable = fileURLToPath(
-    import.meta.resolve("@tidblink/sdk/examples/send-message.mjs"),
+    import.meta.resolve("@tidblink/server/examples/send-message.mjs"),
   );
   const { stdout, stderr } = await promisify(execFile)(
     process.execPath,

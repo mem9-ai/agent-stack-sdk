@@ -8,8 +8,8 @@ import {
   ObservationStoppedError,
   TurnFailedError,
   TurnInterruptedError,
-} from "@tidblink/sdk";
-import { observeMessageWorkflow } from "@tidblink/sdk/examples/observe-message.mjs";
+} from "@tidblink/server";
+import { observeMessageWorkflow } from "@tidblink/server/examples/observe-message.mjs";
 const baseUrl = process.env.SDK_SERVICE_URL;
 const user = new UserClient({ baseUrl, apiKey: process.env.SDK_USER_KEY });
 const organization = new OrganizationClient({

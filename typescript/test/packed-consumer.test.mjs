@@ -114,7 +114,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       RetryReceipt,
       SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
       ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
-    } from "@tidblink/sdk";
+    } from "@tidblink/server";
     import {
       TIDB_LINK_API_VERSION,
       TIDB_LINK_REVISION,
@@ -128,11 +128,11 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TiDBLinkError,
       OrganizationClient,
       UserClient,
-    } from "@tidblink/sdk";
+    } from "@tidblink/server";
     // @ts-expect-error Previous compatibility constants and error exports have no aliases.
-    import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@tidblink/sdk";
+    import { AGENT_SERVICE_API_VERSION, AGENT_SERVICE_REVISION, AgentStackError, AgentStackApiError } from "@tidblink/server";
     // @ts-expect-error Workspace authority was removed from the supported SDK.
-    import { WorkspaceClient } from "@tidblink/sdk";
+    import { WorkspaceClient } from "@tidblink/server";
 
     declare const baseUrl: string;
     declare const organizationApiKey: string;
@@ -371,7 +371,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     temporary,
     "node_modules",
     "@tidblink",
-    "sdk",
+    "server",
   );
   const installedPackage = JSON.parse(
     await readFile(path.join(installedRoot, "package.json"), "utf8"),
@@ -390,7 +390,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal("tidbLink" + prefix + "Revision" in installedPackage, false);
     assert.equal("tidbLink" + prefix + "OpenApiSha256" in installedPackage, false);
   }
-  assert.equal(installedPackage.name, "@tidblink/sdk");
+  assert.equal(installedPackage.name, "@tidblink/server");
   assert.match(installedPackage.version, /^0\./);
   assert.equal(installedPackage.type, "module");
   assert.equal(installedPackage.engines.node, ">=22.12");
@@ -422,27 +422,27 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     `
     import assert from "node:assert/strict";
     import { createServer } from "node:http";
-    import * as sdk from "@tidblink/sdk";
+    import * as sdk from "@tidblink/server";
     assert.equal(sdk.TIDB_LINK_API_VERSION, "0.0.1");
     assert.equal(sdk.TIDB_LINK_REVISION, ${JSON.stringify(installedPackage.tidbLinkRevision)});
-    const { provisionUser } = await import("@tidblink/sdk/examples/provision-user.mjs");
-    const { prepareRealtimeConnection } = await import("@tidblink/sdk/examples/prepare-realtime-connection.mjs");
-    const { readOwnUsage, readUserUsage } = await import("@tidblink/sdk/examples/read-usage.mjs");
+    const { provisionUser } = await import("@tidblink/server/examples/provision-user.mjs");
+    const { prepareRealtimeConnection } = await import("@tidblink/server/examples/prepare-realtime-connection.mjs");
+    const { readOwnUsage, readUserUsage } = await import("@tidblink/server/examples/read-usage.mjs");
     assert.equal(typeof readOwnUsage,"function");
     assert.equal(typeof readUserUsage,"function");
-    const { sendMessageWorkflow } = await import("@tidblink/sdk/examples/send-message.mjs");
+    const { sendMessageWorkflow } = await import("@tidblink/server/examples/send-message.mjs");
     assert.equal(typeof sendMessageWorkflow,"function");
-    const { uploadFileWorkflow } = await import("@tidblink/sdk/examples/upload-file.mjs");
+    const { uploadFileWorkflow } = await import("@tidblink/server/examples/upload-file.mjs");
     assert.equal(typeof uploadFileWorkflow,"function");
-    const { scheduleTaskWorkflow } = await import("@tidblink/sdk/examples/schedule-task.mjs");
+    const { scheduleTaskWorkflow } = await import("@tidblink/server/examples/schedule-task.mjs");
     assert.equal(typeof scheduleTaskWorkflow,"function");
-    const { submitAudioWorkflow } = await import("@tidblink/sdk/examples/submit-audio.mjs");
+    const { submitAudioWorkflow } = await import("@tidblink/server/examples/submit-audio.mjs");
     assert.equal(typeof submitAudioWorkflow,"function");
-    const { observeMessageWorkflow } = await import("@tidblink/sdk/examples/observe-message.mjs");
+    const { observeMessageWorkflow } = await import("@tidblink/server/examples/observe-message.mjs");
     assert.equal(typeof observeMessageWorkflow,"function");
-    const { answerClientToolWorkflow } = await import("@tidblink/sdk/examples/answer-client-tool.mjs");
+    const { answerClientToolWorkflow } = await import("@tidblink/server/examples/answer-client-tool.mjs");
     assert.equal(typeof answerClientToolWorkflow,"function");
-    const { createSessionWorkflow } = await import("@tidblink/sdk/examples/create-session.mjs");
+    const { createSessionWorkflow } = await import("@tidblink/server/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof provisionUser, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");

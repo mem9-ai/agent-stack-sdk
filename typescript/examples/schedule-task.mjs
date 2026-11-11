@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 /** Persist the exact runAt, prompt and creation key before calling. */
 export async function scheduleTaskWorkflow({

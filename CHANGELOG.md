@@ -7,13 +7,14 @@ gives early adopters the Organization Key workflows. It still contains
 `UserClient`, User API Key management and Schedulers; treat them as subject to
 removal before `0.3.0`.
 
-- Rename the package to `@tidblink/sdk`, published under the `@tidblink` npm
-  organization. The earlier `@mem9/tidb-link` name was never published.
+- Rename the package to `@tidblink/server`, published under the `@tidblink` npm
+  organization. It is the package for backends that hold an Organization API
+  Key. The earlier `@mem9/tidb-link` name was never published.
 - Release by merging a release pull request: a package version with its own
   changelog section and no release tag is staged on npm (`next` for prereleases,
   `latest` otherwise) and becomes public after a maintainer approves it there.
-  The workflow then records a tag and a GitHub Release. Pushing a tag no longer
-  publishes.
+  The workflow then records a `@tidblink/server@<version>` tag and a GitHub
+  Release. Pushing a tag no longer publishes.
 - Add `OrganizationClient.user(userId)` for the existing supported End User
   resource workflows without issuing a User Key. Retain `UserClient` compatibility,
   real authorizing credentials, owner-scoped handles and separate usage projections.
@@ -63,7 +64,7 @@ removal before `0.3.0`.
   quickstart using the installed packed SDK against the exact real service;
   independent TypeScript consumers and frozen contracts supplement that evidence.
 - Remove obsolete Workspace/ServiceUser, Template-version/Memory/default-Agent
-  and compatibility exports. Use the current `@tidblink/sdk` package and typed
+  and compatibility exports. Use the current `@tidblink/server` package and typed
   `ti_org_<id>_<secret>` / `ti_user_<id>_<secret>` credential grammar.
 
 ## 0.2.0

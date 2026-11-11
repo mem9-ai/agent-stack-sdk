@@ -11,10 +11,10 @@ import {
   UserClient,
   TiDBLinkApiError,
   ConflictError,
-} from "@tidblink/sdk";
-import { provisionUser } from "@tidblink/sdk/examples/provision-user.mjs";
-import { createSessionWorkflow } from "@tidblink/sdk/examples/create-session.mjs";
-import { sendMessageWorkflow } from "@tidblink/sdk/examples/send-message.mjs";
+} from "@tidblink/server";
+import { provisionUser } from "@tidblink/server/examples/provision-user.mjs";
+import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
+import { sendMessageWorkflow } from "@tidblink/server/examples/send-message.mjs";
 
 const exec = promisify(execFile);
 const baseUrl = process.env.SDK_SERVICE_URL;
@@ -154,7 +154,7 @@ test("provisioning, scoped identity and key lifecycle work in an installed consu
   await organization.revokeUserApiKey(fresh.apiKey.apiKeyId);
   const credentialFile = path.join(process.cwd(), "user-credential.json");
   const executable = fileURLToPath(
-    import.meta.resolve("@tidblink/sdk/examples/provision-user.mjs"),
+    import.meta.resolve("@tidblink/server/examples/provision-user.mjs"),
   );
   const commandEnv = {
     ...process.env,

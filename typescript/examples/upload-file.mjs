@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { UserClient } from "@tidblink/sdk";
+import { UserClient } from "@tidblink/server";
 
 /** Persist both identities and exact file/message input before calling. */
 export async function uploadFileWorkflow({

@@ -9,12 +9,12 @@
   },
   "packageManager": "npm@11.6.2",
   "scripts": {
-    "build": "npm run build --workspace @tidblink/sdk",
-    "typecheck": "npm run typecheck --workspace @tidblink/sdk",
-    "test": "npm run test --workspace @tidblink/sdk",
-    "test:service-contract": "npm run test:service-contract --workspace @tidblink/sdk",
-    "pack:check": "npm run pack:check --workspace @tidblink/sdk",
-    "test:service": "npm run test:service --workspace @tidblink/sdk",
+    "build": "npm run build --workspace @tidblink/server",
+    "typecheck": "npm run typecheck --workspace @tidblink/server",
+    "test": "npm run test --workspace @tidblink/server",
+    "test:service-contract": "npm run test:service-contract --workspace @tidblink/server",
+    "pack:check": "npm run pack:check --workspace @tidblink/server",
+    "test:service": "npm run test:service --workspace @tidblink/server",
     "test:release": "node --test scripts/release-plan.test.mjs"
   },
   "devDependencies": {

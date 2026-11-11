@@ -221,9 +221,10 @@ try {
       (item) => item.connectorId === connector.connectorId,
     ),
   );
-  await assert.rejects(
-    otherOrganization.connectors.get(connector.connectorId),
-    (error) => error.status === 404 || error.status === 401,
+  // Another Key of the same Organization manages the same registration.
+  assert.equal(
+    (await otherOrganization.connectors.get(connector.connectorId)).status,
+    "active",
   );
   const connectorTemplateId = await stage("connector", connector.connectorId);
   const connectorAgent = await owner.createAgent({

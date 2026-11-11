@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased (0.3.0)
+## 0.3.0-rc.0
+
+Release candidate on the `next` dist-tag. It verifies the release process and
+gives early adopters the Organization Key workflows. It still contains
+`UserClient`, User API Key management and Schedulers; treat them as subject to
+removal before `0.3.0`.
 
 - Rename the package to `@tidblink/sdk`, published under the `@tidblink` npm
   organization. The earlier `@mem9/tidb-link` name was never published.

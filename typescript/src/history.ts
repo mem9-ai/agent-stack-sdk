@@ -183,6 +183,8 @@ export interface OperationRecord {
   compensatesOperationId?: string | null;
   source?:
     | { type: "session_client" }
+    | { type: "hardware"; hardwareBindingId: string; method: string }
+    /** Historical Hardware calls name the requirement instead of the binding. */
     | { type: "hardware"; hardwareRequirementId: string; method: string };
   label?: string;
   category?: "tool_call" | "skill_read";
@@ -219,6 +221,8 @@ interface TurnRecordBase {
   sessionId: string;
   status: TurnStatus;
   billingTag: BillingTag | null;
+  /** The Template frozen when the Turn was admitted; null when none was recorded. */
+  agentTemplateId: string | null;
   userMessages?: MessageRecord[];
   userFiles?: TurnUserFile[];
   operations: OperationRecord[];
@@ -232,17 +236,37 @@ interface TurnRecordBase {
 }
 
 export interface FullAgentTurnRecord extends TurnRecordBase {
+  kind?: never;
   executor?: "full_agent";
   userMessage: MessageRecord;
 }
 
 export interface RealtimeTurnRecord extends TurnRecordBase {
+  kind?: never;
   executor: "realtime_model";
   userMessage: MessageRecord;
   realtime: { connectionId: string; linkedTurnIds: string[] };
 }
 
-export type TurnRecord = FullAgentTurnRecord | RealtimeTurnRecord;
+/**
+ * The Turn a Template switch runs under the target Template to summarize the
+ * Session so far. It has no user Message; when it succeeds, its assistant
+ * Message is the summary.
+ */
+export interface TemplateHandoffTurnRecord
+  extends Omit<TurnRecordBase, "agentTemplateId" | "userMessages"> {
+  kind: "template_handoff";
+  executor?: "full_agent";
+  /** The target Template of the switch. */
+  agentTemplateId: string;
+  /** Always empty. */
+  userMessages: MessageRecord[];
+}
+
+export type TurnRecord =
+  | FullAgentTurnRecord
+  | RealtimeTurnRecord
+  | TemplateHandoffTurnRecord;
 
 export interface TurnPage {
   turns: TurnRecord[];

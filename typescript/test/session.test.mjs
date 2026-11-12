@@ -32,17 +32,6 @@ const clientFor = (baseUrl) =>
     apiKey: organizationApiKey,
   }).user("user_1");
 
-const agent = {
-  agentId: "agent_1",
-  organizationId: "org_1",
-  ownerUserId: "user_1",
-  agentTemplateId: "template_1",
-  additionalInstructions: "",
-  status: "active",
-  createdAt: "2026-08-25T00:00:00.000Z",
-  updatedAt: "2026-08-25T00:00:00.000Z",
-};
-
 const sessionRecord = (overrides = {}) => ({
   organizationId: "org_1",
   sessionId: "session_1",
@@ -63,7 +52,8 @@ const sessionRecord = (overrides = {}) => ({
   realtimeVoice: null,
   template: { templateId: "template_1", contentDigest: "a".repeat(64) },
   realtime: null,
-  createdWithAgentId: "agent_1",
+  configurationEpoch: 1,
+  switching: false,
   modelPolicyStatus: "allowed",
   status: "active",
   activeTurnId: null,
@@ -73,7 +63,7 @@ const sessionRecord = (overrides = {}) => ({
   ...overrides,
 });
 
-test("an Agent creates a persistent Session and retains its model ETag", async () => {
+test("an explicit Template creates a persistent Session and retains its model ETag", async () => {
   const calls = [];
   const baseUrl = await serve(async (request, response) => {
     let body = "";
@@ -85,18 +75,19 @@ test("an Agent creates a persistent Session and retains its model ETag", async (
       body,
     });
     response.setHeader("content-type", "application/json");
-    if (request.method === "GET") {
-      response.end(JSON.stringify({ agent }));
-      return;
-    }
     response.setHeader("etag", '"session-v1"');
     response.writeHead(201).end(JSON.stringify({ session: sessionRecord() }));
   });
-  const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
+  const user = clientFor(baseUrl);
 
-  await assert.rejects(remoteAgent.createSession({}), TypeError);
-  assert.equal(calls.length, 1);
-  const session = await remoteAgent.createSession({
+  await assert.rejects(user.createSession({}), TypeError);
+  await assert.rejects(
+    user.createSession({ idempotencyKey: "session-1" }),
+    TypeError,
+  );
+  assert.equal(calls.length, 0);
+  const session = await user.createSession({
+    templateId: "template_1",
     billingTag: { key: "customer", value: "acme" },
     model: "deployment.model",
     idempotencyKey: "session-1",
@@ -104,14 +95,17 @@ test("an Agent creates a persistent Session and retains its model ETag", async (
 
   assert.equal(session.id, "session_1");
   assert.equal(session.model, "gpt-5.6-terra");
-  assert.deepEqual(JSON.parse(calls[1].body), {
-    agentId: "agent_1",
+  assert.equal(session.data.template.templateId, "template_1");
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].url, "/api/v1/org/users/user_1/sessions");
+  assert.deepEqual(JSON.parse(calls[0].body), {
+    agentTemplateId: "template_1",
     model: "deployment.model",
     billingTag: { key: "customer", value: "acme" },
   });
-  assert.equal(calls[1].headers["idempotency-key"], "session-1");
-  assert.equal(calls[1].headers["x-agent9-project-id"], undefined);
-  assert.equal(calls[1].headers["x-ti-project-id"], undefined);
+  assert.equal(calls[0].headers["idempotency-key"], "session-1");
+  assert.equal(calls[0].headers["x-agent9-project-id"], undefined);
+  assert.equal(calls[0].headers["x-ti-project-id"], undefined);
 });
 
 test("a Session updates the model with its retained ETag and never overwrites a conflict", async () => {
@@ -212,12 +206,6 @@ test("Session creation with exhausted retries preserves the caller key for expli
   let fail = true;
   const identities = [];
   const baseUrl = await serve((req, res) => {
-    if (req.method === "GET") {
-      res
-        .writeHead(200, { "content-type": "application/json" })
-        .end(JSON.stringify({ agent }));
-      return;
-    }
     identities.push(req.headers["idempotency-key"]);
     if (fail) {
       res.destroy();
@@ -227,11 +215,11 @@ test("Session creation with exhausted retries preserves the caller key for expli
       .writeHead(201, { "content-type": "application/json", etag: '"model-1"' })
       .end(JSON.stringify({ session: sessionRecord() }));
   });
-  const remoteAgent = await clientFor(baseUrl).getAgent("agent_1");
-  const options = { idempotencyKey: "session-recover" };
-  await assert.rejects(remoteAgent.createSession(options), OutcomeUnknownError);
+  const user = clientFor(baseUrl);
+  const options = { templateId: "template_1", idempotencyKey: "session-recover" };
+  await assert.rejects(user.createSession(options), OutcomeUnknownError);
   fail = false;
-  assert.equal((await remoteAgent.createSession(options)).id, "session_1");
+  assert.equal((await user.createSession(options)).id, "session_1");
   assert(identities.every((value) => value === options.idempotencyKey));
 });
 

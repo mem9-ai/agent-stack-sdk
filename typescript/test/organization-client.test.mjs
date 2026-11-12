@@ -384,8 +384,8 @@ test("Organization authority selects an explicit owner across existing resource 
     response.setHeader("content-type", "application/json");
     response.setHeader("etag", '"revision-1"');
     response.end(JSON.stringify({
-      agents: [], sessions: [], templates: [], models: [], files: [],
-      agent: { agentId: "agent_1" }, session: { sessionId: "session_1" },
+      sessions: [], templates: [], models: [], files: [],
+      session: { sessionId: "session_1" },
       capabilities: {}, hasMore: false, nextCursor: null,
     }));
   });
@@ -394,23 +394,20 @@ test("Organization authority selects an explicit owner across existing resource 
     assert.throws(() => organization.user(owner), TypeError);
   assert.equal(calls.length, 0);
   const owner = organization.user("user_1");
-  await owner.listAgents();
-  await (await owner.getAgent("agent_1")).refresh();
+  await owner.createSession({ templateId: "template_1", idempotencyKey: "s-1" });
   await owner.listSessions({ limit: 2 });
   await owner.session("session_1").refresh();
   await owner.listAgentTemplates();
-  await owner.listModels({ agentId: "agent_1" });
+  await owner.listModels();
   await owner.listRealtimeModels();
   await owner.files.list();
   await owner.files.capabilities();
   assert.deepEqual(calls.map(({ url }) => url), [
-    "/api/v1/org/users/user_1/agents",
-    "/api/v1/org/users/user_1/agents/agent_1",
-    "/api/v1/org/users/user_1/agents/agent_1",
+    "/api/v1/org/users/user_1/sessions",
     "/api/v1/org/users/user_1/sessions?limit=2",
     "/api/v1/org/users/user_1/sessions/session_1",
     "/api/v1/org/users/user_1/agent-templates",
-    "/api/v1/org/users/user_1/agent-models?agentId=agent_1",
+    "/api/v1/org/users/user_1/agent-models",
     "/api/v1/org/users/user_1/realtime-models",
     "/api/v1/org/users/user_1/files",
     "/api/v1/org/users/user_1/drive/upload-capabilities",

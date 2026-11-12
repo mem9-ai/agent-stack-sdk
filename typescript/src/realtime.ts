@@ -80,7 +80,6 @@ export interface RealtimeConnection {
   object: "realtime_connection";
   id: string;
   sessionId: string;
-  agentId: string;
   provider: {
     name: string;
     region: string | null;
@@ -153,7 +152,6 @@ const isRealtimeConnection = (value: unknown): value is RealtimeConnection => {
     value.object === "realtime_connection" &&
     isString(value.id) &&
     isString(value.sessionId) &&
-    isString(value.agentId) &&
     isRecord(provider) &&
     isString(provider.name) &&
     isNullableString(provider.region) &&

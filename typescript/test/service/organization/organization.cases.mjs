@@ -46,21 +46,16 @@ const creation = {
   baseUrl,
   organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
   userId: user.userId,
-  agentTemplateId: process.env.SDK_TEMPLATE_ID,
-  agentCreationKey: randomUUID(),
+  templateId: process.env.SDK_TEMPLATE_ID,
   sessionCreationKey: randomUUID(),
 };
-const { agent, session } = await createSessionWorkflow(creation);
+const { session } = await createSessionWorkflow(creation);
 assert.equal(
   (await createSessionWorkflow(creation)).session.id,
   session.id,
 );
-assert.equal(agent.data.ownerUserId, user.userId);
-await agent.update({ additionalInstructions: "Be concise" });
-assert.equal(
-  (await owner.getAgent(agent.id)).data.additionalInstructions,
-  "Be concise",
-);
+assert.equal(session.data.ownerUserId, user.userId);
+assert.equal(session.data.template?.templateId, process.env.SDK_TEMPLATE_ID);
 await session.rename("SDK Organization journey");
 assert(
   (await owner.listSessions()).sessions.some(
@@ -227,11 +222,8 @@ try {
     "active",
   );
   const connectorTemplateId = await stage("connector", connector.connectorId);
-  const connectorAgent = await owner.createAgent({
-    agentTemplateId: connectorTemplateId,
-    idempotencyKey: randomUUID(),
-  });
-  const connectorSession = await connectorAgent.createSession({
+  const connectorSession = await owner.createSession({
+    templateId: connectorTemplateId,
     idempotencyKey: randomUUID(),
   });
   assert.equal(
@@ -304,7 +296,7 @@ const inFlight = await session.submitMessage({
   text: "Finish accepted work",
 });
 const freshKey = await stage("rotate");
-await assert.rejects(owner.listAgents(), unauthorized);
+await assert.rejects(owner.listSessions(), unauthorized);
 const freshOrganization = new OrganizationClient({
   baseUrl,
   apiKey: freshKey,
@@ -338,7 +330,7 @@ await freshOrganization.getUserUsageDetails(user.userId, {
   to: now.toISOString(),
 });
 await stage("revoke");
-await assert.rejects(fresh.listAgents(), unauthorized);
+await assert.rejects(fresh.listSessions(), unauthorized);
 assert.equal((await other.getSession(session.id)).id, session.id);
 console.log(
   "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, an HTTP Connector call, audio, Realtime HTTP, and rotation/revocation recovery.",

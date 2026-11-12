@@ -43,6 +43,7 @@ import {
   requireEtag,
   requireKnownKeys,
   requireCreationKey,
+  requireTemplateId,
 } from "./http.js";
 import {
   realtimeModelSelectionFrom,
@@ -84,12 +85,28 @@ import type { ListOptions } from "./http.js";
 export type SelectableSessionModel = string;
 export type SessionModel = string;
 
+/** The Sandbox a Session runs in, chosen at creation. */
+export interface SessionSandboxSelection {
+  /** A selectable Sandbox profile; omitted or null uses the Template's profile. */
+  profileId?: string | null;
+  /** A Drive-relative working directory; defaults to `.`. Creation does not make it. */
+  workingDirectory?: string;
+}
+
 export interface CreateSessionOptions extends RequestOptions {
+  /** The active Template the Session runs. Required: there is no default Template. */
+  templateId: string;
+  /** Keep the same key and input when recovering an uncertain creation. */
   idempotencyKey: string;
   model?: string;
   realtimeModel?: string;
   billingTag?: BillingTag | null;
   tools?: ClientToolDeclaration[];
+  /** Added to the Template instructions for this Session only; at most 4096 UTF-8 bytes. */
+  additionalInstructions?: string | null;
+  sandbox?: SessionSandboxSelection;
+  /** Required as `true` when the Template enables cross-Session Recall. */
+  acknowledgeSessionRecall?: boolean;
 }
 
 export interface SuggestSessionNameInput {
@@ -127,7 +144,6 @@ export interface SessionRecord {
     audio: import("./realtime.js").RealtimeAudioFormats;
     startedAt: string;
   } | null;
-  createdWithAgentId: string;
   /** Current Session Configuration Epoch; null for read-only or provider-owned snapshots. */
   configurationEpoch: number | null;
   /** True while a Template switch fences new interaction. */
@@ -503,30 +519,57 @@ const sessionReceipt = (
   return value.session;
 };
 
-export const createSessionForAgent = async (
+export const createSession = async (
   http: HttpClient,
-  agentId: string,
   options: CreateSessionOptions,
 ): Promise<Session> => {
   requireKnownKeys(
     options,
     [
+      "templateId",
       "idempotencyKey",
       "model",
       "realtimeModel",
       "billingTag",
       "tools",
+      "additionalInstructions",
+      "sandbox",
+      "acknowledgeSessionRecall",
       "signal",
       "requestId",
     ],
     "Session options",
   );
+  requireTemplateId(options.templateId, "Session creation");
   requireCreationKey(options.idempotencyKey);
   if (options.tools !== undefined) validateClientTools(options.tools);
-  const { idempotencyKey, signal, requestId, ...body } = options;
+  const instructions = options.additionalInstructions;
+  if (
+    instructions !== undefined &&
+    instructions !== null &&
+    typeof instructions !== "string"
+  )
+    throw new TypeError("additionalInstructions must be text or null");
+  if (options.sandbox !== undefined) {
+    requireKnownKeys(
+      options.sandbox,
+      ["profileId", "workingDirectory"],
+      "Session Sandbox selection",
+    );
+    const { profileId, workingDirectory } = options.sandbox;
+    if (
+      profileId !== undefined &&
+      profileId !== null &&
+      typeof profileId !== "string"
+    )
+      throw new TypeError("sandbox.profileId must be text or null");
+    if (workingDirectory !== undefined && typeof workingDirectory !== "string")
+      throw new TypeError("sandbox.workingDirectory must be text");
+  }
+  const { templateId, idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/sessions",
-    { agentId, ...body },
+    { agentTemplateId: templateId, ...body },
     {
       idempotencyKey,
       idempotent: true,

@@ -10,6 +10,7 @@ import {
 import { setTimeout } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -20,7 +21,7 @@ import {
 } from "../test/support/app-testing-module";
 import { loadE2eEnv } from "../test/support/e2e-env";
 import { developmentReleaseServices } from "../test/support/ops-release-fixture";
-import { createPublishedFixtureAgent } from "../test/support/published-agent-creation";
+import { seedFixtureTemplate } from "../test/support/published-template-fixture";
 import {
   ControlledIntegrationProvider,
   CONTROLLED_INTEGRATION_VALUES,
@@ -145,9 +146,13 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
     name: "SDK retry",
     createdByUserId: null,
   });
-  const agent = await createPublishedFixtureAgent(
-    getAppPersistencePorts(app).agentStore,
-    { organizationId: DEFAULT_ORG_ID, userId: owner.userId },
+  const templateId = await seedFixtureTemplate(
+    getAppPersistencePorts(app).templateStore,
+    {
+      organizationId: DEFAULT_ORG_ID,
+      templateId: `template_${randomUUID().replaceAll("-", "")}`,
+      name: "SDK retry",
+    },
   );
   temporary = await mkdtemp(path.join(tmpdir(), "sdk-retry-consumer-"));
   const packed = JSON.parse(
@@ -219,7 +224,7 @@ it("the installed SDK explicitly retries through enabled checkpoint admission an
           SDK_SERVICE_URL: await app.getUrl(),
           SDK_ORGANIZATION_KEY: key.token,
           SDK_USER_ID: owner.userId,
-          SDK_RETRY_AGENT_ID: agent.agentId,
+          SDK_RETRY_TEMPLATE_ID: templateId,
           SDK_RETRY_PAUSED_FILE: pausedFile,
           SDK_RETRY_OBSERVED_DRAFT_FILE: observedDraftFile,
         },

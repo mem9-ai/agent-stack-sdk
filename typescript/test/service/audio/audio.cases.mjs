@@ -34,12 +34,8 @@ const wav = () => {
   return bytes;
 };
 const newSession = async (client = user) =>
-  (
-    await client.createAgent({
-      agentTemplateId: process.env.SDK_TEMPLATE_ID,
-      idempotencyKey: randomUUID(),
-    })
-  ).createSession({
+  client.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
     idempotencyKey: randomUUID(),
     billingTag: { key: "audio", value: "default" },
   });

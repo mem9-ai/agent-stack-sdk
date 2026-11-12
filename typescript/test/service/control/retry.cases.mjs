@@ -14,8 +14,10 @@ const user = new OrganizationClient({
 const wait = { timeoutMs: 15000, pollIntervalMs: 25 };
 
 test("an explicit SDK retry produces its own result without rewriting the stopped input", async () => {
-  const agent = await user.getAgent(process.env.SDK_RETRY_AGENT_ID);
-  const session = await agent.createSession({ idempotencyKey: randomUUID() });
+  const session = await user.createSession({
+    templateId: process.env.SDK_RETRY_TEMPLATE_ID,
+    idempotencyKey: randomUUID(),
+  });
   const originalInput = {
     clientEventId: randomUUID(),
     text: `SDK_RETRY_${randomUUID()}`,

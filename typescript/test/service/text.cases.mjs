@@ -24,11 +24,10 @@ assert(
 );
 const user = new OrganizationClient({ baseUrl, apiKey }).user(userId);
 const freshSession = async () => {
-  const agent = await user.createAgent({
-    agentTemplateId: process.env.SDK_TEMPLATE_ID,
+  return user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
     idempotencyKey: randomUUID(),
   });
-  return agent.createSession({ idempotencyKey: randomUUID() });
 };
 const waitOptions = { timeoutMs: 15000, pollIntervalMs: 25 };
 

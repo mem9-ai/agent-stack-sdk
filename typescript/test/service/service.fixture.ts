@@ -5,7 +5,7 @@ import {
 } from "../src/billing/billing-usage-fact";
 import {
   buildWebSearchUsage,
-  unpricedNonLlmValuation,
+  nonLlmSaleValuation,
 } from "../src/billing/non-llm-billing";
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -20,7 +20,7 @@ import {
   createAppTestingModule,
   getAppPersistencePorts,
 } from "../test/support/app-testing-module";
-import { createPublishedFixtureAgent } from "../test/support/published-agent-creation";
+import { seedFixtureTemplate } from "../test/support/published-template-fixture";
 import { loadE2eEnv } from "../test/support/e2e-env";
 import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
 import { AgentTemplateContentSchema } from "../src/agent-templates/agent-template-content";
@@ -252,7 +252,7 @@ afterAll(async () => {
 const createSession = async (
   token: string,
   userId: string,
-  agentId: string,
+  agentTemplateId: string,
 ) => {
   const response = await app.inject({
     method: "POST",
@@ -261,13 +261,13 @@ const createSession = async (
       authorization: `Bearer ${token}`,
       "idempotency-key": randomUUID(),
     },
-    payload: { agentId },
+    payload: { agentTemplateId },
   });
   expect(response.statusCode, response.body).toBe(201);
   return response.json().session.sessionId as string;
 };
 
-it("the packed SDK provisions users and manages Agents, Sessions and Realtime Connections through the selected service", async () => {
+it("the packed SDK provisions users and manages Sessions and Realtime Connections through the selected service", async () => {
   const store = app.get(OrganizationStore);
   const foreignOrganizationId = `org_sdk_${randomUUID().replaceAll("-", "")}`;
   await store.seedOrganization({
@@ -316,7 +316,7 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
     sessionId: "sdk_usage_session",
     turnId: "sdk_usage_turn",
     agentRunId: null,
-    agentId: null,
+    agentTemplateId: null,
     ownerUserId: owner.userId,
     authKind: "user-api-key" as const,
     principalBucket: "user_api_key" as const,
@@ -398,7 +398,7 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
     status: "running",
     closeReason: null,
     lastError: null,
-    ...unpricedNonLlmValuation(usageAt),
+    ...nonLlmSaleValuation({ ratedAt: usageAt, salePrice: null, quantities: null }),
     createdAt: usageAt,
     updatedAt: usageAt,
   });
@@ -439,9 +439,9 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
 
   const ports = getAppPersistencePorts(app);
   const enabledTemplateId = `template_${randomUUID().replaceAll("-", "")}`;
-  await ports.agentStore.createAgentTemplate({
+  await seedFixtureTemplate(ports.templateStore, {
     organizationId: DEFAULT_ORG_ID,
-    agentTemplateId: enabledTemplateId,
+    templateId: enabledTemplateId,
     name: "SDK Realtime enabled",
   });
   await fixture.arrangeAgentTemplateContent({
@@ -453,15 +453,10 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
       sandbox: { profileId: "standard-v1" },
     }),
   });
-  const enabledAgent = await createPublishedFixtureAgent(ports.agentStore, {
-    organizationId: DEFAULT_ORG_ID,
-    userId: owner.userId,
-    agentTemplateId: enabledTemplateId,
-  });
   const disabledTemplateId = `template_${randomUUID().replaceAll("-", "")}`;
-  await ports.agentStore.createAgentTemplate({
+  await seedFixtureTemplate(ports.templateStore, {
     organizationId: DEFAULT_ORG_ID,
-    agentTemplateId: disabledTemplateId,
+    templateId: disabledTemplateId,
     name: "SDK Realtime disabled",
   });
   await fixture.arrangeAgentTemplateContent({
@@ -473,31 +468,26 @@ it("the packed SDK provisions users and manages Agents, Sessions and Realtime Co
       sandbox: { profileId: "standard-v1" },
     }),
   });
-  const disabledAgent = await createPublishedFixtureAgent(ports.agentStore, {
-    organizationId: DEFAULT_ORG_ID,
-    userId: owner.userId,
-    agentTemplateId: disabledTemplateId,
-  });
   const enabledSessionId = await createSession(
     own.token,
     owner.userId,
-    enabledAgent.agentId,
+    enabledTemplateId,
   );
   const exampleSessionId = await createSession(
     own.token,
     owner.userId,
-    enabledAgent.agentId,
+    enabledTemplateId,
   );
   const disabledSessionId = await createSession(
     own.token,
     owner.userId,
-    disabledAgent.agentId,
+    disabledTemplateId,
   );
 
   const textSessionId = await createSession(
     own.token,
     owner.userId,
-    enabledAgent.agentId,
+    enabledTemplateId,
   );
   await fixture.recordRealtimeExchange({
     organizationId: DEFAULT_ORG_ID,

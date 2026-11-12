@@ -14,6 +14,7 @@ import {
 } from "../test/support/app-testing-module";
 import { loadE2eEnv } from "../test/support/e2e-env";
 import { OrganizationApiKeyService } from "../src/auth/organization-api-key.service";
+import { seedFixtureTemplate } from "../test/support/published-template-fixture";
 import { AgentTemplateContentSchema } from "../src/agent-templates/agent-template-content";
 import { createAgentServiceFastifyAdapter } from "../src/common/fastify-adapter";
 import { ENV } from "../src/config/config.module";
@@ -204,9 +205,9 @@ it("the installed SDK submits actual audio through transcription, budget and Run
     if (user === budget) expect(updated?.availableMicros).toBe(0);
   }
   const templateId = `template_${randomUUID().replaceAll("-", "")}`;
-  await getAppPersistencePorts(app).agentStore.createAgentTemplate({
+  await seedFixtureTemplate(getAppPersistencePorts(app).templateStore, {
     organizationId: DEFAULT_ORG_ID,
-    agentTemplateId: templateId,
+    templateId,
     name: "SDK Audio",
   });
   await fixture.arrangeAgentTemplateContent({

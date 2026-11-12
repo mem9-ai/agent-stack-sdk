@@ -8,11 +8,10 @@ test("the actual unconfigured transcription deployment refuses audio explicitly"
   baseUrl: process.env.SDK_SERVICE_URL,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 }).user(process.env.SDK_USER_ID);
-  const agent = await user.createAgent({
-    agentTemplateId: process.env.SDK_TEMPLATE_ID,
+  const session = await user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
     idempotencyKey: randomUUID(),
   });
-  const session = await agent.createSession({ idempotencyKey: randomUUID() });
   await assert.rejects(
     session.audio({
       filename: "voice.wav",

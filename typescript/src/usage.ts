@@ -1,4 +1,4 @@
-import { requireKnownKeys } from "./http.js";
+import { requireKnownKeys, setTemplateFilter } from "./http.js";
 import type { RequestOptions } from "./organization.js";
 import type { BillingTag } from "./session.js";
 
@@ -340,8 +340,10 @@ export const usageQuery = (
   );
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options))
-    if (allowed.includes(key) && value !== undefined)
-      query.set(key === "templateId" ? "agentTemplateId" : key, String(value));
+    if (key !== "templateId" && allowed.includes(key) && value !== undefined)
+      query.set(key, String(value));
+  if (allowed.includes("templateId"))
+    setTemplateFilter(query, (options as { templateId?: unknown }).templateId);
   return query.size ? `?${query}` : "";
 };
 

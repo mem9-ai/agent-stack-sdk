@@ -183,6 +183,8 @@ export interface OperationRecord {
   compensatesOperationId?: string | null;
   source?:
     | { type: "session_client" }
+    | { type: "hardware"; hardwareBindingId: string; method: string }
+    /** Historical Hardware calls name the requirement instead of the binding. */
     | { type: "hardware"; hardwareRequirementId: string; method: string };
   label?: string;
   category?: "tool_call" | "skill_read";

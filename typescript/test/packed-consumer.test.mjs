@@ -88,6 +88,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionListOptions,
       SessionSandboxSelection,
       TurnRecord,
+      OperationRecord,
       Organization,
       EndUser,
       Session,
@@ -313,6 +314,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       // @ts-expect-error Models no longer depend on an Agent.
       user.listModels({agentId:"agent_1"});
       const turns: TurnPage = await session.history();
+      const bound: NonNullable<OperationRecord["source"]> = {type:"hardware",method:"turn_on",hardwareBindingId:"hb_1"};
+      const historical: NonNullable<OperationRecord["source"]> = {type:"hardware",method:"turn_on",hardwareRequirementId:"lamp"};
+      void bound; void historical;
       for (const turn of turns.turns as TurnRecord[]) {
         // @ts-expect-error A Template Handoff Turn has no user Message; narrow on kind first.
         void turn.userMessage.content;

@@ -43,6 +43,7 @@ import {
   requireEtag,
   requireKnownKeys,
   requireCreationKey,
+  requireTemplateId,
 } from "./http.js";
 import {
   realtimeModelSelectionFrom,
@@ -539,10 +540,32 @@ export const createSession = async (
     ],
     "Session options",
   );
-  if (typeof options.templateId !== "string" || !options.templateId.trim())
-    throw new TypeError("Session creation requires a Template ID");
+  requireTemplateId(options.templateId, "Session creation");
   requireCreationKey(options.idempotencyKey);
   if (options.tools !== undefined) validateClientTools(options.tools);
+  const instructions = options.additionalInstructions;
+  if (
+    instructions !== undefined &&
+    instructions !== null &&
+    typeof instructions !== "string"
+  )
+    throw new TypeError("additionalInstructions must be text or null");
+  if (options.sandbox !== undefined) {
+    requireKnownKeys(
+      options.sandbox,
+      ["profileId", "workingDirectory"],
+      "Session Sandbox selection",
+    );
+    const { profileId, workingDirectory } = options.sandbox;
+    if (
+      profileId !== undefined &&
+      profileId !== null &&
+      typeof profileId !== "string"
+    )
+      throw new TypeError("sandbox.profileId must be text or null");
+    if (workingDirectory !== undefined && typeof workingDirectory !== "string")
+      throw new TypeError("sandbox.workingDirectory must be text");
+  }
   const { templateId, idempotencyKey, signal, requestId, ...body } = options;
   const result = await http.postResponse<{ session: SessionRecord }>(
     "/sessions",

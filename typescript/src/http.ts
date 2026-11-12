@@ -57,6 +57,32 @@ export function requireCreationKey(value: unknown): asserts value is string {
     );
 }
 
+/** Check a Template ID the SDK sends: 1-64 characters without surrounding whitespace. */
+export function requireTemplateId(
+  value: unknown,
+  label: string,
+): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    !value ||
+    value.length > 64 ||
+    value.trim() !== value
+  )
+    throw new TypeError(
+      `${label} requires a Template ID of 1-64 characters without surrounding whitespace`,
+    );
+}
+
+/** Add an optional `templateId` filter under its wire name, `agentTemplateId`. */
+export const setTemplateFilter = (
+  query: URLSearchParams,
+  templateId: unknown,
+): void => {
+  if (templateId === undefined) return;
+  requireTemplateId(templateId, "The templateId filter");
+  query.set("agentTemplateId", templateId);
+};
+
 export interface HttpResult<T> {
   data: T;
   etag: string | undefined;

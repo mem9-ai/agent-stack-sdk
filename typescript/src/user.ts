@@ -4,6 +4,7 @@ import {
   HttpClient,
   paginationQuery,
   requireKnownKeys,
+  setTemplateFilter,
   type ListOptions,
 } from "./http.js";
 import type { RequestOptions } from "./organization.js";
@@ -82,7 +83,9 @@ export class EndUserClient {
   }
 
   listModels(options?: RequestOptions): Promise<AgentModelCatalog> {
-    return this.#http.get("/agent-models", requestOptions(options));
+    if (options)
+      requireKnownKeys(options, ["signal", "requestId"], "Model list options");
+    return this.#http.get("/agent-models", options);
   }
 
   listRealtimeModels(options?: RequestOptions): Promise<RealtimeModelCatalog> {
@@ -98,7 +101,7 @@ export class EndUserClient {
       );
     const { templateId, ...page } = options ?? {};
     const query = new URLSearchParams(paginationQuery(page));
-    if (templateId !== undefined) query.set("agentTemplateId", templateId);
+    setTemplateFilter(query, templateId);
     const response = await this.#http.get<{
       sessions: SessionRecord[];
       hasMore: boolean;

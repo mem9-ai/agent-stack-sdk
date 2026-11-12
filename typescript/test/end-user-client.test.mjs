@@ -130,6 +130,113 @@ test("Session creation sends explicit nulls and reports a receipt without a mode
   assert.deepEqual(bodies, [sent, sent]);
 });
 
+test("unusable Template IDs fail before dispatch in creation and filters", async () => {
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    res.end("{}");
+  });
+  const organization = new OrganizationClient({ baseUrl, apiKey: key });
+  const user = organization.user("user_1");
+  const range = {
+    from: "2030-01-01T00:00:00.000Z",
+    to: "2030-01-02T00:00:00.000Z",
+  };
+  for (const templateId of ["", " t", "t ", "x".repeat(65), 1, null, ["t"]]) {
+    await assert.rejects(
+      async () => user.createSession({ templateId, idempotencyKey: "ok" }),
+      TypeError,
+    );
+    await assert.rejects(async () => user.listSessions({ templateId }), TypeError);
+    await assert.rejects(
+      async () => organization.getUserUsage("user_1", { ...range, templateId }),
+      TypeError,
+    );
+    await assert.rejects(
+      async () =>
+        organization.getUserUsageDetails("user_1", { ...range, templateId }),
+      TypeError,
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("Session options with unsupported types or keys fail before dispatch", async () => {
+  let calls = 0;
+  const baseUrl = await serve((req, res) => {
+    calls++;
+    res.end("{}");
+  });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
+  for (const options of [
+    { additionalInstructions: 5 },
+    { additionalInstructions: { text: "x" } },
+    { sandbox: null },
+    { sandbox: "work" },
+    { sandbox: { cwd: "work" } },
+    { sandbox: { profileId: 1 } },
+    { sandbox: { workingDirectory: null } },
+  ])
+    await assert.rejects(
+      user.createSession({
+        templateId: "template_1",
+        idempotencyKey: "ok",
+        ...options,
+      }),
+      TypeError,
+    );
+  assert.equal(calls, 0);
+});
+
+test("model discovery accepts no options or null options", async () => {
+  const urls = [];
+  const baseUrl = await serve((req, res) => {
+    urls.push(req.url);
+    res
+      .writeHead(200, { "content-type": "application/json" })
+      .end(JSON.stringify({ models: [] }));
+  });
+  const user = new OrganizationClient({ baseUrl, apiKey: key }).user("user_1");
+  await user.listModels();
+  await user.listModels(null);
+  assert.deepEqual(urls, [
+    "/api/v1/org/users/user_1/agent-models",
+    "/api/v1/org/users/user_1/agent-models",
+  ]);
+});
+
+test("the packaged workflow passes Session options through", async () => {
+  const bodies = [];
+  const baseUrl = await serve(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    res.setHeader("content-type", "application/json");
+    if (req.method === "GET") return res.end(JSON.stringify({ templates: [] }));
+    bodies.push(JSON.parse(body));
+    created(res);
+  });
+  const { createSessionWorkflow } =
+    await import("../examples/create-session.mjs");
+  await createSessionWorkflow({
+    baseUrl,
+    organizationApiKey: key,
+    userId: "user_1",
+    templateId: "template_1",
+    sessionCreationKey: "example-options",
+    additionalInstructions: "Use metric units.",
+    sandbox: { workingDirectory: "work" },
+    acknowledgeSessionRecall: true,
+  });
+  assert.deepEqual(bodies, [
+    {
+      agentTemplateId: "template_1",
+      additionalInstructions: "Use metric units.",
+      sandbox: { workingDirectory: "work" },
+      acknowledgeSessionRecall: true,
+    },
+  ]);
+});
+
 test("Sessions can be listed by their current Template", async () => {
   const urls = [];
   const baseUrl = await serve((req, res) => {

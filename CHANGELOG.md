@@ -36,7 +36,13 @@ Schedulers and every Agent API, and creates Sessions directly from a Template.
   Template content types `tools.mcp`, the MCP Servers and Connectors a Template
   uses.
 - The `create-session.mjs` example takes `templateId` and one
-  `sessionCreationKey`; `AGENT_CREATION_KEY` is gone.
+  `sessionCreationKey`; `AGENT_CREATION_KEY` is gone. It passes
+  `additionalInstructions`, `sandbox` and `acknowledgeSessionRecall` through,
+  and its CLI accepts `ACKNOWLEDGE_SESSION_RECALL=true`.
+- `createSession` and the `templateId` filters reject a Template ID that is
+  empty, longer than 64 characters or padded with whitespace before sending.
+- A Hardware Operation `source` is typed with `hardwareBindingId`, or with
+  `hardwareRequirementId` for historical calls.
 - Add `organization.connectors` to register, list, read, edit, activate and
   deactivate Connectors.
 - Add `verifyConnectorCallback` with a cached `ConnectorKeySet` to verify the

@@ -52,6 +52,7 @@ const creation = {
   sessionCreationKey: randomUUID(),
 };
 // Persist the selected Template, optional model and the creation identity.
+// Add acknowledgeSessionRecall: true when the Template enables cross-Session Recall.
 const { session } = await createSessionWorkflow(creation);
 const message = { clientEventId: randomUUID(), text: "Help me plan a trip" };
 // Retain the Session, command identity and original input before dispatch.
@@ -66,13 +67,16 @@ idempotent: a repeated `createEndUser` returns the existing End User unchanged a
 does not apply the other fields, and concurrent calls create one End User. The SDK
 retries such calls automatically. An `externalId` that equals an existing one only
 when case and accents are ignored is refused with `resource_conflict`. Without an
-`externalId`, every call creates a new End User. Session creation replays require the same creation key and
+`externalId`, every call creates a new End User. A Template that enables
+cross-Session Recall refuses Session creation with
+`agent_template_recall_acknowledgment_required` (HTTP 409) unless the input
+includes `acknowledgeSessionRecall: true`. Session creation replays require the same creation key and
 inputs. Reading the original message receipt or waiting again does not execute
 another Turn. An HTTP request ID is diagnostic, not a creation identity.
 
 The installed example can run with `AGENT_SERVICE_URL`,
 `ORGANIZATION_API_KEY`, `END_USER_ID`, `TEMPLATE_ID` and
-`SESSION_CREATION_KEY` (`MODEL_ID` is optional):
+`SESSION_CREATION_KEY` (`MODEL_ID` and `ACKNOWLEDGE_SESSION_RECALL=true` are optional):
 
 ```sh
 node node_modules/@tidblink/server/examples/create-session.mjs
@@ -278,7 +282,8 @@ that identity. Do not generate a new key just because a response was lost.
 `listAgentTemplates({ limit?, cursor? })` returns
 `{ templates, hasMore, nextCursor }`; `listSessions({ limit?, cursor?, templateId? })`
 returns `{ sessions, hasMore, nextCursor }`, with `Session` handles in `sessions`.
-`templateId` lists only Sessions currently on that Template.
+`templateId` lists only Sessions currently on that Template; keep the same
+`templateId` when following a cursor.
 Continue with the returned opaque cursor until `hasMore` is false, including
 Template pages with no available entries. A changed Template catalog can refuse
 continuation with `agent_template_list_changed`; restart discovery.
@@ -328,7 +333,9 @@ const { session } = await createSessionWorkflow({
 ```
 
 For direct execution, set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`,
-`TEMPLATE_ID` and `SESSION_CREATION_KEY`; `MODEL_ID` is optional.
+`TEMPLATE_ID` and `SESSION_CREATION_KEY`; `MODEL_ID` and
+`ACKNOWLEDGE_SESSION_RECALL=true` are optional. The workflow also passes
+`additionalInstructions`, `sandbox` and `acknowledgeSessionRecall` through.
 Select and persist the Template ID, optional model and the key before calling.
 The example also returns the current Template page and model catalog. If no model
 was requested, it preserves omission so the service can recover the original

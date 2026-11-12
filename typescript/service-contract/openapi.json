@@ -1297,6 +1297,130 @@
         "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
       }
     },
+    "/api/v1/org/users/{userId}/sessions/{id}/template-switches": {
+      "post": {
+        "operationId": "OrganizationSessionsController_switchTemplate",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchSessionTemplateOpenApiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Durable pending Handoff receipt for a changed target with history, or a terminal succeeded or unchanged receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTemplateSwitchResponseOpenApiDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body or required Idempotency-Key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current exact Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth_kind_forbidden: an Organization API Key is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "session_not_found or agent_template_unavailable: the explicit ordinary owner, active Session or target Template is unavailable or authorization-hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "agent_instructions_too_large, idempotency_key_reused, session_read_only, agent_template_recall_acknowledgment_required, session_switch_in_progress, session_switch_busy, session_switch_unsupported, or resource_conflict when the target Realtime language is no longer offered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "turn_admission_closed when deployment maintenance or recovery pauses new Handoff Turns, or skill_package_store_unavailable when required Skill package storage is temporarily unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OrganizationApiKey": []
+          }
+        ],
+        "tags": [
+          "OrganizationSessions"
+        ],
+        "description": "Authorization: OrganizationApiKey; persisted credentials determine Organization and End User scope."
+      }
+    },
     "/api/v1/org/users/{userId}/sessions/{id}/name": {
       "post": {
         "operationId": "OrganizationSessionsController_rename",
@@ -8543,6 +8667,75 @@
           "session"
         ]
       },
+      "SessionTemplateSwitchResponseOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "receipt": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentTemplateId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "succeeded",
+                  "failed",
+                  "unchanged"
+                ]
+              },
+              "configurationEpoch": {
+                "type": "integer",
+                "minimum": 1,
+                "exclusiveMinimum": false
+              },
+              "handoffTurnId": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": "string"
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "session_switch_conflict",
+                      "agent_template_unavailable",
+                      "session_switch_unsupported"
+                    ]
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            },
+            "required": [
+              "commandId",
+              "sessionId",
+              "agentTemplateId",
+              "status",
+              "configurationEpoch",
+              "createdAt"
+            ]
+          }
+        },
+        "required": [
+          "receipt"
+        ]
+      },
       "SessionTimelineResponseOpenApiDto": {
         "type": "object",
         "properties": {
@@ -11466,6 +11659,23 @@
         "required": [
           "name",
           "session"
+        ]
+      },
+      "SwitchSessionTemplateOpenApiDto": {
+        "type": "object",
+        "properties": {
+          "agentTemplateId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "acknowledgeSessionRecall": {
+            "description": "Required when the target enables cross-Session Recall.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agentTemplateId"
         ]
       },
       "TemplateHandoffTurn": {

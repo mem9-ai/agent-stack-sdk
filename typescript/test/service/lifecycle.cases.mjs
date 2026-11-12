@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { OrganizationClient, TiDBLinkApiError, ConflictError } from "@tidblink/server";
@@ -242,4 +243,85 @@ test("the installed Template-to-Session example is runnable and recoverable with
   );
   assert.equal(JSON.parse(stdout).sessionId, first.session.id);
   assert(!(stdout + stderr).includes(options.organizationApiKey));
+});
+
+test("the installed SDK switches an idle Session's Template, through a Handoff Turn once it has history", async () => {
+  // Both fixture Templates are creatable for this owner (first case); the
+  // acknowledgment keeps the case independent of their Session Recall setting.
+  const ack = { acknowledgeSessionRecall: true };
+  const session = await user.createSession({
+    templateId,
+    idempotencyKey: randomUUID(),
+  });
+  // Without incorporated history the switch commits at once.
+  const direct = { templateId: otherTemplateId, idempotencyKey: randomUUID(), ...ack };
+  const first = await session.switchTemplate(direct);
+  assert.equal(first.status, "succeeded");
+  assert.equal(first.sessionId, session.id);
+  assert.equal(first.agentTemplateId, otherTemplateId);
+  assert.equal(first.configurationEpoch, 2);
+  assert.equal(first.handoffTurnId, undefined);
+  assert.deepEqual(await session.switchTemplate(direct), first);
+  await assert.rejects(
+    session.switchTemplate({ ...direct, templateId }),
+    refusal(409, "idempotency_key_reused"),
+  );
+  await session.refresh();
+  assert.equal(session.data.template.templateId, otherTemplateId);
+  assert.equal(session.data.configurationEpoch, 2);
+  const same = await session.switchTemplate({
+    templateId: otherTemplateId,
+    idempotencyKey: randomUUID(),
+    ...ack,
+  });
+  assert.equal(same.status, "unchanged");
+  assert.equal(same.configurationEpoch, 2);
+
+  // The controlled model holds any Turn whose prompt carries this marker for
+  // two seconds, so the Handoff Turn stays running while refusals are checked.
+  await session.turn(
+    { clientEventId: randomUUID(), text: "SDK_FIXTURE_PAUSE before the switch" },
+    { timeoutMs: 15000, pollIntervalMs: 25 },
+  );
+  const back = { templateId, idempotencyKey: randomUUID(), ...ack };
+  const pending = await session.switchTemplate(back);
+  assert.equal(pending.status, "pending");
+  assert(pending.handoffTurnId);
+  await assert.rejects(
+    session.submitMessage({ clientEventId: randomUUID(), text: "During the switch" }),
+    refusal(409, "session_switch_in_progress"),
+  );
+  await assert.rejects(
+    session.switchTemplate({ ...back, idempotencyKey: randomUUID() }),
+    refusal(409, "session_switch_in_progress"),
+  );
+  assert.equal((await user.getSession(session.id)).data.switching, true);
+
+  // Follow the Handoff Turn, not the switch command.
+  const deadline = Date.now() + 30000;
+  let handoff = await session.getTurn(pending.handoffTurnId);
+  while (handoff.status === "running" && Date.now() < deadline) {
+    await delay(100);
+    handoff = await session.getTurn(pending.handoffTurnId);
+  }
+  assert.equal(handoff.kind, "template_handoff");
+  assert.equal(handoff.agentTemplateId, templateId);
+  assert.equal(handoff.status, "succeeded");
+  await session.refresh();
+  assert.equal(session.data.switching, false);
+  assert.equal(session.data.template.templateId, templateId);
+  assert.equal(session.data.configurationEpoch, 3);
+  // A lost response is recovered with the same key and input: the latest receipt.
+  const recovered = await session.switchTemplate(back);
+  assert.equal(recovered.status, "succeeded");
+  assert.equal(recovered.commandId, pending.commandId);
+  assert.equal(recovered.handoffTurnId, pending.handoffTurnId);
+  assert.equal(recovered.configurationEpoch, 3);
+  await assert.rejects(
+    stranger.session(session.id).switchTemplate({
+      templateId: otherTemplateId,
+      idempotencyKey: randomUUID(),
+    }),
+    refusal(404, "session_not_found"),
+  );
 });

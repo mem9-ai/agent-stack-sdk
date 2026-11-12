@@ -8,7 +8,7 @@ stay on your backend; do not ship it to browsers or devices.
 
 This package supports Organization information, End User provisioning,
 Template, Skill and Connector management, Connector callback verification,
-Template/model discovery, Session management,
+Template/model discovery, Session management and Template switches,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
@@ -292,7 +292,9 @@ read a current owned Session; `session(id)` creates a handle without a request.
 
 Each Session freezes its Template recipe, digest and creation options.
 Later Template saves do not rewrite it; `session.data.template` names the
-Template and digest in use. Session model selection is separate:
+Template and digest in use. Only an explicit
+[Template switch](#switching-a-sessions-template) moves it to a Template's
+current content. Session model selection is separate:
 
 ```ts
 const current = await customer.getSession(session.id);
@@ -309,13 +311,6 @@ Organization policy, read-only Sessions and current ownership remain service
 decisions. `session.delete()` updates and returns the Session handle; `.data` contains the deleted tombstone; later ordinary reads
 and lists hide the Session. Active execution or a read-only Session can refuse
 deletion. Name and Billing Tag changes do not change the frozen recipe.
-
-A Session can move to another Template through the service's Template switch
-route, which this SDK does not wrap. The switch runs a Template Handoff Turn
-under the target Template; history reads return it as a Turn with
-`kind: "template_handoff"`, no `userMessage` and an empty `userMessages`, and
-its assistant Message is the summary. Event streams report the outcome as
-`agent.session.template_switch.succeeded` or `.failed`.
 
 The packaged example completes discovery and creation without message execution:
 
@@ -340,6 +335,72 @@ Select and persist the Template ID, optional model and the key before calling.
 The example also returns the current Template page and model catalog. If no model
 was requested, it preserves omission so the service can recover the original
 creation even after the deployment default changes.
+
+### Switching a Session's Template
+
+`session.switchTemplate()` moves a Session to another active Template's current
+content. Switching to the Template the Session is already on also applies that
+Template's latest saved content. Persist a key per switch, as for creation:
+
+```ts
+const receipt = await session.switchTemplate({
+  templateId: nextTemplateId,
+  idempotencyKey: switchKey,
+  // acknowledgeSessionRecall: true, when the target enables cross-Session Recall
+});
+if (receipt.status === "pending") {
+  const handoff = await session.getTurn(receipt.handoffTurnId);
+  if (handoff.status !== "running") await session.refresh();
+} else if (receipt.status === "failed") {
+  console.warn(receipt.error.code);
+}
+```
+
+| `status` | Meaning |
+| --- | --- |
+| `unchanged` | The target's content equals the current configuration; nothing changed and no `handoffTurnId` |
+| `succeeded` | The Session is on the target at the receipt's `configurationEpoch`. A first response says this only when the Session had no history, so no Handoff ran |
+| `pending` | The Session has history, so the Handoff Turn `handoffTurnId` runs under the target Template |
+
+A `pending` switch settles when its Handoff Turn does: the Session moves to the
+target, or the switch fails and the Session stays on its previous Template.
+Follow it like any Turn, with `session.getTurn(receipt.handoffTurnId)` or the
+event stream, which reports `agent.session.template_switch.succeeded` or
+`.failed`. `session.refresh()` then shows the new `template` and
+`configurationEpoch`, and `switching` is `false` once it has settled. The receipt
+holds no Session, so `switchTemplate()` never updates `session.data`; call
+`refresh()`. While a switch is pending, new messages and another switch are
+refused with `session_switch_in_progress`.
+
+The service refuses a switch it does not record:
+
+| Error | Cause |
+| --- | --- |
+| `ConflictError` `session_switch_busy` | A Turn is running or a Realtime Connection is live |
+| `ConflictError` `session_switch_in_progress` | Another switch has not settled |
+| `ConflictError` `agent_template_recall_acknowledgment_required` | The target enables cross-Session Recall; pass `acknowledgeSessionRecall: true` |
+| `ConflictError` `session_read_only` | The Session cannot change Template, such as a Template Test Session |
+| `ConflictError` `resource_conflict` | The target's Realtime language is no longer offered, or state changed during admission |
+| `ConflictError` `idempotency_key_reused` | The key was used with a different Session, Template or acknowledgment |
+| `TiDBLinkApiError` 404 `agent_template_unavailable` | The target is archived, missing or its dependencies are unusable |
+| `TiDBLinkApiError` 404 `session_not_found` | The Session or its owner is unavailable |
+| `TiDBLinkApiError` 503 `turn_admission_closed`, `skill_package_store_unavailable` | Temporarily unavailable; retry later |
+
+After a lost response (`OutcomeUnknownError`), repeat the call with the same key
+and input to recover the receipt; the service returns the command's latest
+receipt and records no second switch. Do not poll this way. Commands belong to
+the Organization API Key that sent them, so recover with the same key; after a
+rotation, follow the Session instead. A replay after the Session is deleted or
+its owner loses access is refused with `session_not_found`.
+
+The Handoff Turn summarizes the Session so far for the target Template. History
+reads return it as a Turn with `kind: "template_handoff"`, no `userMessage` and
+an empty `userMessages`; when it succeeds, its assistant Message is the summary.
+The service's
+[ADR 0107](https://github.com/mem9-ai/agent-stack/blob/bc65d6b76928f4b5348302349342309bd24b28ac/docs/adr/0107-switch-session-template-baselines-through-configuration-epochs.md)
+describes what the Session keeps across a switch (models, Billing Tag, Client
+Tools and creation options) and that cancelling the Handoff Turn fails the
+switch.
 
 ## Text messages and original results
 
@@ -895,8 +956,8 @@ Organization, text/progress/history and Session lifecycle methods accept
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
 request identity takes precedence over the one sent.
 
-Safe reads and keyed Session creation use bounded retries with the same
-request identity and creation key. User creation,
+Safe reads, keyed Session creation and Template switches use bounded retries
+with the same request identity and key. User creation,
 Session updates, deletion and Realtime mutations are never
 automatically replayed. Disconnects, unusable success responses, HTTP 408 and
 server failures during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
@@ -906,8 +967,8 @@ refused.
 
 After uncertain End User creation, repeat it with the same `externalId`.
 
-After uncertain Session creation, repeat the original input with the same
-creation key. After an uncertain name, tag or model update, read the
+After uncertain Session creation or Template switch, repeat the original input
+with the same key. After an uncertain name, tag or model update, read the
 resource before deciding on another change. Deletion can hide a
 resource from ordinary reads, so a missing resource does not recover its original
 mutation receipt.
@@ -1015,7 +1076,8 @@ Fixtures prepare identities, Templates and eligible
 Realtime Sessions. A composed installed quickstart provisions one fresh User,
 discovers Templates/models, creates a Session, obtains a final answer
 and recovers the same original result. Public SDK methods also verify ownership,
-lifecycle updates and Realtime operations. Text cases
+lifecycle updates, Template switches with and without a Handoff Turn, and Realtime
+operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Progress cases verify draft replacement, cursor

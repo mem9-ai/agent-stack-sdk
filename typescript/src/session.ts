@@ -32,6 +32,11 @@ import {
 } from "./progress.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
+  switchTemplate,
+  type SwitchTemplateInput,
+  type TemplateSwitchReceipt,
+} from "./template-switch.js";
+import {
   subscribe,
   type SubscribeOptions,
   type SubscriptionItem,
@@ -385,6 +390,15 @@ export class Session {
       receipt?.session,
       result.requestId,
     );
+  }
+
+  /**
+   * Move this idle Session to another Template. After a lost response, repeat
+   * with the same input to recover the receipt. The receipt holds no Session,
+   * so `data` is not updated: call `refresh()` to read the new Template.
+   */
+  switchTemplate(input: SwitchTemplateInput): Promise<TemplateSwitchReceipt> {
+    return switchTemplate(this.#http, this.id, input);
   }
 
   /** One connection to the event stream. See `subscribe` for a resilient one. */

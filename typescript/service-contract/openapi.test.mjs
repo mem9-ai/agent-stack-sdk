@@ -402,6 +402,75 @@ test("Sessions are created from an explicit Template with Session-level options"
   assert.equal(properties(session).createdWithAgentId, undefined);
 });
 
+test("a keyed Template switch returns a receipt that names its Handoff Turn", () => {
+  const command = document.paths[`${sessionPath}/template-switches`].post;
+  assert.deepEqual(command.security, [{ OrganizationApiKey: [] }]);
+  const key = command.parameters.find(
+    (p) => p.in === "header" && p.name === "Idempotency-Key",
+  );
+  assert.equal(key.required, true);
+  assert.equal(key.schema.pattern, "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$");
+  assert.equal(
+    command.requestBody.content["application/json"].schema.$ref,
+    "#/components/schemas/SwitchSessionTemplateOpenApiDto",
+  );
+  const body = schema("SwitchSessionTemplateOpenApiDto");
+  assert.deepEqual(body.required, ["agentTemplateId"]);
+  // Exactly the fields the SDK sends.
+  assert.deepEqual(Object.keys(properties(body)).sort(), [
+    "acknowledgeSessionRecall",
+    "agentTemplateId",
+  ]);
+  assert.equal(properties(body).agentTemplateId.maxLength, 64);
+  assert.equal(properties(body).acknowledgeSessionRecall.type, "boolean");
+  assert.deepEqual(Object.keys(command.responses).sort(), [
+    "202",
+    "400",
+    "401",
+    "403",
+    "404",
+    "409",
+    "503",
+  ]);
+  assert.equal(
+    command.responses["202"].content["application/json"].schema.$ref,
+    "#/components/schemas/SessionTemplateSwitchResponseOpenApiDto",
+  );
+  for (const code of ["session_switch_busy", "session_switch_in_progress", "idempotency_key_reused"])
+    assert.match(command.responses["409"].description, new RegExp(code));
+  // The SDK treats these 503 refusals as definite: the service records nothing.
+  for (const code of ["turn_admission_closed", "skill_package_store_unavailable"])
+    assert.match(command.responses["503"].description, new RegExp(code));
+  const receipt = properties(schema("SessionTemplateSwitchResponseOpenApiDto")).receipt;
+  assert.deepEqual(receipt.required, [
+    "commandId",
+    "sessionId",
+    "agentTemplateId",
+    "status",
+    "configurationEpoch",
+    "createdAt",
+  ]);
+  const fields = properties(receipt);
+  assert.deepEqual(Object.keys(fields).sort(), [
+    "agentTemplateId",
+    "commandId",
+    "completedAt",
+    "configurationEpoch",
+    "createdAt",
+    "error",
+    "handoffTurnId",
+    "sessionId",
+    "status",
+  ]);
+  assert.deepEqual(fields.status.enum, ["pending", "succeeded", "failed", "unchanged"]);
+  assert.equal(fields.handoffTurnId.type, "string");
+  assert.deepEqual(properties(fields.error).code.enum, [
+    "session_switch_conflict",
+    "agent_template_unavailable",
+    "session_switch_unsupported",
+  ]);
+});
+
 test("the core Agent is gone from the selected contract", () => {
   for (const path of Object.keys(document.paths))
     assert.doesNotMatch(path, /\/agents(\/|$)/);

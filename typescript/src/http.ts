@@ -47,13 +47,17 @@ export const paginationQuery = (options?: ListOptions): string => {
   return query.size ? `?${query}` : "";
 };
 
-export function requireCreationKey(value: unknown): asserts value is string {
+/** Check a stable command key; `label` names the operation in the error. */
+export function requireCreationKey(
+  value: unknown,
+  label = "Creation",
+): asserts value is string {
   if (
     typeof value !== "string" ||
     !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value)
   )
     throw new TypeError(
-      "Creation requires a stable idempotencyKey (1-128 safe characters)",
+      `${label} requires a stable idempotencyKey (1-128 safe characters)`,
     );
 }
 

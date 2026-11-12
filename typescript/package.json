@@ -1,6 +1,6 @@
 {
   "name": "@tidblink/server",
-  "version": "0.3.0-rc.0",
+  "version": "0.4.0-rc.0",
   "description": "Official TypeScript SDK for TiDB Link",
   "license": "Apache-2.0",
   "type": "module",

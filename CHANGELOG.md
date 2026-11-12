@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.0-rc.0
+
+Release candidate on the `next` dist-tag for the service after it retired the
+core Agent. Compared with 0.3.0-rc.0 it removes User API Key authority,
+Schedulers and every Agent API, and creates Sessions directly from a Template.
+
 - Pin the supported contract to service
   `bc65d6b76928f4b5348302349342309bd24b28ac` and OpenAPI SHA-256
   `aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913`.

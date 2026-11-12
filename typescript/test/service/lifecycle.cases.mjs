@@ -246,12 +246,15 @@ test("the installed Template-to-Session example is runnable and recoverable with
 });
 
 test("the installed SDK switches an idle Session's Template, through a Handoff Turn once it has history", async () => {
+  // Both fixture Templates are creatable for this owner (first case); the
+  // acknowledgment keeps the case independent of their Session Recall setting.
+  const ack = { acknowledgeSessionRecall: true };
   const session = await user.createSession({
     templateId,
     idempotencyKey: randomUUID(),
   });
   // Without incorporated history the switch commits at once.
-  const direct = { templateId: otherTemplateId, idempotencyKey: randomUUID() };
+  const direct = { templateId: otherTemplateId, idempotencyKey: randomUUID(), ...ack };
   const first = await session.switchTemplate(direct);
   assert.equal(first.status, "succeeded");
   assert.equal(first.sessionId, session.id);
@@ -269,34 +272,51 @@ test("the installed SDK switches an idle Session's Template, through a Handoff T
   const same = await session.switchTemplate({
     templateId: otherTemplateId,
     idempotencyKey: randomUUID(),
+    ...ack,
   });
   assert.equal(same.status, "unchanged");
   assert.equal(same.configurationEpoch, 2);
 
+  // The controlled model holds any Turn whose prompt carries this marker for
+  // two seconds, so the Handoff Turn stays running while refusals are checked.
   await session.turn(
-    { clientEventId: randomUUID(), text: "SDK_FIXTURE_SUCCESS" },
+    { clientEventId: randomUUID(), text: "SDK_FIXTURE_PAUSE before the switch" },
     { timeoutMs: 15000, pollIntervalMs: 25 },
   );
-  const back = { templateId, idempotencyKey: randomUUID() };
+  const back = { templateId, idempotencyKey: randomUUID(), ...ack };
   const pending = await session.switchTemplate(back);
   assert.equal(pending.status, "pending");
   assert(pending.handoffTurnId);
-  let latest = pending;
-  for (let attempt = 0; latest.status === "pending" && attempt < 300; attempt++) {
-    await delay(50);
-    latest = await session.switchTemplate(back);
+  await assert.rejects(
+    session.submitMessage({ clientEventId: randomUUID(), text: "During the switch" }),
+    refusal(409, "session_switch_in_progress"),
+  );
+  await assert.rejects(
+    session.switchTemplate({ ...back, idempotencyKey: randomUUID() }),
+    refusal(409, "session_switch_in_progress"),
+  );
+  assert.equal((await user.getSession(session.id)).data.switching, true);
+
+  // Follow the Handoff Turn, not the switch command.
+  const deadline = Date.now() + 30000;
+  let handoff = await session.getTurn(pending.handoffTurnId);
+  while (handoff.status === "running" && Date.now() < deadline) {
+    await delay(100);
+    handoff = await session.getTurn(pending.handoffTurnId);
   }
-  assert.equal(latest.status, "succeeded");
-  assert.equal(latest.commandId, pending.commandId);
-  assert.equal(latest.handoffTurnId, pending.handoffTurnId);
-  assert.equal(latest.configurationEpoch, 3);
-  const handoff = await session.getTurn(pending.handoffTurnId);
   assert.equal(handoff.kind, "template_handoff");
   assert.equal(handoff.agentTemplateId, templateId);
   assert.equal(handoff.status, "succeeded");
   await session.refresh();
-  assert.equal(session.data.template.templateId, templateId);
   assert.equal(session.data.switching, false);
+  assert.equal(session.data.template.templateId, templateId);
+  assert.equal(session.data.configurationEpoch, 3);
+  // A lost response is recovered with the same key and input: the latest receipt.
+  const recovered = await session.switchTemplate(back);
+  assert.equal(recovered.status, "succeeded");
+  assert.equal(recovered.commandId, pending.commandId);
+  assert.equal(recovered.handoffTurnId, pending.handoffTurnId);
+  assert.equal(recovered.configurationEpoch, 3);
   await assert.rejects(
     stranger.session(session.id).switchTemplate({
       templateId: otherTemplateId,

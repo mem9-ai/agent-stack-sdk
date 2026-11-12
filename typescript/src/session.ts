@@ -393,8 +393,9 @@ export class Session {
   }
 
   /**
-   * Move this idle Session to another Template. Repeat with the same input to
-   * read the switch's latest status. `data` is not updated; call `refresh()`.
+   * Move this idle Session to another Template. After a lost response, repeat
+   * with the same input to recover the receipt. The receipt holds no Session,
+   * so `data` is not updated: call `refresh()` to read the new Template.
    */
   switchTemplate(input: SwitchTemplateInput): Promise<TemplateSwitchReceipt> {
     return switchTemplate(this.#http, this.id, input);

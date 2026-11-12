@@ -1,3 +1,4 @@
+import type { TemplateSwitchStatus } from "./template-switch.js";
 import { TiDBLinkError } from "./errors.js";
 import type { ClarificationItem } from "./session.js";
 import type { RealtimeResponseKind, SessionRealtimeEvent } from "./history.js";
@@ -115,7 +116,7 @@ export type RealtimeResponseEvent = KnownEvent<
 export interface TemplateSwitchEventData {
   id: string;
   commandId: string;
-  status: "succeeded" | "failed";
+  status: Extract<TemplateSwitchStatus, "succeeded" | "failed">;
   configurationEpoch: number;
   agentTemplateId: string;
   contentDigest: string | null;

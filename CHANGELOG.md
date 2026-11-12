@@ -5,13 +5,18 @@
 - Add `session.switchTemplate({ templateId, idempotencyKey,
   acknowledgeSessionRecall? })` to move an idle Session to another Template
   ([#28](https://github.com/mem9-ai/tidblink-sdk/issues/28)). It returns the
-  service's `TemplateSwitchReceipt`: `unchanged`, `succeeded`, or `pending` with
-  the `handoffTurnId` of the Template Handoff Turn, which later settles as
-  `succeeded` or `failed`. Repeating the call with the same key and input reads
-  the latest receipt and recovers a lost response; the keyed request is retried
-  like Session creation. `SwitchTemplateInput`, `TemplateSwitchReceipt` and
-  `TemplateSwitchStatus` are exported. The service contract is unchanged; the
-  frozen `openapi.json` snapshot now includes the switch route.
+  service's receipt, typed as `TemplateSwitchReceipt` with one variant per
+  `status`: `unchanged`, `succeeded`, or `pending` with the `handoffTurnId` of
+  the Template Handoff Turn; a later read can show `failed` with `error.code`.
+  Follow a pending switch through its Handoff Turn, the
+  `agent.session.template_switch.*` events or `refresh()`; the call does not
+  update `session.data`. After a lost response, repeat the same key and input
+  to recover the receipt. An uncertain outcome raises `OutcomeUnknownError` with
+  `sessionId`; the 503 refusals `turn_admission_closed` and
+  `skill_package_store_unavailable` are definite `TiDBLinkApiError`s.
+  `SwitchTemplateInput`, `TemplateSwitchReceipt` and `TemplateSwitchStatus` are
+  exported. The service contract is unchanged; the frozen `openapi.json`
+  snapshot now includes the switch route.
 
 ## 0.4.0-rc.0
 

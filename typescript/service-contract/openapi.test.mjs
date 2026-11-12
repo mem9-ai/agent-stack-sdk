@@ -438,6 +438,9 @@ test("a keyed Template switch returns a receipt that names its Handoff Turn", ()
   );
   for (const code of ["session_switch_busy", "session_switch_in_progress", "idempotency_key_reused"])
     assert.match(command.responses["409"].description, new RegExp(code));
+  // The SDK treats these 503 refusals as definite: the service records nothing.
+  for (const code of ["turn_admission_closed", "skill_package_store_unavailable"])
+    assert.match(command.responses["503"].description, new RegExp(code));
   const receipt = properties(schema("SessionTemplateSwitchResponseOpenApiDto")).receipt;
   assert.deepEqual(receipt.required, [
     "commandId",

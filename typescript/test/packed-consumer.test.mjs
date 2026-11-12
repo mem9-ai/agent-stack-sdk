@@ -89,6 +89,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       SessionSandboxSelection,
       SwitchTemplateInput,
       TemplateSwitchReceipt,
+      TemplateSwitchStatus,
       TurnRecord,
       OperationRecord,
       Organization,
@@ -325,9 +326,27 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         if (turn.kind === "template_handoff") { const target: string = turn.agentTemplateId; void target; }
         else { const text: string = turn.userMessage.content; const frozen: string | null = turn.agentTemplateId; void text; void frozen; }
       }
+      // The README's switch example, as written.
+      const nextTemplateId = "template_2"; const switchKey = "switch-1";
+      const receipt = await session.switchTemplate({
+        templateId: nextTemplateId,
+        idempotencyKey: switchKey,
+      });
+      if (receipt.status === "pending") {
+        const handoff = await session.getTurn(receipt.handoffTurnId);
+        if (handoff.status !== "running") await session.refresh();
+      } else if (receipt.status === "failed") {
+        console.warn(receipt.error.code);
+      }
       const switchInput: SwitchTemplateInput = {templateId:"template_2",idempotencyKey:"switch-1",acknowledgeSessionRecall:true};
       const switched: TemplateSwitchReceipt = await session.switchTemplate(switchInput);
-      if (switched.status === "pending") { const handoff: string | undefined = switched.handoffTurnId; void handoff; }
+      const switchStatus: TemplateSwitchStatus = switched.status;
+      const pendingHandoff: string = switched.status === "pending" ? switched.handoffTurnId : "";
+      // @ts-expect-error Only a pending receipt guarantees a Handoff Turn.
+      const anyHandoff: string = switched.handoffTurnId;
+      // @ts-expect-error An unchanged switch runs no Handoff Turn.
+      const noHandoff: string = switched.status === "unchanged" ? switched.handoffTurnId : "";
+      void switchStatus; void pendingHandoff; void anyHandoff; void noHandoff;
       // @ts-expect-error A Template switch requires a recoverable identity.
       session.switchTemplate({templateId:"template_2"});
       // @ts-expect-error The SDK names the target templateId, not the wire field.

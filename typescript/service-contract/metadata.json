@@ -3,7 +3,7 @@
   "tidbLinkApiVersion": "0.0.1",
   "sourceOpenApiSha256": "aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913",
   "snapshots": {
-    "openapi.json": "b8b91a1a6dc260edb300748a07ce95939f255b72f3a520efc2eb307d0766eb18",
+    "openapi.json": "095b6d26ef1ad4b7929148d81c3aab31078f7e81d9f5966aa85e159afd9fb899",
     "files.json": "67e33af42406e1ed0d13c9e4ee55d80bc67c1124b7a942849668564af0b30ed3",
     "management.json": "380967b7dc2f3840cb43a51c8c144b6a732bcb09266d232e4f0e4f7e8cbda29d",
     "connectors.json": "3560d6a5b95f39ac8e3ad8937ebf73279bc9c86d1da88a15f504d8eb1b5c83a8",

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Add `session.switchTemplate({ templateId, idempotencyKey,
+  acknowledgeSessionRecall? })` to move an idle Session to another Template
+  ([#28](https://github.com/mem9-ai/tidblink-sdk/issues/28)). It returns the
+  service's `TemplateSwitchReceipt`: `unchanged`, `succeeded`, or `pending` with
+  the `handoffTurnId` of the Template Handoff Turn, which later settles as
+  `succeeded` or `failed`. Repeating the call with the same key and input reads
+  the latest receipt and recovers a lost response; the keyed request is retried
+  like Session creation. `SwitchTemplateInput`, `TemplateSwitchReceipt` and
+  `TemplateSwitchStatus` are exported. The service contract is unchanged; the
+  frozen `openapi.json` snapshot now includes the switch route.
+
 ## 0.4.0-rc.0
 
 Release candidate on the `next` dist-tag for the service after it retired the

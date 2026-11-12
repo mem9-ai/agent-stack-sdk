@@ -87,6 +87,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       CreateSessionOptions,
       SessionListOptions,
       SessionSandboxSelection,
+      SwitchTemplateInput,
+      TemplateSwitchReceipt,
       TurnRecord,
       OperationRecord,
       Organization,
@@ -323,6 +325,13 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         if (turn.kind === "template_handoff") { const target: string = turn.agentTemplateId; void target; }
         else { const text: string = turn.userMessage.content; const frozen: string | null = turn.agentTemplateId; void text; void frozen; }
       }
+      const switchInput: SwitchTemplateInput = {templateId:"template_2",idempotencyKey:"switch-1",acknowledgeSessionRecall:true};
+      const switched: TemplateSwitchReceipt = await session.switchTemplate(switchInput);
+      if (switched.status === "pending") { const handoff: string | undefined = switched.handoffTurnId; void handoff; }
+      // @ts-expect-error A Template switch requires a recoverable identity.
+      session.switchTemplate({templateId:"template_2"});
+      // @ts-expect-error The SDK names the target templateId, not the wire field.
+      session.switchTemplate({agentTemplateId:"template_2",idempotencyKey:"switch-1"});
       void page;
       return session.delete();
     }

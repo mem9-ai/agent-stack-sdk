@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { OrganizationClient, TiDBLinkApiError, ConflictError } from "@tidblink/server";
@@ -242,4 +243,65 @@ test("the installed Template-to-Session example is runnable and recoverable with
   );
   assert.equal(JSON.parse(stdout).sessionId, first.session.id);
   assert(!(stdout + stderr).includes(options.organizationApiKey));
+});
+
+test("the installed SDK switches an idle Session's Template, through a Handoff Turn once it has history", async () => {
+  const session = await user.createSession({
+    templateId,
+    idempotencyKey: randomUUID(),
+  });
+  // Without incorporated history the switch commits at once.
+  const direct = { templateId: otherTemplateId, idempotencyKey: randomUUID() };
+  const first = await session.switchTemplate(direct);
+  assert.equal(first.status, "succeeded");
+  assert.equal(first.sessionId, session.id);
+  assert.equal(first.agentTemplateId, otherTemplateId);
+  assert.equal(first.configurationEpoch, 2);
+  assert.equal(first.handoffTurnId, undefined);
+  assert.deepEqual(await session.switchTemplate(direct), first);
+  await assert.rejects(
+    session.switchTemplate({ ...direct, templateId }),
+    refusal(409, "idempotency_key_reused"),
+  );
+  await session.refresh();
+  assert.equal(session.data.template.templateId, otherTemplateId);
+  assert.equal(session.data.configurationEpoch, 2);
+  const same = await session.switchTemplate({
+    templateId: otherTemplateId,
+    idempotencyKey: randomUUID(),
+  });
+  assert.equal(same.status, "unchanged");
+  assert.equal(same.configurationEpoch, 2);
+
+  await session.turn(
+    { clientEventId: randomUUID(), text: "SDK_FIXTURE_SUCCESS" },
+    { timeoutMs: 15000, pollIntervalMs: 25 },
+  );
+  const back = { templateId, idempotencyKey: randomUUID() };
+  const pending = await session.switchTemplate(back);
+  assert.equal(pending.status, "pending");
+  assert(pending.handoffTurnId);
+  let latest = pending;
+  for (let attempt = 0; latest.status === "pending" && attempt < 300; attempt++) {
+    await delay(50);
+    latest = await session.switchTemplate(back);
+  }
+  assert.equal(latest.status, "succeeded");
+  assert.equal(latest.commandId, pending.commandId);
+  assert.equal(latest.handoffTurnId, pending.handoffTurnId);
+  assert.equal(latest.configurationEpoch, 3);
+  const handoff = await session.getTurn(pending.handoffTurnId);
+  assert.equal(handoff.kind, "template_handoff");
+  assert.equal(handoff.agentTemplateId, templateId);
+  assert.equal(handoff.status, "succeeded");
+  await session.refresh();
+  assert.equal(session.data.template.templateId, templateId);
+  assert.equal(session.data.switching, false);
+  await assert.rejects(
+    stranger.session(session.id).switchTemplate({
+      templateId: otherTemplateId,
+      idempotencyKey: randomUUID(),
+    }),
+    refusal(404, "session_not_found"),
+  );
 });

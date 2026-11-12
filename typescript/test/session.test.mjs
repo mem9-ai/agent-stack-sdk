@@ -6,6 +6,7 @@ import {
   ConflictError,
   OutcomeUnknownError,
   OrganizationClient,
+  TiDBLinkApiError,
 } from "../dist/index.js";
 
 const servers = [];
@@ -261,4 +262,151 @@ test("Session suggested naming keeps the model token and reports uncertain namin
   await session.setModel("dynamic-model");
   await assert.rejects(session.suggestName(input), OutcomeUnknownError);
   assert.equal(suggests, 2);
+});
+
+const switchPath = "/api/v1/org/users/user_1/sessions/session_1/template-switches";
+const switchReceipt = (overrides = {}) => ({
+  commandId: "stsw_1",
+  sessionId: "session_1",
+  agentTemplateId: "template_2",
+  status: "pending",
+  configurationEpoch: 1,
+  handoffTurnId: "turn_handoff",
+  createdAt: "2026-11-12T00:00:00.000Z",
+  ...overrides,
+});
+
+test("a Template switch sends the keyed target and returns the receipt naming its Handoff Turn", async () => {
+  const calls = [];
+  const baseUrl = await serve(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    calls.push({
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body,
+    });
+    response
+      .writeHead(202, { "content-type": "application/json" })
+      .end(JSON.stringify({ receipt: switchReceipt() }));
+  });
+  const session = clientFor(baseUrl).session("session_1");
+
+  for (const input of [
+    {},
+    { templateId: "template_2" },
+    { idempotencyKey: "switch-1" },
+    { templateId: " template_2", idempotencyKey: "switch-1" },
+    { templateId: "t".repeat(65), idempotencyKey: "switch-1" },
+    { templateId: "template_2", idempotencyKey: "switch 1" },
+    { templateId: "template_2", idempotencyKey: "switch-1", acknowledgeSessionRecall: "yes" },
+    { agentTemplateId: "template_2", idempotencyKey: "switch-1" },
+  ])
+    await assert.rejects(session.switchTemplate(input), TypeError);
+  assert.equal(calls.length, 0);
+
+  const receipt = await session.switchTemplate({
+    templateId: "template_2",
+    idempotencyKey: "switch-1",
+    acknowledgeSessionRecall: true,
+    requestId: "request-1",
+  });
+  assert.deepEqual(receipt, switchReceipt());
+  await session.switchTemplate({ templateId: "template_2", idempotencyKey: "switch-2" });
+
+  assert.deepEqual(
+    calls.map(({ method, url }) => [method, url]),
+    [
+      ["POST", switchPath],
+      ["POST", switchPath],
+    ],
+  );
+  assert.deepEqual(JSON.parse(calls[0].body), {
+    agentTemplateId: "template_2",
+    acknowledgeSessionRecall: true,
+  });
+  assert.equal(calls[0].headers["idempotency-key"], "switch-1");
+  assert.equal(calls[0].headers["x-request-id"], "request-1");
+  assert.deepEqual(JSON.parse(calls[1].body), { agentTemplateId: "template_2" });
+  assert.equal(calls[1].headers["idempotency-key"], "switch-2");
+});
+
+test("a lost Template switch response keeps its key and is recovered by repeating the input", async () => {
+  let drops = 4;
+  const keys = [];
+  const baseUrl = await serve((request, response) => {
+    keys.push(request.headers["idempotency-key"]);
+    if (drops-- > 0) {
+      response.destroy();
+      return;
+    }
+    response
+      .writeHead(202, { "content-type": "application/json" })
+      .end(
+        JSON.stringify({
+          receipt: switchReceipt({
+            status: "succeeded",
+            configurationEpoch: 2,
+            completedAt: "2026-11-12T00:00:01.000Z",
+          }),
+        }),
+      );
+  });
+  const session = clientFor(baseUrl).session("session_1");
+  const input = { templateId: "template_2", idempotencyKey: "switch-recover" };
+
+  await assert.rejects(
+    session.switchTemplate(input),
+    (error) => error instanceof OutcomeUnknownError,
+  );
+  assert.equal(keys.length, 3);
+  // One more dropped response is retried automatically with the same key.
+  const receipt = await session.switchTemplate(input);
+  assert.equal(receipt.status, "succeeded");
+  assert.equal(receipt.configurationEpoch, 2);
+  assert.equal(keys.length, 5);
+  assert(keys.every((key) => key === input.idempotencyKey));
+});
+
+test("Template switch refusals keep their service codes and unusable receipts are uncertain", async () => {
+  const replies = [
+    [409, { error: { code: "session_switch_busy", message: "Busy" } }],
+    [404, { error: { code: "agent_template_unavailable", message: "Unavailable" } }],
+    [202, { receipt: switchReceipt({ sessionId: "session_2" }) }],
+    [202, { receipt: switchReceipt({ agentTemplateId: "template_3" }) }],
+    [202, { receipt: switchReceipt({ status: "running" }) }],
+    [202, {}],
+  ];
+  const baseUrl = await serve((request, response) => {
+    const [status, body] = replies.shift();
+    response
+      .writeHead(status, { "content-type": "application/json" })
+      .end(JSON.stringify(body));
+  });
+  const session = clientFor(baseUrl).session("session_1");
+  const input = { templateId: "template_2", idempotencyKey: "switch-1" };
+
+  await assert.rejects(
+    session.switchTemplate(input),
+    (error) =>
+      error instanceof ConflictError &&
+      error.status === 409 &&
+      error.code === "session_switch_busy",
+  );
+  await assert.rejects(
+    session.switchTemplate(input),
+    (error) =>
+      error instanceof TiDBLinkApiError &&
+      !(error instanceof ConflictError) &&
+      error.status === 404 &&
+      error.code === "agent_template_unavailable",
+  );
+  for (let index = 0; index < 4; index++)
+    await assert.rejects(
+      session.switchTemplate(input),
+      (error) =>
+        error instanceof OutcomeUnknownError && error.sessionId === "session_1",
+    );
+  assert.equal(replies.length, 0);
 });

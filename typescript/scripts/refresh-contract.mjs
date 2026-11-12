@@ -46,6 +46,7 @@ const snapshots = {
       `${session}/model`,
       `${session}/realtime-model`,
       `${session}/billing-tag`,
+      `${session}/template-switches`,
       `${session}/name`,
       `${session}/name/suggest`,
       `${session}/events`,

@@ -95,6 +95,11 @@ export type {
   SessionRecord,
 } from "./session.js";
 export type {
+  SwitchTemplateInput,
+  TemplateSwitchReceipt,
+  TemplateSwitchStatus,
+} from "./template-switch.js";
+export type {
   OpenRealtimeConnectionInput,
   OpenRealtimeConnectionResult,
   RealtimeAudioFormat,

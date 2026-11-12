@@ -24,12 +24,11 @@ const tool = {
   },
 };
 const freshSession = async () =>
-  (
-    await user.createAgent({
-      agentTemplateId: process.env.SDK_TEMPLATE_ID,
-      idempotencyKey: randomUUID(),
-    })
-  ).createSession({ idempotencyKey: randomUUID(), tools: [tool] });
+  user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
+    idempotencyKey: randomUUID(),
+    tools: [tool],
+  });
 const until = async (condition, label) => {
   const end = Date.now() + 15_000;
   while (!condition()) {

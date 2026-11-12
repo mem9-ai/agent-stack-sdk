@@ -10,7 +10,6 @@ export type BillingPrincipalBucket =
   | "organization_machine"
   | "organization_user";
 export type BillingAttributionKind =
-  | "agent"
   | "user_level"
   | "system"
   | "unattributed";
@@ -61,7 +60,8 @@ export interface BillingFactCompleteness extends BillingFactCompletenessCounters
 }
 
 export interface UsageTotals {
-  currency: "USD";
+  /** The single currency of this deployment. */
+  currency: "USD" | "CNY";
   /** Platform-borne priced cost; other bearers remain in costByBearer. */
   totalCostMicros: number;
   llmCostMicros: number;
@@ -97,7 +97,6 @@ export interface BillingBearerCostTotals {
 export interface BillingAttributionCounters {
   status: "complete" | "incomplete";
   classifiedUsageCount: number;
-  agentUsageCount: number;
   userLevelUsageCount: number;
   systemUsageCount: number;
   unattributedUsageCount: number;
@@ -223,12 +222,13 @@ interface OrganizationUsageCommon {
   id: string;
   occurredAt: string;
   sessionId: string;
-  /** Null for `voice_realtime` usage and standalone Template-switch compaction. */
+  /** Null for `voice_realtime` usage. */
   turnId: string | null;
   /** The Realtime connection of `voice_realtime` usage; null otherwise. */
   realtimeConnectionId?: string | null;
   agentRunId: string | null;
-  agentId: string | null;
+  /** The Template admitted for the usage's Turn; null when it has none. */
+  agentTemplateId: string | null;
   attributionKind: BillingAttributionKind;
   costMicros: number | null;
   currency: string | null;
@@ -315,6 +315,8 @@ export interface OrganizationUserUsageOptions extends RequestOptions {
   /** Exact exclusive UTC timestamp with milliseconds. */
   to: string;
   interval?: BillingUsageSeriesInterval;
+  /** Only usage admitted under this Template. */
+  templateId?: string;
   tagKey?: string;
   tagValue?: string;
 }
@@ -339,7 +341,7 @@ export const usageQuery = (
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options))
     if (allowed.includes(key) && value !== undefined)
-      query.set(key, String(value));
+      query.set(key === "templateId" ? "agentTemplateId" : key, String(value));
   return query.size ? `?${query}` : "";
 };
 

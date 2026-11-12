@@ -197,7 +197,6 @@ test("a Session prepares a Realtime Connection and returns its one-time connect 
     object: "realtime_connection",
     id: "rtc_1",
     sessionId: "session_1",
-    agentId: "agent_1",
     provider: { name: "qwen-omni", region: "cn-beijing", model: "qwen-live" },
     status: "connecting",
     audio: {
@@ -265,7 +264,6 @@ const realtimeConnection = (overrides = {}) => ({
   object: "realtime_connection",
   id: "rtc_1",
   sessionId: "session_1",
-  agentId: "agent_1",
   provider: { name: "qwen-omni", region: "cn-beijing", model: "qwen-live" },
   status: "connecting",
   audio: {

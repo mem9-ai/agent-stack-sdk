@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Pin the supported contract to service
+  `bc65d6b76928f4b5348302349342309bd24b28ac` and OpenAPI SHA-256
+  `aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913`.
+- **Breaking:** remove the Agent API, because the service no longer has Agents:
+  the `Agent` class, `AgentRecord`, `CreateAgentInput`, `UpdateAgentInput`,
+  `EndUserClient.createAgent`, `listAgents` and `getAgent`, and
+  `OrganizationClient.unlinkAgent`. `listModels()` no longer accepts `agentId`.
+- **Breaking:** create Sessions with `user.createSession({ templateId,
+  idempotencyKey, ... })` instead of `agent.createSession(...)`. `templateId` is
+  required; there is no default Template. The Agent preferences become Session
+  creation options: `additionalInstructions`, `sandbox` (`profileId`,
+  `workingDirectory`, typed as `SessionSandboxSelection`) and
+  `acknowledgeSessionRecall`.
+- **Breaking:** `SessionRecord.createdWithAgentId`, `RealtimeConnection.agentId`,
+  the usage item `agentId`, the attribution counter `agentUsageCount` and the
+  attribution kind `agent` are gone. A Realtime Connection without `agentId` is
+  now accepted; the previous version rejected every receipt from this service.
+- `listSessions({ templateId })` lists the Sessions currently on a Template,
+  and `getUserUsage` / `getUserUsageDetails` accept `templateId`; both send it as
+  `agentTemplateId`. `SessionListOptions` is exported.
+- Turns from history and the timeline carry `agentTemplateId`, the Template
+  admitted for the Turn. A Template switch adds a `TemplateHandoffTurnRecord`
+  (`kind: "template_handoff"`) with no `userMessage`; narrow on `kind` before
+  reading `userMessage`.
+- Usage items carry `agentTemplateId`, and usage totals may be in `CNY`.
+  Template content types `tools.mcp`, the MCP Servers and Connectors a Template
+  uses.
+- The `create-session.mjs` example takes `templateId` and one
+  `sessionCreationKey`; `AGENT_CREATION_KEY` is gone.
 - Add `organization.connectors` to register, list, read, edit, activate and
   deactivate Connectors.
 - Add `verifyConnectorCallback` with a cached `ConnectorKeySet` to verify the
@@ -27,9 +56,6 @@
 - `OrganizationClient` accepts a `fetch` option. Every request the client
   makes goes through it, including event streams and file transfers; the
   default is the global `fetch`. `FetchFunction` is exported.
-- Pin the supported contract to service
-  `1c7f98ee12c28e3d1adb656b90324c0b95135e42` and OpenAPI SHA-256
-  `c4cd8062d92750b2b354cb6f817211c9e3128155bf3a2a95cb5a36bae9dd71d6`.
 - `createEndUser` with an `externalId` is idempotent: the service returns the
   existing End User unchanged, and the SDK retries the call automatically.
   It previously failed with `resource_conflict`; that error now means only an

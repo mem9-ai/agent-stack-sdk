@@ -145,8 +145,22 @@ test("history pages preserve Full Agent and Realtime projections", () => {
       200,
     );
   }
-  const turn = properties(schema("Turn"));
+  assert.deepEqual(
+    schema("Turn").oneOf.map(({ $ref }) => $ref),
+    [
+      "#/components/schemas/UserInputTurn",
+      "#/components/schemas/TemplateHandoffTurn",
+    ],
+  );
+  const turn = properties(schema("UserInputTurn"));
   assert.deepEqual(turn.executor.enum, ["full_agent", "realtime_model"]);
+  assert(schema("UserInputTurn").required.includes("agentTemplateId"));
+  assert.equal(turn.agentTemplateId.nullable, true);
+  const handoff = schema("TemplateHandoffTurn");
+  assert.deepEqual(properties(handoff).kind.enum, ["template_handoff"]);
+  assert.equal(properties(handoff).agentTemplateId.type, "string");
+  assert.equal(properties(handoff).userMessage, undefined);
+  assert(handoff.required.includes("userMessages"));
   assert.equal(turn.userMessages.type, "array");
   assert.equal(turn.realtimeResponses.type, "array");
   assert.deepEqual(properties(turn.realtime).linkedTurnIds.items, {
@@ -282,7 +296,7 @@ test("target-User usage preserves Organization authority, exact ranges and its r
 });
 
 test("Client Tools preserve declaration replacement, pending deadlines and explicit result command shapes", () => {
-  const create = properties(schema("CreateSessionOpenApiDto"));
+  const create = properties(schema("CreateTemplateSessionOpenApiDto"));
   assert(create.tools);
   const replace = document.paths[`${sessionPath}/tools`].put;
   assert(
@@ -351,4 +365,62 @@ test("Session reads expose the Configuration Epoch and Template-switch fence", (
   assert(session.required.includes("switching"));
   assert.equal(properties(session).configurationEpoch.nullable, true);
   assert.equal(properties(session).switching.type, "boolean");
+});
+
+test("Sessions are created from an explicit Template with Session-level options", () => {
+  const create = document.paths["/api/v1/org/users/{userId}/sessions"].post;
+  assert.equal(
+    create.requestBody.content["application/json"].schema.$ref,
+    "#/components/schemas/CreateTemplateSessionOpenApiDto",
+  );
+  const body = schema("CreateTemplateSessionOpenApiDto");
+  assert.deepEqual(body.required, ["agentTemplateId"]);
+  assert.equal(body.additionalProperties, false);
+  const fields = properties(body);
+  // Every field the SDK sends; hardwareIds is deliberately not exposed.
+  for (const key of [
+    "agentTemplateId",
+    "model",
+    "realtimeModel",
+    "billingTag",
+    "tools",
+    "additionalInstructions",
+    "sandbox",
+    "acknowledgeSessionRecall",
+  ])
+    assert(fields[key], `missing Session creation field ${key}`);
+  assert.equal(fields.agentId, undefined);
+  assert.equal(fields.additionalInstructions.nullable, true);
+  assert.deepEqual(Object.keys(properties(fields.sandbox)).sort(), [
+    "profileId",
+    "workingDirectory",
+  ]);
+  assert.equal(fields.acknowledgeSessionRecall.type, "boolean");
+  const list = document.paths["/api/v1/org/users/{userId}/sessions"].get;
+  assert(list.parameters.some((p) => p.name === "agentTemplateId" && p.in === "query"));
+  const session = properties(schema("SessionResponseOpenApiDto")).session;
+  assert.equal(properties(session).createdWithAgentId, undefined);
+});
+
+test("the core Agent is gone from the selected contract", () => {
+  for (const path of Object.keys(document.paths))
+    assert.doesNotMatch(path, /\/agents(\/|$)/);
+  const models = document.paths["/api/v1/org/users/{userId}/agent-models"].get;
+  assert.equal(
+    (models.parameters ?? []).some((p) => p.name === "agentId"),
+    false,
+  );
+  for (const name of [
+    "OpenRealtimeConnectionResponseOpenApiDto",
+    "RealtimeConnectionResponseOpenApiDto",
+  ])
+    assert.equal(
+      properties(properties(schema(name)).realtimeConnection).agentId,
+      undefined,
+    );
+  for (const route of ["", "/details"]) {
+    const read =
+      document.paths[`/api/v1/org/users/{userId}/billing/usage${route}`].get;
+    assert(read.parameters.some((p) => p.name === "agentTemplateId"));
+  }
 });

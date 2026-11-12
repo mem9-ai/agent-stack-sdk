@@ -22,10 +22,6 @@ const stranger = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 }).user(process.env.SDK_FOREIGN_USER_ID);
-const organization = new OrganizationClient({
-  baseUrl,
-  apiKey: process.env.SDK_ORGANIZATION_KEY,
-});
 const foreignOrg = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_FOREIGN_ORGANIZATION_KEY,
@@ -36,7 +32,7 @@ const refusal = (status, code) => (error) =>
   error.code === code &&
   !!error.requestId;
 
-test("the installed SDK selects Templates, creates independent Agents and updates owner preferences", async () => {
+test("the installed SDK selects Templates and creates Sessions with Session options", async () => {
   const templates = [];
   let cursor;
   do {
@@ -64,42 +60,51 @@ test("the installed SDK selects Templates, creates independent Agents and update
         m.availability === "available",
     ),
   );
-  const input = { agentTemplateId: templateId, idempotencyKey: randomUUID() };
-  const first = await user.createAgent(input);
-  const recovered = await user.createAgent(input);
-  const second = await user.createAgent({
+  const input = {
+    templateId,
+    idempotencyKey: randomUUID(),
+    additionalInstructions: "  Concise\r\nanswers.  ",
+    sandbox: { profileId: null, workingDirectory: "work" },
+  };
+  const first = await user.createSession(input);
+  const recovered = await user.createSession(input);
+  const second = await user.createSession({
     ...input,
     idempotencyKey: randomUUID(),
   });
   assert.equal(recovered.id, first.id);
   assert.notEqual(second.id, first.id);
-  assert.equal(first.data.additionalInstructions, undefined);
+  assert.equal(first.data.template.templateId, templateId);
   await assert.rejects(
-    user.createAgent({ ...input, agentTemplateId: otherTemplateId }),
-    refusal(409, "agent_creation_conflict"),
-  );
-  assert((await user.listAgents()).some((a) => a.id === first.id));
-  const owned = await user.getAgent(first.id);
-  assert.equal(owned.data.additionalInstructions, "");
-  await owned.update({ additionalInstructions: "  Concise\r\nanswers.  " });
-  assert.equal(owned.data.additionalInstructions, "Concise\nanswers.");
-  assert.equal(
-    (await user.getAgent(first.id)).data.additionalInstructions,
-    "Concise\nanswers.",
-  );
-  assert.equal(
-    (await user.getAgent(second.id)).data.additionalInstructions,
-    "",
+    user.createSession({ ...input, templateId: otherTemplateId }),
+    refusal(409, "session_creation_conflict"),
   );
   await assert.rejects(
-    owned.update({ additionalInstructions: "中".repeat(1366) }),
+    user.createSession({
+      templateId,
+      idempotencyKey: randomUUID(),
+      additionalInstructions: "中".repeat(1366),
+    }),
     refusal(400, "validation_error"),
   );
-  await owned.update({ additionalInstructions: null });
-  assert.equal(owned.data.additionalInstructions, "");
+  const other = await user.createSession({
+    templateId: otherTemplateId,
+    idempotencyKey: randomUUID(),
+    additionalInstructions: null,
+  });
+  assert.equal(other.data.template.templateId, otherTemplateId);
+  const onTemplate = await user.listSessions({ templateId, limit: 200 });
+  assert(onTemplate.sessions.some((item) => item.id === first.id));
+  assert(onTemplate.sessions.every((item) => item.data.template.templateId === templateId));
+  const onOther = await user.listSessions({ templateId: otherTemplateId, limit: 200 });
+  assert.deepEqual(
+    onOther.sessions.map((item) => item.id).filter((id) => id === first.id),
+    [],
+  );
+  assert(onOther.sessions.some((item) => item.id === other.id));
   await assert.rejects(
-    stranger.getAgent(first.id),
-    refusal(404, "agent_not_found"),
+    stranger.getSession(first.id),
+    refusal(404, "session_not_found"),
   );
   const foreignHandle = stranger.session("missing");
   await assert.rejects(
@@ -107,47 +112,30 @@ test("the installed SDK selects Templates, creates independent Agents and update
     refusal(404, "session_not_found"),
   );
   await assert.rejects(
-    foreignOrg.unlinkAgent(first.data.ownerUserId, first.id),
-    refusal(404, "agent_not_found"),
+    foreignOrg
+      .user(process.env.SDK_USER_ID)
+      .createSession({ templateId, idempotencyKey: randomUUID() }),
+    (error) => error instanceof TiDBLinkApiError && error.status === 404,
   );
-  await assert.rejects(
-    organization.unlinkAgent(second.data.ownerUserId + "missing", first.id),
-    refusal(404, "agent_not_found"),
-  );
-  const archived = await organization.unlinkAgent(
-    first.data.ownerUserId,
-    first.id,
-  );
-  assert.equal(archived.status, "archived");
-  assert.equal((await user.createAgent(input)).status, "archived");
-  await assert.rejects(
-    user.getAgent(first.id),
-    refusal(404, "agent_not_found"),
-  );
-  assert(!(await user.listAgents()).some((a) => a.id === first.id));
 });
 
-test("owned Sessions preserve creation identity, paging, conditional model edits, names, tags and history after unlink", async () => {
-  const agent = await user.createAgent({
-    agentTemplateId: templateId,
-    idempotencyKey: randomUUID(),
-  });
-  const models = await user.listModels({ agentId: agent.id });
+test("owned Sessions preserve creation identity, paging, conditional model edits, names and tags", async () => {
+  const models = await user.listModels();
   const model = models.effectiveDefaultModel;
   const nextModel = models.effectiveAllowedModels.find((id) => id !== model);
   assert(nextModel, "Controlled release must serve two models");
   const options = {
+    templateId,
     idempotencyKey: randomUUID(),
     model,
     billingTag: { key: "customer", value: "one" },
   };
-  const session = await agent.createSession(options);
-  assert.equal((await agent.createSession(options)).id, session.id);
-  assert.equal(session.data.createdWithAgentId, agent.id);
+  const session = await user.createSession(options);
+  assert.equal((await user.createSession(options)).id, session.id);
   assert.equal(session.data.template.templateId, templateId);
   const digest = session.data.template.contentDigest;
   await assert.rejects(
-    agent.createSession({ ...options, model: nextModel }),
+    user.createSession({ ...options, model: nextModel }),
     refusal(409, "session_creation_conflict"),
   );
   const stale = await user.getSession(session.id);
@@ -160,7 +148,7 @@ test("owned Sessions preserve creation identity, paging, conditional model edits
   assert.equal(stale.model, model);
   assert.equal((await user.getSession(session.id)).model, nextModel);
   // Creation identity retains the original requested model even after selection changes.
-  assert.equal((await agent.createSession(options)).id, session.id);
+  assert.equal((await user.createSession(options)).id, session.id);
   await session.suggestName({
     userText: "Plan a trip",
     assistantText: "Choose the destination",
@@ -177,8 +165,10 @@ test("owned Sessions preserve creation identity, paging, conditional model edits
   await session.setBillingTag(null);
   await session.setModel(model);
   assert.equal((await user.getSession(session.id)).data.billingTag, null);
-  await agent.update({ additionalInstructions: "Future Sessions only" });
-  const later = await agent.createSession({ idempotencyKey: randomUUID() });
+  const later = await user.createSession({
+    templateId,
+    idempotencyKey: randomUUID(),
+  });
   assert.equal(
     (await user.getSession(session.id)).data.template.contentDigest,
     digest,
@@ -203,15 +193,8 @@ test("owned Sessions preserve creation identity, paging, conditional model edits
     stranger.session(session.id).rename("foreign"),
     refusal(404, "session_not_found"),
   );
-  await organization.unlinkAgent(agent.data.ownerUserId, agent.id);
   const retained = await user.getSession(session.id);
-  assert.equal(retained.data.createdWithAgentId, agent.id);
   assert.equal(retained.data.template.contentDigest, digest);
-  await assert.rejects(
-    agent.createSession({ idempotencyKey: randomUUID() }),
-    (error) => error instanceof TiDBLinkApiError && error.status === 404,
-  );
-  // Reads and lifecycle ownership survive unlink; execution does not acquire a new Agent.
   await retained.rename("Retained conversation");
   assert.equal(
     (await user.getSession(session.id)).data.name,
@@ -225,22 +208,20 @@ test("owned Sessions preserve creation identity, paging, conditional model edits
   );
 });
 
-test("the installed Template-to-Agent-to-Session example is runnable and recoverable without message execution", async () => {
+test("the installed Template-to-Session example is runnable and recoverable without message execution", async () => {
   const options = {
     baseUrl,
     organizationApiKey: process.env.SDK_ORGANIZATION_KEY,
     userId: process.env.SDK_USER_ID,
-    agentTemplateId: templateId,
-    agentCreationKey: randomUUID(),
+    templateId,
     sessionCreationKey: randomUUID(),
   };
   const first = await createSessionWorkflow(options);
   const second = await createSessionWorkflow(options);
-  assert.equal(first.agent.id, second.agent.id);
   assert.equal(first.session.id, second.session.id);
   assert.equal(
-    (await user.getSession(first.session.id)).data.createdWithAgentId,
-    first.agent.id,
+    (await user.getSession(first.session.id)).data.template.templateId,
+    templateId,
   );
   const executable = fileURLToPath(
     import.meta.resolve("@tidblink/server/examples/create-session.mjs"),
@@ -254,8 +235,7 @@ test("the installed Template-to-Agent-to-Session example is runnable and recover
         AGENT_SERVICE_URL: baseUrl,
         ORGANIZATION_API_KEY: options.organizationApiKey,
         END_USER_ID: options.userId,
-        TEMPLATE_ID: options.agentTemplateId,
-        AGENT_CREATION_KEY: options.agentCreationKey,
+        TEMPLATE_ID: options.templateId,
         SESSION_CREATION_KEY: options.sessionCreationKey,
       },
     },

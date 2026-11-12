@@ -15,12 +15,10 @@ const user = new OrganizationClient({
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 }).user(process.env.SDK_USER_ID);
 const freshSession = async () =>
-  (
-    await user.createAgent({
-      agentTemplateId: process.env.SDK_TEMPLATE_ID,
-      idempotencyKey: randomUUID(),
-    })
-  ).createSession({ idempotencyKey: randomUUID() });
+  user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
+    idempotencyKey: randomUUID(),
+  });
 const wait = { timeoutMs: 15000, pollIntervalMs: 25 };
 
 test("actual SDK progress preserves drafts, resumes from a cursor and confirms the original result", async () => {

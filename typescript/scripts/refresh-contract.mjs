@@ -39,8 +39,6 @@ const snapshots = {
       "/api/v1/org/users",
       "/api/v1/org/users/{userId}",
       `${user}/agent-templates`,
-      `${user}/agents`,
-      `${user}/agents/{id}`,
       `${user}/agent-models`,
       `${user}/realtime-models`,
       `${user}/sessions`,

@@ -26,12 +26,10 @@ const metadata = (bytes, originalName = "note.txt") => ({
   idempotencyKey: randomUUID(),
 });
 const newSession = async () =>
-  (
-    await local.createAgent({
-      agentTemplateId: process.env.SDK_TEMPLATE_ID,
-      idempotencyKey: randomUUID(),
-    })
-  ).createSession({ idempotencyKey: randomUUID() });
+  local.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
+    idempotencyKey: randomUUID(),
+  });
 
 test("actual inline/empty uploads become verified files and selected bytes participate in a real Turn", async () => {
   const secret = `only-in-file-${randomUUID()}`;
@@ -79,11 +77,8 @@ test("actual inline/empty uploads become verified files and selected bytes parti
     stranger.files.get(file.fileId),
     (error) => error instanceof TiDBLinkApiError && error.status === 404,
   );
-  const strangerAgent = await stranger.createAgent({
-    agentTemplateId: process.env.SDK_TEMPLATE_ID,
-    idempotencyKey: randomUUID(),
-  });
-  const strangerSession = await strangerAgent.createSession({
+  const strangerSession = await stranger.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
     idempotencyKey: randomUUID(),
   });
   await assert.rejects(

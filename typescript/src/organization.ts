@@ -6,7 +6,7 @@ import {
   type OrganizationUserUsageSummary,
   type OrganizationUserUsageDetails,
 } from "./usage.js";
-import { EndUserClient, type AgentRecord } from "./user.js";
+import { EndUserClient } from "./user.js";
 import { Templates } from "./templates.js";
 import { Skills } from "./skills.js";
 import { Connectors } from "./connectors.js";
@@ -108,33 +108,13 @@ export class OrganizationClient {
     return new EndUserClient(this.#http.forUser(userId));
   }
 
-  async unlinkAgent(
-    userId: string,
-    agentId: string,
-    options?: RequestOptions,
-  ): Promise<AgentRecord> {
-    const result = await this.#http.deleteResponse<{ agent: AgentRecord }>(
-      `/users/${encodeURIComponent(userId)}/agents/${encodeURIComponent(agentId)}`,
-      { ...requestOptions(options), outcomeUnknown: true },
-    );
-    if (
-      typeof result.data?.agent?.agentId !== "string" ||
-      !result.data.agent.agentId
-    )
-      throw new OutcomeUnknownError(
-        "Agent unlink returned no usable receipt; reconcile the association",
-        { requestId: result.requestId },
-      );
-    return result.data.agent;
-  }
-
   getUserUsage(
     userId: string,
     options: OrganizationUserUsageOptions,
   ): Promise<OrganizationUserUsageSummary> {
     const path = userUsagePath(userId, options);
     return this.#http.get(
-      `${path}${usageQuery(options, ["from", "to", "interval", "tagKey", "tagValue"])}`,
+      `${path}${usageQuery(options, ["from", "to", "interval", "templateId", "tagKey", "tagValue"])}`,
       options,
     );
   }
@@ -145,7 +125,7 @@ export class OrganizationClient {
   ): Promise<OrganizationUserUsageDetails> {
     const path = userUsagePath(userId, options);
     return this.#http.get(
-      `${path}/details${usageQuery(options, ["from", "to", "kind", "limit", "cursor", "tagKey", "tagValue"])}`,
+      `${path}/details${usageQuery(options, ["from", "to", "kind", "limit", "cursor", "templateId", "tagKey", "tagValue"])}`,
       options,
     );
   }

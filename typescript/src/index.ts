@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "1c7f98ee12c28e3d1adb656b90324c0b95135e42" as const;
+  "bc65d6b76928f4b5348302349342309bd24b28ac" as const;
 
 export {
   TiDBLinkApiError,
@@ -74,14 +74,12 @@ export type {
   ConnectorKeySetOptions,
   VerifyConnectorCallbackOptions,
 } from "./connector-callback.js";
-export { Agent, EndUserClient } from "./user.js";
+export { EndUserClient } from "./user.js";
 export type {
-  AgentRecord,
   AgentTemplate,
   AgentTemplatePage,
   AgentModelCatalog,
-  CreateAgentInput,
-  UpdateAgentInput,
+  SessionListOptions,
   SessionPage,
 } from "./user.js";
 export type { ListOptions, FetchFunction } from "./http.js";
@@ -89,6 +87,7 @@ export { Session } from "./session.js";
 export type {
   BillingTag,
   CreateSessionOptions,
+  SessionSandboxSelection,
   SuggestSessionNameInput,
   ClarificationItem,
   SelectableSessionModel,
@@ -123,6 +122,7 @@ export type {
   TurnRecord,
   FullAgentTurnRecord,
   RealtimeTurnRecord,
+  TemplateHandoffTurnRecord,
   TurnPage,
   TurnStatus,
   TurnUserFile,

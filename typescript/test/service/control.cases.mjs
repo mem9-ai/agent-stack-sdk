@@ -11,11 +11,10 @@ const user = new OrganizationClient({
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 }).user(process.env.SDK_USER_ID);
 const freshSession = async () => {
-  const agent = await user.createAgent({
-    agentTemplateId: process.env.SDK_TEMPLATE_ID,
+  return user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
     idempotencyKey: randomUUID(),
   });
-  return agent.createSession({ idempotencyKey: randomUUID() });
 };
 async function incorporated(session, inputId) {
   const deadline = Date.now() + 10000;

@@ -25,6 +25,11 @@ export interface TemplateContent {
   /** Published Skill versions from `skills` or `templates.catalog()`. */
   skills?: { skillId: string; version: number }[];
   capabilities?: { sessionRecall?: { enabled?: boolean } };
+  /**
+   * Organization MCP Servers and Connectors the Template uses, by `serverId`.
+   * On replace, omitting `tools` keeps the current references.
+   */
+  tools?: { mcp: { serverId: string }[] };
   /** A task the voice model keeps working on across a Realtime connection. */
   standingTask?: { goal: string };
   [field: string]: unknown;

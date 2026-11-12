@@ -8,15 +8,15 @@ stay on your backend; do not ship it to browsers or devices.
 
 This package supports Organization information, End User provisioning,
 Template, Skill and Connector management, Connector callback verification,
-Template/model discovery, personal Agent and Session management,
+Template/model discovery, Session management,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
 continuous progress, Client Tools, conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
-1c7f98ee](https://github.com/mem9-ai/agent-stack/commit/1c7f98ee12c28e3d1adb656b90324c0b95135e42).
+bc65d6b7](https://github.com/mem9-ai/agent-stack/commit/bc65d6b76928f4b5348302349342309bd24b28ac).
 
 Text commands return durable receipts independently of execution. Waiting reads the
-original command's outcome. Template version application, Memory configuration,
-default Agents and general Agent overrides are removed. Browser, MSP, Console and device APIs are
+original command's outcome. The service has no Agent: a Session is created
+directly from an explicit Template, and there is no default Template. Browser, MSP, Console and device APIs are
 outside this package. Every resource workflow uses an Organization API Key with
 an explicitly selected End User; User API Keys are not supported.
 
@@ -48,10 +48,10 @@ const template = page.templates[0];
 if (!template) throw new Error("Select an available Template; follow nextCursor if hasMore");
 const creation = {
   baseUrl, organizationApiKey, userId: endUser.userId,
-  agentTemplateId: template.agentTemplateId,
-  agentCreationKey: randomUUID(), sessionCreationKey: randomUUID(),
+  templateId: template.agentTemplateId,
+  sessionCreationKey: randomUUID(),
 };
-// Persist the selected Template, optional model and both creation identities.
+// Persist the selected Template, optional model and the creation identity.
 const { session } = await createSessionWorkflow(creation);
 const message = { clientEventId: randomUUID(), text: "Help me plan a trip" };
 // Retain the Session, command identity and original input before dispatch.
@@ -66,23 +66,23 @@ idempotent: a repeated `createEndUser` returns the existing End User unchanged a
 does not apply the other fields, and concurrent calls create one End User. The SDK
 retries such calls automatically. An `externalId` that equals an existing one only
 when case and accents are ignored is refused with `resource_conflict`. Without an
-`externalId`, every call creates a new End User. Agent/Session creation replays require the same creation keys and
+`externalId`, every call creates a new End User. Session creation replays require the same creation key and
 inputs. Reading the original message receipt or waiting again does not execute
 another Turn. An HTTP request ID is diagnostic, not a creation identity.
 
 The installed example can run with `AGENT_SERVICE_URL`,
-`ORGANIZATION_API_KEY`, `END_USER_ID`, `TEMPLATE_ID`, `AGENT_CREATION_KEY` and
+`ORGANIZATION_API_KEY`, `END_USER_ID`, `TEMPLATE_ID` and
 `SESSION_CREATION_KEY` (`MODEL_ID` is optional):
 
 ```sh
 node node_modules/@tidblink/server/examples/create-session.mjs
 ```
 
-`organization.user(userId)` returns an `EndUserClient` with that User's Agent,
+`organization.user(userId)` returns an `EndUserClient` with that User's
 Session, file and catalog methods. Selecting a User sends no request.
 Usage reads stay on `organization.getUserUsage(userId, options)` and
 `getUserUsageDetails`.
-Private MCP registration, general Drive entry management, sandbox preferences,
+Private MCP registration, general Drive entry management, Template switching,
 Schedulers and native Hardware APIs are not wrapped by this SDK. Use the
 pinned public HTTP contract for those existing service capabilities. Building ToD,
 a device gateway or management integration remains outside this package.
@@ -119,8 +119,8 @@ const organization = new OrganizationClient({
 
 ## Managing Templates and Skills
 
-A Template defines an Agent: its identity, instructions, Sandbox, voice language
-and Skills. `organization.templates` manages the Organization's Templates, and
+A Template defines what a Session runs: its identity, instructions, Sandbox,
+voice language, Skills and Connectors. `organization.templates` manages the Organization's Templates, and
 `organization.skills` uploads and publishes the Skills they reference. Both act
 on the Organization; they need no End User.
 
@@ -173,7 +173,7 @@ published Skills and their versions.
 
 ## Connectors
 
-A Connector is an Organization-owned MCP tool server that Agents call. The
+A Connector is an Organization-owned MCP tool server that Sessions call. The
 platform calls it for the End User who owns the Session and names that User in
 every call, so your server can act on the right account without trusting model
 arguments.
@@ -217,11 +217,11 @@ Tokens are Ed25519-signed, valid for at most 60 seconds, scoped to your
 Organization and Connector, and may be reused within that scope. Deduplicate side
 effects by `callId`; the platform never retries a call (`attempt` is always 1).
 Abandon work after `deadline`. The packaged `http-connector.mjs` example is a
-complete Connector over Streamable HTTP without an MCP library. Agents see each
+complete Connector over Streamable HTTP without an MCP library. The model sees each
 tool as `mcp_<server name>__<tool>`. This SDK does not include a client for the
 `tunnel` transport.
 
-## Templates, Agents and Sessions
+## Templates and Sessions
 
 Use `organization.user(userId)` to discover available Templates and deployment models. Model
 IDs are strings from the deployment catalog, including newly published models.
@@ -240,50 +240,54 @@ const page = await customer.listAgentTemplates({ limit: 20 });
 const template = page.templates[0];
 if (!template) throw new Error("Select an available Template");
 const models = await customer.listModels();
-const agent = await customer.createAgent({
-  agentTemplateId: template.agentTemplateId,
-  idempotencyKey: "customer-agent-1",
-});
-await agent.update({ additionalInstructions: "Prefer concise answers." });
-const session = await agent.createSession({
+const session = await customer.createSession({
+  templateId: template.agentTemplateId,
   idempotencyKey: "customer-conversation-1",
   model: models.effectiveDefaultModel,
   billingTag: { key: "account", value: "customer-1" },
+  additionalInstructions: "Prefer concise answers.",
+  sandbox: { workingDirectory: "projects/trip" },
 });
 await session.rename("Planning");
 await session.suggestName({ userText: "Plan a trip" }); // Generates and saves a name.
 await session.setBillingTag(null);
 ```
 
-Persist each creation key before calling. A new Agent key creates an independent
-Agent even for the same Template; the same key and Template recover the original
-Agent, including after unlinking. Reusing the key for another Template raises
-`ConflictError` with `agent_creation_conflict`. Session creation likewise requires
-a stable key and the same original input when recovering a creation. Its model,
-Realtime Model and Billing Tag selections participate in that identity. Do not
-generate a new key just because a response was lost.
+`createSession` requires `templateId`, an active Template of the Organization;
+there is no default Template. The other options belong to this Session only:
+
+- `additionalInstructions` are added to the Template instructions. The service
+  normalizes line endings to LF and trims whitespace, allows up to 4096 UTF-8
+  bytes after normalization, and rejects unsupported control characters. The
+  Template and additional instructions together are limited to 16 KiB
+  (`agent_instructions_too_large`).
+- `sandbox.profileId` selects a Sandbox profile; omit it or pass `null` to use
+  the Template's profile. `sandbox.workingDirectory` is a Drive-relative
+  directory and defaults to `.`; creating the Session does not create it.
+- `acknowledgeSessionRecall: true` is required when the Template enables
+  cross-Session Recall, which can read other Sessions of the same End User;
+  otherwise creation fails with `agent_template_recall_acknowledgment_required`.
+- `model`, `realtimeModel`, `billingTag` and Client Tool `tools` work as
+  described in their own sections.
+
+Persist the creation key before calling. The same key and the same input recover
+the original Session; reusing the key with different input raises
+`ConflictError` with `session_creation_conflict`. Every option participates in
+that identity. Do not generate a new key just because a response was lost.
 
 `listAgentTemplates({ limit?, cursor? })` returns
-`{ templates, hasMore, nextCursor }`; `listSessions({ limit?, cursor? })` returns
-`{ sessions, hasMore, nextCursor }`, with `Session` handles in `sessions`.
+`{ templates, hasMore, nextCursor }`; `listSessions({ limit?, cursor?, templateId? })`
+returns `{ sessions, hasMore, nextCursor }`, with `Session` handles in `sessions`.
+`templateId` lists only Sessions currently on that Template.
 Continue with the returned opaque cursor until `hasMore` is false, including
 Template pages with no available entries. A changed Template catalog can refuse
 continuation with `agent_template_list_changed`; restart discovery.
-Session cursors belong to their owning User and list. `listAgents()` returns a
-complete `Agent[]` without pagination. Use `getAgent(id)` and `getSession(id)` to
-read current owned resources; `session(id)` creates a handle without a request.
+Session cursors belong to their owning User and list. Use `getSession(id)` to
+read a current owned Session; `session(id)` creates a handle without a request.
 
-Agent create/list responses contain association metadata. `getAgent`,
-`agent.refresh()` and `agent.update()` also include `data.additionalInstructions`.
-The service normalizes line endings to LF and trims whitespace, allows up to
-4096 UTF-8 bytes after normalization, and rejects unsupported control characters.
-Null or empty text clears the setting. Updates use last committed write wins,
-without an ETag, and affect only future Sessions. Multiple Agents using the same
-Template retain independent settings and Sessions.
-
-Each Session freezes its Template recipe, digest and Agent preferences at
-creation. Later Template saves and Agent updates do not rewrite it. Session
-model selection is separate:
+Each Session freezes its Template recipe, digest and creation options.
+Later Template saves do not rewrite it; `session.data.template` names the
+Template and digest in use. Session model selection is separate:
 
 ```ts
 const current = await customer.getSession(session.id);
@@ -301,36 +305,31 @@ decisions. `session.delete()` updates and returns the Session handle; `.data` co
 and lists hide the Session. Active execution or a read-only Session can refuse
 deletion. Name and Billing Tag changes do not change the frozen recipe.
 
-Organization authority can explicitly unlink an Agent belonging to a target User:
-
-```ts
-const archived = await organization.unlinkAgent(endUser.userId, agent.id);
-```
-
-The returned association is archived. Unlinking retains existing Session
-ownership, binding, configuration and history; it does not grant the Organization
-access to existing Sessions by itself. Authorized Organization owner-scoped
-clients and the User retain access to saved history under the service rules.
+A Session can move to another Template through the service's Template switch
+route, which this SDK does not wrap. The switch runs a Template Handoff Turn
+under the target Template; history reads return it as a Turn with
+`kind: "template_handoff"`, no `userMessage` and an empty `userMessages`, and
+its assistant Message is the summary. Event streams report the outcome as
+`agent.session.template_switch.succeeded` or `.failed`.
 
 The packaged example completes discovery and creation without message execution:
 
 ```js
 import { createSessionWorkflow } from "@tidblink/server/examples/create-session.mjs";
 
-const { agent, session } = await createSessionWorkflow({
+const { session } = await createSessionWorkflow({
   baseUrl: process.env.AGENT_SERVICE_URL,
   organizationApiKey: process.env.ORGANIZATION_API_KEY,
   userId: process.env.END_USER_ID,
-  agentCreationKey: process.env.AGENT_CREATION_KEY,
   sessionCreationKey: process.env.SESSION_CREATION_KEY,
-  agentTemplateId: process.env.TEMPLATE_ID,
+  templateId: process.env.TEMPLATE_ID,
   model: process.env.MODEL_ID,
 });
 ```
 
 For direct execution, set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`,
-`TEMPLATE_ID`, `AGENT_CREATION_KEY` and `SESSION_CREATION_KEY`; `MODEL_ID` is optional.
-Select and persist the Template ID, optional model and both keys before calling.
+`TEMPLATE_ID` and `SESSION_CREATION_KEY`; `MODEL_ID` is optional.
+Select and persist the Template ID, optional model and the key before calling.
 The example also returns the current Template page and model catalog. If no model
 was requested, it preserves omission so the service can recover the original
 creation even after the deployment default changes.
@@ -554,7 +553,8 @@ const tools: ClientToolDeclaration[] = [{
     additionalProperties: false,
   },
 }];
-const session = await agent.createSession({
+const session = await customer.createSession({
+  templateId: savedTemplateId,
   idempotencyKey: savedSessionCreationKey,
   tools,
 });
@@ -882,15 +882,15 @@ upload, read and attach the same ordinary Files.
 
 ## Errors and uncertain outcomes
 
-Organization, text/progress/history and refreshed Agent/Session lifecycle methods accept
+Organization, text/progress/history and Session lifecycle methods accept
 `{ requestId?, signal? }` options; creation and list options include these fields.
 `TiDBLinkApiError` preserves status, service code, request identity and details;
 `ConflictError` preserves explicit 409/412 conflicts. The service's response
 request identity takes precedence over the one sent.
 
-Safe reads and keyed Agent/Session creation use bounded retries with the same
-request identity and creation key. User creation, preference and
-Session updates, unlinking, deletion and Realtime mutations are never
+Safe reads and keyed Session creation use bounded retries with the same
+request identity and creation key. User creation,
+Session updates, deletion and Realtime mutations are never
 automatically replayed. Disconnects, unusable success responses, HTTP 408 and
 server failures during these mutations raise `OutcomeUnknownError`. For an HTTP failure, its
 `cause` retains the `TiDBLinkApiError`. `AbortSignal` stops the local request;
@@ -899,9 +899,9 @@ refused.
 
 After uncertain End User creation, repeat it with the same `externalId`.
 
-After uncertain Agent/Session creation, repeat the original input with the same
-creation key. After an uncertain preference, name, tag or model update, read the
-resource before deciding on another change. Unlinking and deletion can hide a
+After uncertain Session creation, repeat the original input with the same
+creation key. After an uncertain name, tag or model update, read the
+resource before deciding on another change. Deletion can hide a
 resource from ordinary reads, so a missing resource does not recover its original
 mutation receipt.
 
@@ -922,8 +922,10 @@ new token after reconciling the connection state.
 | Details | Globally ordered `items`; optional `kind`, `limit` (1 to 500) and opaque `cursor`; `nextCursor: null` ends the stream |
 
 Both support an exact `tagKey`/`tagValue` pair. Send both or neither. Values retain
-case sensitivity and the service's normalization rules. Preserve the original
-range, kind and tag filters when following a cursor.
+case sensitivity and the service's normalization rules. Both also accept
+`templateId`, which keeps only usage admitted under that Template; each detail
+item reports it as `agentTemplateId`. Preserve the original range, kind, Template
+and tag filters when following a cursor.
 
 ```ts
 const page = await organization.getUserUsageDetails(targetUserId, {
@@ -968,7 +970,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/1c7f98ee12c28e3d1adb656b90324c0b95135e42/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/bc65d6b76928f4b5348302349342309bd24b28ac/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -990,9 +992,9 @@ The compiled fixture reuses the service system harness, its isolated database,
 controlled model/storage/ASR/voice dependencies and real background runner. A
 separate process installs the tarball in a clean directory and calls only the
 installed SDK and packaged Organization example for its application workflow.
-It verifies Organization provisioning, discovery, Agent/Session
+It verifies Organization provisioning, discovery, Session
 creation replay, owner isolation, file upload/download and message attachment,
-text results, SSE/history, Client Tools, Connector registration and an Agent call
+text results, SSE/history, Client Tools, Connector registration and a Session's call
 to the example HTTP Connector, audio,
 Realtime HTTP grants, rotation/revocation and fresh-authority recovery. Management credential changes
 and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
@@ -1004,7 +1006,7 @@ all rows in the selected dedicated test database before and after their runs.
 They use genuine credentials, real TiDB and controlled dependencies. Their scope:
 Fixtures prepare identities, Templates and eligible
 Realtime Sessions. A composed installed quickstart provisions one fresh User,
-discovers Templates/models, creates an Agent and Session, obtains a final answer
+discovers Templates/models, creates a Session, obtains a final answer
 and recovers the same original result. Public SDK methods also verify ownership,
 lifecycle updates and Realtime operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
@@ -1027,9 +1029,9 @@ Audio cases use the real transcription adapter with a controlled HTTP supplier a
 real spend limits. They cover recorded input, malformed/unsupported recordings,
 supplier and budget refusals, model failure, active-response interruption and the
 installed audio example.
-The public Session projection exposes the frozen Template digest but hides stored
-Agent preferences. Preference snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/1c7f98ee12c28e3d1adb656b90324c0b95135e42/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+The public Session projection exposes the frozen Template digest but hides the
+stored creation options. Those snapshots and active-Turn model freezing also rely
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/bc65d6b76928f4b5348302349342309bd24b28ac/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 Usage cases seed controlled facts and verify both public projections, exact filters,
 paging and authority without executing messages to manufacture billing data.

@@ -80,12 +80,14 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       AudioTurnInput, AudioTurnEvent, AudioTurnResult,
       UserFile, FileUploadCapabilities, FileUpload, FileUploadStatus,
       FileUploadPart, UploadedFilePart, FilePage, FileContent, FileDownloadGrant,
-      Agent, EndUserClient, BillingPrincipalBucket,
-      AgentRecord,
+      EndUserClient, BillingPrincipalBucket,
       AgentTemplatePage,
       AgentModelCatalog,
       SessionPage,
       CreateSessionOptions,
+      SessionListOptions,
+      SessionSandboxSelection,
+      TurnRecord,
       Organization,
       EndUser,
       Session,
@@ -137,12 +139,23 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     import { WorkspaceClient } from "@tidblink/server";
     // @ts-expect-error User API Key authority was removed from the supported SDK.
     import { UserClient } from "@tidblink/server";
+    // @ts-expect-error The core Agent was retired; Sessions are created from a Template.
+    import { Agent } from "@tidblink/server";
+    // @ts-expect-error Agent records were retired with the core Agent.
+    import type { AgentRecord, CreateAgentInput, UpdateAgentInput } from "@tidblink/server";
 
     declare const baseUrl: string;
     declare const organizationApiKey: string;
     const organization = new OrganizationClient({ baseUrl, apiKey: organizationApiKey });
     const owner: EndUserClient = organization.user("user_1");
-    const orgAgent: Promise<Agent> = owner.getAgent("agent_1");
+    // @ts-expect-error The core Agent was retired.
+    owner.getAgent("agent_1");
+    // @ts-expect-error The core Agent was retired.
+    owner.listAgents();
+    // @ts-expect-error The core Agent was retired.
+    owner.createAgent({ agentTemplateId: "template_1", idempotencyKey: "agent-1" });
+    // @ts-expect-error The core Agent was retired, and with it the Organization unlink.
+    organization.unlinkAgent("user_1", "agent_1");
     // @ts-expect-error Schedulers are not part of the supported SDK.
     owner.schedulers.list();
     const principal: BillingPrincipalBucket = "organization_user";
@@ -199,9 +212,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const parsed: SessionEvent = parseSessionEvent({ id: "c", data: "{}" });
       void parsed;
     }
-    async function clientToolsWorkflow(session: Session, agent: Agent) {
+    async function clientToolsWorkflow(session: Session, user: EndUserClient) {
       const tool: ClientToolDeclaration = {type:"function",name:"lookup_order",description:"Read an order",parameters:{type:"object",properties:{orderId:{type:"string"}}}};
-      const created: Session = await agent.createSession({idempotencyKey:"tools-session",tools:[tool]});
+      const created: Session = await user.createSession({templateId:"template_1",idempotencyKey:"tools-session",tools:[tool]});
       const set: ClientToolSet = await session.getClientTools();
       const options: ReplaceClientToolsOptions = {ifMatch:set.etag};
       const replaced: ClientToolSet = await session.replaceClientTools([],options);
@@ -262,7 +275,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       void cursor;
     }
     async function usageWorkflow() {
-      const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour"};
+      const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour",templateId:"template_1"};
       const target: OrganizationUserUsageSummary = await organization.getUserUsage("user_1",range);
       const pageOptions: OrganizationUserUsageDetailsOptions = {from:range.from,to:range.to,kind:"llm",limit:1};
       const page: OrganizationUserUsageDetails = await organization.getUserUsageDetails("user_1",pageOptions);
@@ -278,25 +291,35 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const user = owner;
       const templates: AgentTemplatePage = await user.listAgentTemplates({limit:1});
       const models: AgentModelCatalog = await user.listModels();
-      const agent: Agent = await user.createAgent({agentTemplateId:templates.templates[0]!.agentTemplateId,idempotencyKey:"agent-1"});
-      await agent.update({additionalInstructions:"Concise"});
-      const options: CreateSessionOptions = {idempotencyKey:"session-1",model:models.effectiveDefaultModel};
-      const session: Session = await agent.createSession(options);
+      const sandbox: SessionSandboxSelection = {profileId:null,workingDirectory:"work"};
+      const options: CreateSessionOptions = {templateId:templates.templates[0]!.agentTemplateId,idempotencyKey:"session-1",model:models.effectiveDefaultModel,additionalInstructions:"Concise",sandbox,acknowledgeSessionRecall:true};
+      const session: Session = await user.createSession(options);
       await session.rename("My Session");
       await session.suggestName({userText:"Hello"});
       await session.setBillingTag({key:"account",value:"customer"});
       await session.setModel("dynamic.model");
-      const page: SessionPage = await user.listSessions({limit:1});
-      const archived: AgentRecord = await organization.unlinkAgent(agent.data.ownerUserId,agent.id);
+      const listOptions: SessionListOptions = {limit:1,templateId:"template_1"};
+      const page: SessionPage = await user.listSessions(listOptions);
       // @ts-expect-error Retired Template versions are not creation selectors.
-      user.createAgent({agentTemplateId:"template_1",idempotencyKey:"a",templateVersion:1});
-      // @ts-expect-error Agent creation requires a recoverable identity.
-      user.createAgent({agentTemplateId:"template_1"});
+      user.createSession({templateId:"template_1",idempotencyKey:"a",templateVersion:1});
       // @ts-expect-error Session creation requires a recoverable identity.
-      agent.createSession();
-      // @ts-expect-error Memory and general config overrides are retired.
-      agent.configure({memory:{enabled:true}});
-      void page; void archived;
+      user.createSession({templateId:"template_1"});
+      // @ts-expect-error Session creation requires an explicit Template; there is no default.
+      user.createSession({idempotencyKey:"s"});
+      // @ts-expect-error Sessions are no longer created from an Agent.
+      user.createSession({agentId:"agent_1",idempotencyKey:"s"});
+      // @ts-expect-error Native Hardware binding is not part of the SDK.
+      user.createSession({templateId:"template_1",idempotencyKey:"s",hardwareIds:["hw_1"]});
+      // @ts-expect-error Models no longer depend on an Agent.
+      user.listModels({agentId:"agent_1"});
+      const turns: TurnPage = await session.history();
+      for (const turn of turns.turns as TurnRecord[]) {
+        // @ts-expect-error A Template Handoff Turn has no user Message; narrow on kind first.
+        void turn.userMessage.content;
+        if (turn.kind === "template_handoff") { const target: string = turn.agentTemplateId; void target; }
+        else { const text: string = turn.userMessage.content; const frozen: string | null = turn.agentTemplateId; void text; void frozen; }
+      }
+      void page;
       return session.delete();
     }
     async function realtimeWorkflow(session: Session): Promise<RealtimeConnection> {
@@ -321,7 +344,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     // @ts-expect-error The owner is selected with organization.user(), not a client option.
     new OrganizationClient({ baseUrl, apiKey: organizationApiKey, userId: "user_1" });
     // @ts-expect-error Runtime selection is not an Agent configuration capability.
-    const removedRuntime: CreateSessionOptions = { idempotencyKey:"a", runtime: { backend: "codex", authId: "removed" } };
+    const removedRuntime: CreateSessionOptions = { templateId:"template_1", idempotencyKey:"a", runtime: { backend: "codex", authId: "removed" } };
     declare const session: Session;
     session.setModel("deployment.model");
     // @ts-expect-error Structured Turn output is not supported.
@@ -358,6 +381,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     void apiError;
     void WorkspaceClient;
     void UserClient;
+    void Agent;
     void removedRuntime;
     void provisionEndUser;
     void lifecycleWorkflow;
@@ -470,6 +494,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
     assert.equal(sdk.UserClient, undefined);
+    assert.equal(sdk.Agent, undefined);
     for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError", "TIDB_LINK_PROVISIONING_REVISION", "TIDB_LINK_REALTIME_REVISION", "TIDB_LINK_LIFECYCLE_REVISION", "TIDB_LINK_TEXT_REVISION"]) {
       assert.equal(sdk[name], undefined);
     }
@@ -479,8 +504,8 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     const server = createServer((request, response) => {
       requests.push({ method: request.method, url: request.url, key: request.headers.authorization });
       response.setHeader("content-type", "application/json");
-      if (request.url === "/api/v1/org/users/user_1/agents") {
-        response.end(JSON.stringify({ agents: [] }));
+      if (request.url === "/api/v1/org/users/user_1/sessions") {
+        response.end(JSON.stringify({ sessions: [], hasMore: false, nextCursor: null }));
       } else if (request.url === "/api/v1/org/users/user_1/realtime-models") {
         response.end(JSON.stringify({
           defaultModel: "voice-a",
@@ -494,7 +519,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       } else if (request.url === "/api/v1/org/users/user_1/sessions/session_1/realtime") {
         response.writeHead(201).end(JSON.stringify({
           realtimeConnection: {
-            object: "realtime_connection", id: "rtc_1", sessionId: "session_1", agentId: "agent_1",
+            object: "realtime_connection", id: "rtc_1", sessionId: "session_1",
             provider: { name: "mock", region: "test", model: "voice-a" }, status: "connecting",
             audio: { input: { encoding: "pcm16", sampleRate: 16000, channels: 1 }, output: { encoding: "pcm16", sampleRate: 24000, channels: 1 } },
             activeTaskTurnId: null, usage: { inputAudioSec: 0, outputAudioSec: 0, thoughtTokens: 0, textTokens: 0 },
@@ -513,7 +538,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const baseUrl = "http://127.0.0.1:" + server.address().port;
       const org = new sdk.OrganizationClient({ baseUrl, apiKey: orgKey });
       const user = org.user("user_1");
-      assert.deepEqual(await user.listAgents(), []);
+      assert.deepEqual(await user.listSessions(), { sessions: [], hasMore: false, nextCursor: null });
       const prepared = await prepareRealtimeConnection({
         baseUrl,
         organizationApiKey: orgKey,
@@ -524,7 +549,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       assert.match(prepared.connectToken, /^rct_/);
       assert.equal(JSON.stringify(user).includes(prepared.connectToken), false);
       assert.deepEqual(requests, [
-        {method:"GET",url:"/api/v1/org/users/user_1/agents",key:"Bearer " + orgKey},
+        {method:"GET",url:"/api/v1/org/users/user_1/sessions",key:"Bearer " + orgKey},
         {method:"GET",url:"/api/v1/org/users/user_1/realtime-models",key:"Bearer " + orgKey},
         {method:"GET",url:"/api/v1/org/users/user_1/sessions/session_1",key:"Bearer " + orgKey},
         {method:"POST",url:"/api/v1/org/users/user_1/sessions/session_1/realtime",key:"Bearer " + orgKey},

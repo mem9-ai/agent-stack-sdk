@@ -91,12 +91,11 @@ test("one installed consumer provisions a new User and completes and recovers th
     baseUrl,
     organizationApiKey: apiKey,
     userId: endUser.userId,
-    agentTemplateId: template.agentTemplateId,
-    agentCreationKey: randomUUID(),
+    templateId: template.agentTemplateId,
     sessionCreationKey: randomUUID(),
     model: models.effectiveDefaultModel,
   };
-  const { agent, session } = await createSessionWorkflow(creation);
+  const { session } = await createSessionWorkflow(creation);
   const input = {
     baseUrl,
     organizationApiKey: apiKey,
@@ -111,7 +110,6 @@ test("one installed consumer provisions a new User and completes and recovers th
   assert.equal(result.interaction.result.status, "succeeded");
   assert(result.interaction.appliedAt);
   const recovered = await createSessionWorkflow(creation);
-  assert.equal(recovered.agent.id, agent.id);
   assert.equal(recovered.session.id, session.id);
   assert.deepEqual(
     await session.reconcileInteraction(input.clientEventId),

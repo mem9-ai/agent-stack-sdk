@@ -45,8 +45,6 @@ const json = (res, body, status = 200, headers = {}) =>
 test("Client Tool declarations can be sent at Session creation and read or replaced with their own ETag", async () => {
   const requests = [];
   const baseUrl = await serve(async (req, res) => {
-    if (req.url === "/api/v1/org/users/user_1/agents/agent_1")
-      return json(res, { agent: { agentId: "agent_1" } });
     let body = "";
     for await (const chunk of req) body += chunk;
     requests.push({
@@ -72,9 +70,11 @@ test("Client Tool declarations can be sent at Session creation and read or repla
       },
     );
   });
-  const session = await (
-    await userFor(baseUrl).getAgent("agent_1")
-  ).createSession({ idempotencyKey: "create-1", tools: [tool] });
+  const session = await userFor(baseUrl).createSession({
+    templateId: "template_1",
+    idempotencyKey: "create-1",
+    tools: [tool],
+  });
   const current = await session.getClientTools();
   assert.deepEqual(current, {
     revision: 1,
@@ -93,7 +93,7 @@ test("Client Tool declarations can be sent at Session creation and read or repla
     {
       method: "POST",
       url: "/api/v1/org/users/user_1/sessions",
-      body: { agentId: "agent_1", tools: [tool] },
+      body: { agentTemplateId: "template_1", tools: [tool] },
       etag: undefined,
     },
     {

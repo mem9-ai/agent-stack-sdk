@@ -166,11 +166,10 @@ test("an Organization creates, replaces and archives a Template and starts a Ses
   );
 
   const user = organization.user(userId);
-  const agent = await user.createAgent({
-    agentTemplateId: created.template.id,
-    idempotencyKey: id("agent"),
+  const session = await user.createSession({
+    templateId: created.template.id,
+    idempotencyKey: id("session"),
   });
-  const session = await agent.createSession({ idempotencyKey: id("session") });
   assert.equal(session.data.template?.templateId, created.template.id);
   assert.equal(session.data.template?.contentDigest, replaced.template.contentDigest);
 

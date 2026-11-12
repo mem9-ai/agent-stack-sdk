@@ -57,7 +57,11 @@ test("Organization usage targets an explicit User and retains cursor, exact rang
     to: "2030-01-02T00:00:00.000Z",
   };
   assert.deepEqual(
-    await org.getUserUsage("user_1", { ...range, interval: "hour" }),
+    await org.getUserUsage("user_1", {
+      ...range,
+      interval: "hour",
+      templateId: "template_1",
+    }),
     aggregate,
   );
   assert.deepEqual(
@@ -66,11 +70,17 @@ test("Organization usage targets an explicit User and retains cursor, exact rang
       kind: "llm",
       limit: 1,
       cursor: "opaque/+?cursor",
+      templateId: "template_1",
       tagKey: "team",
       tagValue: "R&D",
     }),
     details,
   );
+  for (const request of requests) {
+    const query = new URL(request.url, baseUrl).searchParams;
+    assert.equal(query.get("agentTemplateId"), "template_1");
+    assert.equal(query.has("templateId"), false);
+  }
   const url = new URL(requests[1].url, baseUrl);
   assert.equal(url.pathname, "/api/v1/org/users/user_1/billing/usage/details");
   assert.equal(url.searchParams.get("cursor"), "opaque/+?cursor");

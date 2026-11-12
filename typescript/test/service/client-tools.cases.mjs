@@ -24,12 +24,11 @@ const tool = {
   },
 };
 const freshSession = async () =>
-  (
-    await user.createAgent({
-      agentTemplateId: process.env.SDK_TEMPLATE_ID,
-      idempotencyKey: randomUUID(),
-    })
-  ).createSession({ idempotencyKey: randomUUID(), tools: [tool] });
+  user.createSession({
+    templateId: process.env.SDK_TEMPLATE_ID,
+    idempotencyKey: randomUUID(),
+    tools: [tool],
+  });
 async function pending(session) {
   const end = Date.now() + 10000;
   while (Date.now() < end) {

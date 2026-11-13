@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Session connections execute Client Tools: `connect({ tools })` takes a
+  handler with `description`, `parameters` and `run(args, context)` per tool
+  name. The SDK claims each call and runs it only once the core grants the
+  claim, submits the returned value or thrown error as the result over any
+  Backend Connection until the call's deadline, runs each `callId` at most once,
+  and aborts `context.signal` at `deadlineAt`. A refused result reaches
+  `onError` as the new `ClientToolResultRefusedError`.
 - Add `session.connect(options)`, which attaches a Session to this process's
   Backend Connection (service ADR 0109) and returns a `SessionConnection`.
   Callbacks `onEvent`, `onTranscript`, `onResponse` and `onCursor` receive the

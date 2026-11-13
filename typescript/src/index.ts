@@ -21,6 +21,7 @@ export {
 } from "./errors.js";
 export { OrganizationClient } from "./organization.js";
 export { SessionConnection } from "./session-connection.js";
+export { ClientToolResultRefusedError } from "./client-tool-executor.js";
 export type {
   ConnectOptions,
   ClientToolHandler,

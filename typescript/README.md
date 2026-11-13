@@ -10,7 +10,8 @@ This package supports Organization information, End User provisioning,
 Template, Skill and Connector management, Connector callback verification,
 Template/model discovery, Session management and Template switches,
 text submission, steering, cancellation, checkpoint retry, original-result waiting,
-continuous progress, Client Tools, conversation history, file attachments,
+continuous progress, Client Tools, Session connections over Backend Connections,
+conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
 89fca0b3](https://github.com/mem9-ai/agent-stack/commit/89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6).
 
@@ -588,9 +589,9 @@ platform that receives or forwards the stream itself.
 The packaged `device-voice-session.mjs` example is the backend of a voice device:
 `connectDevice` prepares the Realtime connection and returns the WebSocket URL and
 short-lived connect token for the device, and `serveDeviceTools` subscribes to the
-Session and answers each Client Tool call through your device channel. Tool calls
-are verified on text-initiated Turns; voice-initiated Turns do not use Session
-Client Tools yet.
+Session and answers each Client Tool call through your device channel. Voice
+Turns use the Session's Client Tools like text Turns. For a new backend, prefer
+`session.connect()` (see [Connecting a Session](#connecting-a-session)).
 
 The packaged `observe-message.mjs` example observes an existing input and never
 submits it again. Run it with `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID` and
@@ -652,6 +653,58 @@ await conn.close();
   without it they are rethrown asynchronously, which by default ends a Node.js
   process.
 
+### Client Tools on a connection
+
+`tools` maps each Client Tool name to its declaration and a `run` function. Each
+attach replaces the Session's whole Client Tool set with these declarations, and
+the connection executes their calls:
+
+```ts
+const lampTools = (deviceId: string): ClientToolHandlers => ({
+  set_light: {
+    description: "Turn the lamp on or off, or set its brightness",
+    parameters: {
+      type: "object",
+      properties: {
+        on: { type: "boolean" },
+        brightness: { type: "integer", minimum: 1, maximum: 100 },
+      },
+    },
+    run: async (args, { signal }) => {
+      // Fail at once when the device is offline, so the model does not wait.
+      const state = await askDevice(deviceId, "set_light", args, { signal });
+      return state.on ? `On at ${state.brightness}%` : "Off";
+    },
+  },
+});
+```
+
+- **Claim before running.** For each call the SDK first asks the core for the
+  right to execute it and runs `run` only when the core grants it, so a call the
+  core reports as not performed was never executed. A call that nobody claims
+  within the core's claim window (5 seconds) is reported to the model as not
+  performed.
+- **Results.** A returned string is what the model receives; other values are
+  sent as JSON. A thrown error becomes a failure whose message the model sees.
+  A tool the connection has no handler for fails with a message saying so.
+  Results go back over any Backend Connection of the Organization and are
+  retried after a lost connection until the call's deadline.
+- **Once per call.** A `callId` runs at most once per connection, even when the
+  core sends it again after a reconnect. If the core's answer to a claim is
+  lost, the SDK does not run the call and closes it as failed.
+- **Deadline.** `run` receives `{ callId, sessionId, userId, turnId, name,
+  deadlineAt, signal }`. At `deadlineAt`, 60 seconds after the call was
+  published, `signal` aborts and the SDK reports a timeout; the core then tells
+  the model the effect is unknown.
+- **After `close()`** calls already running finish and their results are still
+  submitted; later calls are not received.
+
+A result the core does not accept, for example after the call's deadline,
+reaches `onError` as a `ClientToolResultRefusedError` with the core's `reason`.
+Calls of a Session with an executing connection are answered only there: they
+carry `claimBy` in `requires_action` events, and REST `submitClientToolOutput()`
+cannot answer them.
+
 The connection uses the global `WebSocket` of Node.js 22, which sends the
 Organization API Key in the upgrade's `Authorization` header and never in the
 URL. Pass `WebSocket` to `OrganizationClient` to use another implementation; it
@@ -690,8 +743,8 @@ await session.replaceClientTools(tools, { ifMatch: current.etag });
 Replacement is the complete set, with `[]` clearing it. Its ETag is independent of
 the Session's model ETag. Stale replacement returns `precondition_failed`; read the
 set and decide again. A Turn retains the declarations admitted when it started.
-An identical replacement keeps its revision. Scheduler-started Turns and audio inputs do not
-use the Session-client declarations under this service baseline.
+An identical replacement keeps its revision. Text, voice and prerecorded-audio Turns
+use the Session's declarations; Scheduler-started Turns do not.
 
 After submitting a message, retrieve pending calls independently of any progress
 subscription:

@@ -49,13 +49,17 @@ test("JSON-RPC errors carry the refusal reasons the SDK reacts to", () => {
   assert.deepEqual(error.properties.code.enum, [
     -32700, -32600, -32601, -32602, -32603, -32000,
   ]);
+  // reason is an open string: session.send also passes REST error codes through.
+  assert.equal(error.properties.data.properties.reason.type, "string");
+  assert("details" in error.properties.data.properties);
   for (const reason of [
     "connection_full",
     "connection_draining",
     "session_not_found",
+    "session_not_attached",
     "authentication_required",
   ])
-    assert(error.properties.data.properties.reason.enum.includes(reason), reason);
+    assert(schema["x-error-codes"]["-32000"].includes(reason), reason);
   // A request the core does not serve is answered, which the liveness probe relies on.
   assert.match(schema["x-error-codes"]["-32601"], /Method not found/);
 });
@@ -134,4 +138,23 @@ test("tool.call, tool.claim and tool.result keep the shape the executor uses", (
     "not_claimed",
     "call_settled",
   ]);
+});
+
+test("session.send submits the REST message command and answers its receipt", () => {
+  const send = params("SessionSendRequest");
+  assert.deepEqual(send.required, ["sessionId", "clientEventId", "data"]);
+  assert.equal(send.properties.clientEventId.pattern, "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$");
+  assert.deepEqual(Object.keys(send.properties.data.properties).sort(), [
+    "billingTag",
+    "clarificationSourceTurnId",
+    "content",
+    "text",
+    "userFileIds",
+  ]);
+  assert.match(definitions.SessionSendRequest.description, /events of the Turn can arrive before the reply/);
+  assert.match(definitions.SessionSendRequest.description, /same clientEventId/);
+  assert.deepEqual(
+    definitions.SessionSendResponse.properties.result.required,
+    ["interaction", "replayed"],
+  );
 });

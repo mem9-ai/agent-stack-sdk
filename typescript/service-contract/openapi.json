@@ -722,7 +722,7 @@
             }
           },
           "409": {
-            "description": "The Idempotency-Key conflicts, cross-Session Recall requires acknowledgment (agent_template_recall_acknowledgment_required), the model provider is unconfigured, the Realtime Model is unavailable (realtime_model_unavailable), Realtime is disabled (realtime_not_enabled), combined instructions exceed 16 KiB (agent_instructions_too_large), or any requested Hardware lacks a current Registration for the Session owner (hardware_registration_unavailable).",
+            "description": "The Idempotency-Key conflicts, cross-Session Recall requires acknowledgment (agent_template_recall_acknowledgment_required), the model provider is unconfigured, the Realtime Model is unavailable (realtime_model_unavailable), Realtime is disabled (realtime_not_enabled), or combined instructions exceed 16 KiB (agent_instructions_too_large).",
             "content": {
               "application/json": {
                 "schema": {
@@ -4518,15 +4518,6 @@
           },
           "acknowledgeSessionRecall": {
             "type": "boolean"
-          },
-          "hardwareIds": {
-            "description": "Distinct Hardware IDs with an active Registration for the Session owner. All bindings and the Session commit together.",
-            "type": "array",
-            "maxItems": 100,
-            "items": {
-              "type": "string",
-              "pattern": "^hw_[0-9a-f]{32}$"
-            }
           }
         },
         "required": [
@@ -4697,13 +4688,8 @@
                 "type": "string",
                 "enum": [
                   "agent_instructions_too_large",
-                  "hardware_connection_unavailable",
                   "websocket_required",
-                  "hardware_registration_unavailable",
                   "binding_commit_unknown",
-                  "hardware_credential_unavailable",
-                  "hardware_command_closed",
-                  "hardware_command_outcome_unknown",
                   "binding_receipt_integrity",
                   "validation_error",
                   "template_test_busy",
@@ -4808,8 +4794,6 @@
                   "precondition_required",
                   "precondition_failed",
                   "resource_conflict",
-                  "hardware_model_conflict",
-                  "hardware_model_in_use",
                   "agent_template_profile_unavailable",
                   "agent_template_dependency_unavailable",
                   "agent_template_archived",

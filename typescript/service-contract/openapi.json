@@ -66,7 +66,7 @@
     },
     "/api/v1/org/users": {
       "post": {
-        "description": "Requires an Organization Key. Shares Console End User field rules. With an externalId exactly equal (after trimming) to that of an End User of this Organization, whichever surface created it, returns that End User unchanged with 200: request fields are not applied and a disabled End User is returned with its status. An externalId equal to another only under the case- and accent-insensitive comparison (which also equates forms such as ß and ss) returns 409. Otherwise creates the End User and returns 201; without an externalId every request creates a new End User. Retrying a creation with the same externalId is safe, and concurrent creations with one new externalId create one End User. Creation atomically copies the Organization initial personal monthly LLM ceiling when one is configured; otherwise the User has no personal ceiling. Creates no Platform Account, Membership, Agent or management authority. Save user.userId as your application mapping.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization and End User scope.",
+        "description": "Requires an Organization Key. Shares Console End User field rules. With an externalId exactly equal (after trimming) to that of an End User of this Organization, whichever surface created it, returns that End User unchanged with 200: request fields are not applied and a disabled End User is returned with its status. An externalId equal to another only under the case- and accent-insensitive comparison (which also equates forms such as ß and ss) returns 409. Otherwise creates the End User and returns 201; without an externalId every request creates a new End User. Retrying a creation with the same externalId is safe, and concurrent creations with one new externalId create one End User. Creates no Platform Account, Membership, Agent or management authority. Save user.userId as your application mapping.\n\nAuthorization: OrganizationApiKey; persisted credentials determine Organization and End User scope.",
         "operationId": "AdminController_createEndUser",
         "parameters": [],
         "requestBody": {
@@ -1616,22 +1616,6 @@
                 }
               }
             }
-          },
-          "429": {
-            "description": "The platform-funded LLM spend limit is exhausted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "example": {
-                  "error": {
-                    "code": "llm_spend_limit_exhausted",
-                    "message": "LLM spend limit exhausted"
-                  }
-                }
-              }
-            }
           }
         },
         "security": [
@@ -1699,7 +1683,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A persisted Server-Sent Events stream under current exact Organization Key, ordinary User, and Organization authority. Revocation or rotation closes only that credential’s subscription; disabled ordinary owners remain readable. The cursor in each id field can be supplied on a later request. Disconnecting the subscription does not cancel the active Turn. Each data frame is a JSON envelope with type, sessionId, turnId, createdAt and data. Turn events (agent.session.turn.*) carry the durable Turn event in data. Terminal Template switches arrive as agent.session.template_switch.succeeded or agent.session.template_switch.failed with display-safe command, status, epoch and Template provenance. Realtime facts of the Session timeline arrive in the same order: agent.session.realtime.input_transcript.completed for each final user transcript and agent.session.realtime.response.completed for each completed Realtime model response, with data {id, type, realtimeConnectionId, text, turnId, createdAt} and, for a response, kind (chat, task_ack, task_progress, task_result, clarify; historical device_ack remains readable), responseId and interrupted. Their envelope turnId is the linked Turn or null. Partial Realtime transcripts are delivered only on the realtime connection. agent.session.turn.output_text.snapshot carries the complete provisional draft in data.payload.text: replace the draft for that turnId, including revisions or an empty reset, rather than appending. A resumed snapshot is independently usable without earlier draft frames. agent.session.turn.progress carries a separate progress message in data.payload.text. agent.session.turn.item.added with data.event = assistant_message carries the final saved message in data.payload.text and data.payload.messageId; the terminal Turn event establishes its outcome. agent.session.turn.item.added with data.event = operation_step carries data.payload.operationId, status and label; a tool Operation also carries data.payload.category (skill_read for a read inside a frozen Skill package, with data.payload.skill {skillId, name}; otherwise tool_call), matching the Operation in Turn reads. Client Tool progress also carries safe data.payload.source: {type: session_client} or {type: hardware, hardwareBindingId, method}. Historical calls may carry hardwareRequirementId. Hardware labels identify the binding or requirement and original method. Hardware arguments, outputs and private target identities are omitted from progress and Turn Operations. The hardware_read_state platform tool creates a hardware.state.read Operation; public input contains only its tool name and binding or requirement identifier, and output omits sensor data. Metadata-only Operations omit source. Events saved before these fields existed omit them. agent.session.turn.requires_action with data.event = client_tool_calls carries data.payload.calls, the Client Tool calls of one model step, each with callId, name, arguments and deadlineAt; answer each with agent.session.input.client_tool_output before its deadline. Receiving this event counts as delivery of its calls. No output_text.delta alias is emitted.",
+            "description": "A persisted Server-Sent Events stream under current exact Organization Key, ordinary User, and Organization authority. Revocation or rotation closes only that credential’s subscription; disabled ordinary owners remain readable. The cursor in each id field can be supplied on a later request. Disconnecting the subscription does not cancel the active Turn. Each data frame is a JSON envelope with type, sessionId, turnId, createdAt and data. Turn events (agent.session.turn.*) carry the durable Turn event in data. Terminal Template switches arrive as agent.session.template_switch.succeeded or agent.session.template_switch.failed with display-safe command, status, epoch and Template provenance. Realtime facts of the Session timeline arrive in the same order: agent.session.realtime.input_transcript.completed for each final user transcript and agent.session.realtime.response.completed for each completed Realtime model response, with data {id, type, realtimeConnectionId, text, turnId, createdAt} and, for a response, kind (chat, task_ack, task_progress, task_result, clarify; historical device_ack remains readable), responseId and interrupted. Their envelope turnId is the linked Turn or null. Partial Realtime transcripts are delivered only on the realtime connection. agent.session.turn.output_text.snapshot carries the complete provisional draft in data.payload.text: replace the draft for that turnId, including revisions or an empty reset, rather than appending. A resumed snapshot is independently usable without earlier draft frames. agent.session.turn.progress carries a separate progress message in data.payload.text. agent.session.turn.item.added with data.event = assistant_message carries the final saved message in data.payload.text and data.payload.messageId; the terminal Turn event establishes its outcome. agent.session.turn.item.added with data.event = operation_step carries data.payload.operationId, status and label; a tool Operation also carries data.payload.category (skill_read for a read inside a frozen Skill package, with data.payload.skill {skillId, name}; otherwise tool_call), matching the Operation in Turn reads. Client Tool progress also carries safe data.payload.source {type: session_client}. Events and Operations recorded before native Hardware retired may carry {type: hardware, hardwareBindingId or hardwareRequirementId, method} with a label naming the binding or requirement and original method, omitting Hardware arguments, outputs and private target identities; their historical hardware.state.read Operations expose only the tool name and binding or requirement identifier and omit sensor data. Metadata-only Operations omit source. Events saved before these fields existed omit them. agent.session.turn.requires_action with data.event = client_tool_calls carries data.payload.calls, the Client Tool calls of one model step, each with callId, name, arguments and deadlineAt; answer each with agent.session.input.client_tool_output before its deadline. Receiving this event counts as delivery of its calls, except a call that also carries claimBy: it was published to the Session’s executing Backend Connection attachment, this event authorizes nothing for it, and only that attachment executes it, from tool.call after tool.claim, and answers it with tool.result. No output_text.delta alias is emitted.",
             "headers": {
               "Cache-Control": {
                 "required": true,
@@ -1845,7 +1829,7 @@
             }
           },
           "400": {
-            "description": "The command envelope or command data is invalid, or an idle text Turn admission exceeds the combined Session-client and Hardware tool limit after model projection (64 tools or 64 KiB; validation_failed). Admission saves no input or Turn on this overflow. New checkpoint retries are disabled by default and return checkpoint_runtime_unavailable when disabled or unavailable; previously accepted retry commands still recover their receipts.",
+            "description": "The command envelope or command data is invalid, or an idle text Turn admission exceeds the Client Tool limit after model projection (64 tools or 64 KiB; validation_failed). Admission saves no input or Turn on this overflow. New checkpoint retries are disabled by default and return checkpoint_runtime_unavailable when disabled or unavailable; previously accepted retry commands still recover their receipts.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1875,7 +1859,7 @@
             }
           },
           "404": {
-            "description": "The Session is unavailable or authorization-hidden, or a client_tool_output references an unknown, foreign or Hardware call (client_tool_call_unavailable).",
+            "description": "The Session is unavailable or authorization-hidden, or a client_tool_output references an unknown or foreign call, a historical Hardware call, or a call published to the Session’s executing Backend Connection attachment, which only tool.result answers (client_tool_call_unavailable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2572,7 +2556,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Pending Session-client Tool calls, oldest first. Hardware calls are delivered only over their device connection and never appear here.",
+            "description": "Pending Session-client Tool calls, oldest first. Hardware calls recorded before native Hardware retired, and calls published to the Session’s executing Backend Connection attachment, never appear here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4485,7 +4469,7 @@
                   ]
                 },
                 "name": {
-                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "description": "Client function name; platform tool names, the mcp_ prefix and double underscores are reserved.",
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_-]{1,64}$"
                 },
@@ -4796,7 +4780,6 @@
                   "drive_file_not_found",
                   "drive_path_too_long",
                   "drive_download_rate_limited",
-                  "llm_spend_limit_exhausted",
                   "drive_download_provider_error",
                   "drive_download_unavailable",
                   "invalid_idempotency_key",
@@ -7534,7 +7517,7 @@
                   ]
                 },
                 "name": {
-                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "description": "Client function name; platform tool names, the mcp_ prefix and double underscores are reserved.",
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_-]{1,64}$"
                 },
@@ -7585,7 +7568,7 @@
                   ]
                 },
                 "name": {
-                  "description": "Client function name; platform tool names including hardware_read_state, the mcp_ prefix and double underscores are reserved.",
+                  "description": "Client function name; platform tool names, the mcp_ prefix and double underscores are reserved.",
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_-]{1,64}$"
                 },
@@ -9492,7 +9475,7 @@
                                     ]
                                   },
                                   "source": {
-                                    "description": "Client Tool source. Hardware exposes the Session binding or historical requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                                    "description": "Client Tool source: session_client for every new call. Hardware sources appear only on calls recorded before native Hardware retired and expose the Session binding or requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
                                     "oneOf": [
                                       {
                                         "type": "object",
@@ -9559,15 +9542,15 @@
                                     ]
                                   },
                                   "label": {
-                                    "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                                    "description": "Readable label of a historical Hardware Client Tool, for example Speaker · set_volume. Absent on metadata-only Operations.",
                                     "type": "string",
                                     "maxLength": 322
                                   },
                                   "input": {
-                                    "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                                    "description": "Kind-specific input. A tool Operation has toolName and args; a historical Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
                                   },
                                   "output": {
-                                    "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                                    "description": "Kind-specific result. Hardware Client Tool Operations, recorded before native Hardware retired, omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
                                   },
                                   "resultPointer": {
                                     "type": "object",
@@ -10260,7 +10243,7 @@
                                     ]
                                   },
                                   "source": {
-                                    "description": "Client Tool source. Hardware exposes the Session binding or historical requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                                    "description": "Client Tool source: session_client for every new call. Hardware sources appear only on calls recorded before native Hardware retired and expose the Session binding or requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
                                     "oneOf": [
                                       {
                                         "type": "object",
@@ -10327,15 +10310,15 @@
                                     ]
                                   },
                                   "label": {
-                                    "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                                    "description": "Readable label of a historical Hardware Client Tool, for example Speaker · set_volume. Absent on metadata-only Operations.",
                                     "type": "string",
                                     "maxLength": 322
                                   },
                                   "input": {
-                                    "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                                    "description": "Kind-specific input. A tool Operation has toolName and args; a historical Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
                                   },
                                   "output": {
-                                    "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                                    "description": "Kind-specific result. Hardware Client Tool Operations, recorded before native Hardware retired, omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
                                   },
                                   "resultPointer": {
                                     "type": "object",
@@ -11965,7 +11948,7 @@
                   ]
                 },
                 "source": {
-                  "description": "Client Tool source. Hardware exposes the Session binding or historical requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                  "description": "Client Tool source: session_client for every new call. Hardware sources appear only on calls recorded before native Hardware retired and expose the Session binding or requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
                   "oneOf": [
                     {
                       "type": "object",
@@ -12032,15 +12015,15 @@
                   ]
                 },
                 "label": {
-                  "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                  "description": "Readable label of a historical Hardware Client Tool, for example Speaker · set_volume. Absent on metadata-only Operations.",
                   "type": "string",
                   "maxLength": 322
                 },
                 "input": {
-                  "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                  "description": "Kind-specific input. A tool Operation has toolName and args; a historical Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
                 },
                 "output": {
-                  "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                  "description": "Kind-specific result. Hardware Client Tool Operations, recorded before native Hardware retired, omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
                 },
                 "resultPointer": {
                   "type": "object",
@@ -13245,7 +13228,7 @@
                             ]
                           },
                           "source": {
-                            "description": "Client Tool source. Hardware exposes the Session binding or historical requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                            "description": "Client Tool source: session_client for every new call. Hardware sources appear only on calls recorded before native Hardware retired and expose the Session binding or requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
                             "oneOf": [
                               {
                                 "type": "object",
@@ -13312,15 +13295,15 @@
                             ]
                           },
                           "label": {
-                            "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                            "description": "Readable label of a historical Hardware Client Tool, for example Speaker · set_volume. Absent on metadata-only Operations.",
                             "type": "string",
                             "maxLength": 322
                           },
                           "input": {
-                            "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                            "description": "Kind-specific input. A tool Operation has toolName and args; a historical Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
                           },
                           "output": {
-                            "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                            "description": "Kind-specific result. Hardware Client Tool Operations, recorded before native Hardware retired, omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
                           },
                           "resultPointer": {
                             "type": "object",
@@ -14014,7 +13997,7 @@
                             ]
                           },
                           "source": {
-                            "description": "Client Tool source. Hardware exposes the Session binding or historical requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
+                            "description": "Client Tool source: session_client for every new call. Hardware sources appear only on calls recorded before native Hardware retired and expose the Session binding or requirement identifier and original method. Private device and Registration identities are omitted. Absent on metadata-only Operations. Current reads default older Session-client Operations to session_client; persisted historical progress events may omit source.",
                             "oneOf": [
                               {
                                 "type": "object",
@@ -14081,15 +14064,15 @@
                             ]
                           },
                           "label": {
-                            "description": "Readable Hardware Client Tool label, for example Speaker · set_volume. Absent on metadata-only Operations.",
+                            "description": "Readable label of a historical Hardware Client Tool, for example Speaker · set_volume. Absent on metadata-only Operations.",
                             "type": "string",
                             "maxLength": 322
                           },
                           "input": {
-                            "description": "Kind-specific input. A tool Operation has toolName and args; a Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
+                            "description": "Kind-specific input. A tool Operation has toolName and args; a historical Hardware Client Tool exposes only toolName, callId and mode, omitting device arguments. Neither input nor output carries the model supplier's tool-call id; use the Operation id to identify a tool call and its result."
                           },
                           "output": {
-                            "description": "Kind-specific result. Hardware Client Tool Operations omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
+                            "description": "Kind-specific result. Hardware Client Tool Operations, recorded before native Hardware retired, omit output in every status. An llm.complete Operation exposes usage as token counts only: input, output, cacheRead, cacheWrite, totalTokens, and optional cacheWrite1h and reasoning. Counts that are unavailable or invalid are omitted; absent usage is omitted. Supplier SDK cost is not exposed. Customer fees are available from the Billing usage APIs. A failed or interrupted llm.complete Operation has error {code, message, details?} with fixed text only; model_provider_failed carries details.provider (category, httpStatus, errorType, errorCode); other failures use runtime_error or a ledger outcome code. Any other failed, interrupted or unknown_result Operation with an error, including tool Operations, has error {code, message, details} with fixed text naming only the tool: an intentional tool code (for example mcp_unavailable or validation_error) is kept; an allow-listed web_search_* or session_recall_* reason becomes the code and is repeated as details.code with a boolean details.retryable; anything else reads tool_failed. A memory.recall Operation keeps only memory_recall_failed, turn_interrupted or operation_result_unknown, and otherwise reads tool_failed. details also carries tool, category (rejected, unavailable, remote_error, failed, unknown_result, interrupted or unexpected) and, when known, dispatch and retryContract."
                           },
                           "resultPointer": {
                             "type": "object",

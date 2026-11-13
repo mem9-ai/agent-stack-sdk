@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Pin the supported contract to service
+  `89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6` and OpenAPI SHA-256
+  `ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756`. The
+  service no longer refuses Turns or audio for an exhausted LLM spend limit, so
+  its 429 `llm_spend_limit_exhausted` answers are gone; the SDK passed them
+  through unchanged and needs no code change. Native Hardware is retired, and
+  Client Tool calls published to a Backend Connection attachment are answered
+  only over that connection, not through `submitClientToolOutput()`.
 - Add `session.switchTemplate({ templateId, idempotencyKey,
   acknowledgeSessionRecall? })` to move an idle Session to another Template
   ([#28](https://github.com/mem9-ai/tidblink-sdk/issues/28)). It returns the

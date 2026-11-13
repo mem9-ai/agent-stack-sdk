@@ -13,10 +13,6 @@ const stranger = new OrganizationClient({
   baseUrl,
   apiKey: process.env.SDK_ORGANIZATION_KEY,
 }).user(process.env.SDK_FOREIGN_USER_ID);
-const budget = new OrganizationClient({
-  baseUrl,
-  apiKey: process.env.SDK_ORGANIZATION_KEY,
-}).user(process.env.SDK_AUDIO_BUDGET_USER_ID);
 const wav = () => {
   const bytes = Buffer.alloc(364);
   bytes.write("RIFF", 0);
@@ -78,7 +74,7 @@ test("actual audio bytes become transcribed input and a successful saved Turn wi
   );
 });
 
-test("actual audio preserves unsupported/malformed/provider and budget refusals before a Turn starts", async () => {
+test("actual audio preserves unsupported/malformed/provider refusals before a Turn starts", async () => {
   const session = await newSession();
   await assert.rejects(
     session.audio({
@@ -100,14 +96,6 @@ test("actual audio preserves unsupported/malformed/provider and budget refusals 
     (error) => error instanceof TiDBLinkApiError && error.code === "asr_failed",
   );
   assert.deepEqual((await session.history()).turns, []);
-  const limited = await newSession(budget);
-  await assert.rejects(
-    limited.audio(recording("budget.wav")),
-    (error) =>
-      error instanceof TiDBLinkApiError &&
-      error.status === 429 &&
-      error.code === "llm_spend_limit_exhausted",
-  );
   await assert.rejects(
     stranger.session(session.id).audio(recording()),
     (error) => error instanceof TiDBLinkApiError && error.status === 404,

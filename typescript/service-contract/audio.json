@@ -1,6 +1,6 @@
 {
-  "revision": "bc65d6b76928f4b5348302349342309bd24b28ac",
-  "sourceOpenApiSha256": "aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913",
+  "revision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
+  "sourceOpenApiSha256": "ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756",
   "paths": {
     "/api/v1/org/users/{userId}/sessions/{id}/turns/audio": {
       "post": {
@@ -59,7 +59,7 @@
         },
         "responses": {
           "201": {
-            "description": "Audio Turn outside ordinary JSON text input identity/recovery guarantees. The owning response uses SSE frames whose event name and JSON data identify the TurnStreamEvent, with comment keepalives; turn_started may omit inputId. An ordinary upstream disconnect requests interruption. Rotation or revocation closes this response without canceling an accepted Turn; recover its result using fresh authority. Cancel an owned live Turn through POST events with a stable clientEventId and its exact turnId.",
+            "description": "Audio Turn outside ordinary JSON text input identity/recovery guarantees. The owning response uses SSE frames whose event name and JSON data identify the TurnStreamEvent, with comment keepalives; turn_started may omit inputId. An ordinary upstream disconnect requests interruption. Rotation or revocation closes this response without canceling an accepted Turn; recover its result using fresh authority. Cancel an owned live Turn through POST events with a stable clientEventId and its exact turnId. The transcript is the Turn input, so the Turn freezes the Session Client Tool set as a text Turn does; answer each client_tool_calls frame with agent.session.input.client_tool_output, except calls that carry claimBy, which only the Session’s executing Backend Connection attachment executes and answers.",
             "headers": {
               "Cache-Control": {
                 "required": true,
@@ -84,7 +84,20 @@
               "text/event-stream": {
                 "schema": {
                   "type": "string",
-                  "description": "Each SSE frame contains event: <TurnStreamEvent.event> and data: <TurnStreamEvent JSON>, terminated by a blank line. Comment frames are keepalive heartbeats."
+                  "description": "Each SSE frame contains event: <TurnStreamEvent.event> and data: <TurnStreamEvent JSON>, terminated by a blank line. Comment frames are keepalive heartbeats.",
+                  "x-sse-event-schema": {
+                    "$ref": "#/components/schemas/TurnStreamEvent"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error: the upload is invalid, the transcript is empty, or the Session Client Tool set exceeds 64 tools or 64 KiB after model projection. The tool-set check runs at Turn admission, after transcription; transcription usage remains billed and no Turn is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -95,22 +108,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "The platform-funded LLM spend limit is exhausted before streaming starts.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "example": {
-                  "error": {
-                    "code": "llm_spend_limit_exhausted",
-                    "message": "LLM spend limit exhausted"
-                  }
                 }
               }
             }
@@ -432,7 +429,6 @@
                   "drive_file_not_found",
                   "drive_path_too_long",
                   "drive_download_rate_limited",
-                  "llm_spend_limit_exhausted",
                   "drive_download_provider_error",
                   "drive_download_unavailable",
                   "invalid_idempotency_key",
@@ -944,6 +940,84 @@
                     "Staging",
                     "Production"
                   ]
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event",
+              "turnId",
+              "sessionId",
+              "seq",
+              "createdAt",
+              "payload"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "client_tool_calls"
+                ]
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "agentRunId": {
+                "description": "Physical AgentRun that emitted this event. Historical replay rows may omit it.",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "description": "The Client Tool calls of one model step, published together; answer each with agent.session.input.client_tool_output before its deadline, except a call with claimBy.",
+                "required": [
+                  "calls"
+                ],
+                "properties": {
+                  "calls": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "callId",
+                        "name",
+                        "arguments",
+                        "deadlineAt"
+                      ],
+                      "properties": {
+                        "callId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "arguments": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "deadlineAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "claimBy": {
+                          "description": "Present when the call was published to the Session's executing Backend Connection attachment. Only that attachment executes it, after tool.claim succeeds before this time, and answers it with tool.result.",
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }

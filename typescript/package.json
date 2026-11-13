@@ -8,8 +8,8 @@
     "node": ">=22.12"
   },
   "tidbLinkApiVersion": "0.0.1",
-  "tidbLinkRevision": "bc65d6b76928f4b5348302349342309bd24b28ac",
-  "tidbLinkOpenApiSha256": "aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913",
+  "tidbLinkRevision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
+  "tidbLinkOpenApiSha256": "ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

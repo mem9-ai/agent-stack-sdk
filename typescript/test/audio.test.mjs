@@ -110,6 +110,57 @@ test("audio progress preserves fragmented SSE envelopes and complete draft snaps
   );
 });
 
+test("audio Turns deliver the Client Tool calls they publish and refuse malformed ones", async () => {
+  const calls = [
+    {
+      callId: "call_1",
+      name: "set_light",
+      arguments: { on: true },
+      deadlineAt: "2099-01-01T00:00:00.000Z",
+    },
+    {
+      callId: "call_2",
+      name: "get_status",
+      arguments: {},
+      deadlineAt: "2099-01-01T00:00:00.000Z",
+      claimBy: "2099-01-01T00:00:00.000Z",
+    },
+  ];
+  const events = [
+    event("turn_started", {}),
+    event("client_tool_calls", { calls }, 1),
+    event("assistant_message", { messageId: "m1", text: "Done" }, 2),
+    event("turn_finished", { status: "succeeded" }, 3),
+  ];
+  const respond = (body) =>
+    serve(async (req, res) => {
+      for await (const _ of req) {
+      }
+      res.writeHead(201, { "content-type": "text/event-stream" });
+      res.end(body);
+    });
+  assert.deepEqual(
+    await Array.fromAsync(
+      sessionAt(await respond(events.map(frame).join(""))).streamAudio(input()),
+    ),
+    events,
+  );
+  assert.equal(
+    (await sessionAt(await respond(events.map(frame).join(""))).audio(input())).text,
+    "Done",
+  );
+  const malformed = await respond(
+    frame(event("turn_started", {})) +
+      frame(event("client_tool_calls", { calls: [{ callId: "call_1" }] }, 1)),
+  );
+  await assert.rejects(
+    Array.fromAsync(sessionAt(malformed).streamAudio(input())),
+    (error) =>
+      error instanceof OutcomeUnknownError &&
+      /invalid Client Tool calls/.test(error.cause?.message ?? error.message),
+  );
+});
+
 test("audio final failure and interruption cannot promote a provisional or earlier message to success", async () => {
   for (const status of ["failed", "interrupted"]) {
     const baseUrl = await serve(async (req, res) => {

@@ -72,6 +72,24 @@ const realtimeSource = {
   list: async () => ({ models: realtimeModels, defaultModelId: "voice-a" }),
   current: async () => realtimeModels[0].settings,
   readiness: async () => "configured" as const,
+  // Template switches pin the Session's Realtime capability; this catalog has no release.
+  prepareCapability: async (selection: string | null) => {
+    const model = realtimeModels.find(
+      (item) => item.id === (selection ?? "voice-a"),
+    );
+    return model?.available
+      ? {
+          selection,
+          resolvedModelId: model.id,
+          releaseId: "sdk-fixture-release",
+          releaseHash: "sdk-fixture-release",
+          connectionId: "sdk-fixture-connection",
+          credentialVersionId: "sdk-fixture-credential",
+          settings: model.settings,
+        }
+      : null;
+  },
+  assertCurrentCapability: async () => true,
   open: async () => {
     throw new Error(
       "SDK Realtime verification does not redeem WebSocket credentials",
@@ -297,18 +315,6 @@ it("the packed SDK provisions users and manages Sessions and Realtime Connection
     displayName: "SDK Realtime stranger",
   });
   const billing = app.get(BillingUsageStore);
-  const limit = await billing.getUserLlmSpendLimitView({
-    organizationId: DEFAULT_ORG_ID,
-    userId: owner.userId,
-  });
-  // Failure cases retain conservative reservations; later cases need independent budget headroom.
-  await billing.mutateLlmSpendLimit({
-    organizationId: DEFAULT_ORG_ID,
-    scope: { kind: "member", userId: owner.userId },
-    expectedRevision: limit!.revision,
-    monthlyBaseMicros: 1_000_000_000,
-    actorUserId: owner.userId,
-  });
   const usageAt = "2030-01-02T10:00:00.000Z";
   const billingTag = { key: "cost_center", value: "Café/QA" };
   const attribution = {

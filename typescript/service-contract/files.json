@@ -1,6 +1,6 @@
 {
-  "revision": "bc65d6b76928f4b5348302349342309bd24b28ac",
-  "sourceOpenApiSha256": "aba1a0e6bd0ebe9ef75483bde11b3cc0e34ba30ee14389bec7d5774f5776e913",
+  "revision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
+  "sourceOpenApiSha256": "ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756",
   "paths": {
     "/api/v1/org/users/{userId}/files": {
       "get": {
@@ -1791,7 +1791,6 @@
                   "drive_file_not_found",
                   "drive_path_too_long",
                   "drive_download_rate_limited",
-                  "llm_spend_limit_exhausted",
                   "drive_download_provider_error",
                   "drive_download_unavailable",
                   "invalid_idempotency_key",

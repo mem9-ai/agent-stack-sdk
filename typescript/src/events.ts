@@ -75,6 +75,13 @@ export interface ClientToolCallPayload {
   name: string;
   arguments: Record<string, unknown>;
   deadlineAt: string;
+  /**
+   * Present when the call was published to the Session's executing Backend
+   * Connection attachment. Only that attachment executes it, after claiming it
+   * before this time; this event authorizes nothing, and REST
+   * `submitClientToolOutput()` cannot answer it.
+   */
+  claimBy?: string;
 }
 
 export type TurnRequiresActionEvent = KnownEvent<
@@ -166,6 +173,21 @@ const FINISHED_STATUS: Record<string, string> = {
 const isTextPayload = (payload: Record<string, unknown>) =>
   isString(payload.text);
 
+/** Whether a `client_tool_calls` payload has the fields the SDK types. */
+export const isClientToolCallsPayload = (
+  payload: Record<string, unknown>,
+): payload is { calls: ClientToolCallPayload[] } =>
+  Array.isArray(payload.calls) &&
+  payload.calls.every(
+    (call) =>
+      isObject(call) &&
+      isString(call.callId) &&
+      isString(call.name) &&
+      isObject(call.arguments) &&
+      isString(call.deadlineAt) &&
+      (call.claimBy === undefined || isString(call.claimBy)),
+  );
+
 const isKnownTurnPayload = (
   name: string,
   payload: Record<string, unknown>,
@@ -184,17 +206,7 @@ const isKnownTurnPayload = (
         isString(payload.label)
       );
     case "client_tool_calls":
-      return (
-        Array.isArray(payload.calls) &&
-        payload.calls.every(
-          (call) =>
-            isObject(call) &&
-            isString(call.callId) &&
-            isString(call.name) &&
-            isObject(call.arguments) &&
-            isString(call.deadlineAt),
-        )
-      );
+      return isClientToolCallsPayload(payload);
     case "turn_finished":
       return payload.status === FINISHED_STATUS[type];
     case "turn_error":

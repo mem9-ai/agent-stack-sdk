@@ -10,6 +10,10 @@ import { decodeSse } from "./sse.js";
 import { validClarification } from "./turn.js";
 import type { BillingTag, ClarificationItem } from "./session.js";
 import type { OperationRecord, TurnFailure } from "./history.js";
+import {
+  isClientToolCallsPayload,
+  type ClientToolCallPayload,
+} from "./events.js";
 import type { RequestOptions } from "./organization.js";
 
 export interface AudioTurnInput extends RequestOptions {
@@ -51,6 +55,12 @@ export type AudioTurnEvent =
       "assistant_message",
       { messageId: string; text: string; clarificationItem?: ClarificationItem }
     >
+  /**
+   * Client Tool calls the audio Turn published. Answer them the way the
+   * Session's Client Tools are answered; this event authorizes nothing by
+   * itself.
+   */
+  | AudioEnvelope<"client_tool_calls", { calls: ClientToolCallPayload[] }>
   | AudioEnvelope<"turn_error", TurnFailure>
   | AudioEnvelope<
       "turn_finished",
@@ -188,6 +198,7 @@ export async function* streamAudio(
           "assistant_draft",
           "operation_step",
           "assistant_message",
+          "client_tool_calls",
           "turn_error",
           "turn_finished",
         ].includes(event.event)
@@ -212,6 +223,13 @@ export async function* streamAudio(
       )
         throw new TiDBLinkError(
           "Audio response returned an invalid final Message",
+        );
+      if (
+        event.event === "client_tool_calls" &&
+        !isClientToolCallsPayload(event.payload)
+      )
+        throw new TiDBLinkError(
+          "Audio response returned invalid Client Tool calls",
         );
       if (
         event.event === "turn_finished" &&

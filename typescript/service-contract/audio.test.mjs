@@ -45,7 +45,7 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
   assert.deepEqual(success.headers["Cache-Control"].schema.enum, [
     "no-cache, no-transform",
   ]);
-  for (const status of ["409", "429", "501"])
+  for (const status of ["409", "501"])
     assert(operation.responses[status]);
   const events = contract.components.schemas.TurnStreamEvent.oneOf;
   assert.deepEqual(
@@ -53,6 +53,7 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
     [
       "assistant_draft",
       "assistant_message",
+      "client_tool_calls",
       "operation_step",
       "progress",
       "turn_error",
@@ -60,6 +61,11 @@ test("prerecorded audio keeps its multipart request and distinct response-owned 
       "turn_started",
     ],
   );
+  const calls = events.find(
+    (event) => event.properties.event.enum[0] === "client_tool_calls",
+  ).properties.payload.properties.calls.items;
+  assert.deepEqual(calls.required, ["callId", "name", "arguments", "deadlineAt"]);
+  assert.equal(calls.properties.claimBy.type, "string");
   for (const event of events)
     assert.deepEqual(event.required, [
       "event",

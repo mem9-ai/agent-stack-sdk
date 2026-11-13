@@ -158,16 +158,6 @@ it("an independent installed SDK consumer uses Organization authority against th
             organizationId,
             userId: message.userId!,
           });
-          await harness.withIsolatedDatabaseFixture((client) =>
-            client.llm_spend_limit_settings.updateMany({
-              where: {
-                organization_id: organizationId,
-                scope_kind: "member",
-                scope_id: message.userId!,
-              },
-              data: { active_base_micros: 100_000_000n },
-            }),
-          );
         } else if (message.stage === "text") {
           harness.model.enqueueText({
             chunks: ["Organization SDK answer."],

@@ -600,6 +600,63 @@ submits it again. Run it with `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_
 node node_modules/@tidblink/server/examples/observe-message.mjs
 ```
 
+## Connecting a Session
+
+`session.connect()` attaches a Session to this process's Backend Connection, one
+WebSocket per Application Server process to the core (ADR 0109 of the service).
+It is meant for a backend that stays attached to a Session, for example while
+the user's device is online: it receives the Session's events, and it declares
+and executes the Session's Client Tools. Each connection is one row in the
+core and costs no polling, so attach when the device comes online.
+
+```ts
+const conn = await organization.user(userId).session(sessionId).connect({
+  tools: lampTools(deviceId),                 // see below
+  cursor: await db.getCursor(deviceId),       // resume after a restart
+  onCursor: (cursor) => db.saveCursor(deviceId, cursor),
+  onTranscript: (t) => app.push(deviceId, { role: "user", text: t.text }),
+  onResponse: (r) => app.push(deviceId, { role: "assistant", text: r.text }),
+  onEvent: (event) => forward(event),         // every event, in order
+});
+conn.closed.then((end) => console.log("connection ended", end.reason));
+// ...when the device goes offline:
+await conn.close();
+```
+
+- **Events.** Callbacks run one event at a time, in the Session's order, and
+  `onCursor` follows once an event's callbacks have completed. Persist that
+  cursor and pass it back as `cursor` to replay what was missed; without one,
+  delivery starts after the Session's latest event and history is not replayed.
+  `onTranscript` and `onResponse` receive completed Realtime transcripts and
+  responses; `onEvent` receives every event, including types the SDK does not
+  know.
+- **Reconnection.** The SDK opens Backend Connections on demand, holds up to the
+  `maxSessions` the core announces on each (1024 today) and opens another when
+  one is full. After a lost connection, or when the core asks a connection to
+  drain before a restart, it re-attaches each Session on another connection from
+  the last processed event, without gaps or repeats. A connection that holds
+  nothing closes after a few seconds. Liveness is checked with an application
+  `ping` when a connection is silent.
+- **One executor per Session.** A connection attaches for execution by default.
+  Another process's connection to the same Session takes it over, and this one
+  ends with `closed` resolving `{ reason: "superseded" }`. One `OrganizationClient`
+  holds at most one connection per Session; reuse it. `observe: true` attaches
+  for events only, never takes the Session over and cannot declare tools.
+- **Ends.** `closed` resolves once: `closed` after `close()` or
+  `organization.close()`, `superseded`, `session_deleted`, or `error` when the
+  connection cannot be restored, for example after the Organization API Key was
+  revoked (a `BackendConnectionClosedError` with code 4001). A refused attach
+  rejects `connect()` with a `BackendRequestError` whose `reason` is the core's,
+  such as `session_not_found`.
+- **Errors in your callbacks** do not stop delivery. They go to `onError`;
+  without it they are rethrown asynchronously, which by default ends a Node.js
+  process.
+
+The connection uses the global `WebSocket` of Node.js 22, which sends the
+Organization API Key in the upgrade's `Authorization` header and never in the
+URL. Pass `WebSocket` to `OrganizationClient` to use another implementation; it
+must accept `new WebSocket(url, { protocols, headers })`.
+
 ## Session Client Tools
 
 Declare the application functions that an ordinary text Turn may request. The

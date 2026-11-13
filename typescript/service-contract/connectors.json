@@ -1,6 +1,6 @@
 {
-  "revision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
-  "sourceOpenApiSha256": "ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756",
+  "revision": "cadb1144fe2d450d45baf9a09f826a64258b8ada",
+  "sourceOpenApiSha256": "901c38fb353ada4bdaf9b27507f54e8455abf3ba3abd950c87c82cfea5c8744e",
   "paths": {
     "/api/v1/org/connectors": {
       "get": {
@@ -1274,13 +1274,8 @@
                 "type": "string",
                 "enum": [
                   "agent_instructions_too_large",
-                  "hardware_connection_unavailable",
                   "websocket_required",
-                  "hardware_registration_unavailable",
                   "binding_commit_unknown",
-                  "hardware_credential_unavailable",
-                  "hardware_command_closed",
-                  "hardware_command_outcome_unknown",
                   "binding_receipt_integrity",
                   "validation_error",
                   "template_test_busy",
@@ -1385,8 +1380,6 @@
                   "precondition_required",
                   "precondition_failed",
                   "resource_conflict",
-                  "hardware_model_conflict",
-                  "hardware_model_in_use",
                   "agent_template_profile_unavailable",
                   "agent_template_dependency_unavailable",
                   "agent_template_archived",

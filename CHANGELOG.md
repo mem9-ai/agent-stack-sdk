@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Pin the supported contract to service
+  `cadb1144fe2d450d45baf9a09f826a64258b8ada` and OpenAPI SHA-256
+  `901c38fb353ada4bdaf9b27507f54e8455abf3ba3abd950c87c82cfea5c8744e`. The
+  service now serves `session.send` on Backend Connections, passes REST error
+  codes and `details` through `session.send` refusals, and no longer lists
+  Hardware error codes or Session `hardwareIds`. No SDK change.
 - Session connections execute Client Tools: `connect({ tools })` takes a
   handler with `description`, `parameters` and `run(args, context)` per tool
   name. The SDK claims each call and runs it only once the core grants the

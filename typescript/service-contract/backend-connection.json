@@ -1,10 +1,10 @@
 {
-  "revision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
-  "sourceSchemaSha256": "beaba46768424c494814cc3076928139e4f7d2216e97ac0874b1e7b89415cc3b",
+  "revision": "cadb1144fe2d450d45baf9a09f826a64258b8ada",
+  "sourceSchemaSha256": "ac7fdbedd25d19ff4b3d2d38ed760c53b70963a5566c7b321e12476f276082cc",
   "schema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "tidb-link.backend.v1",
-    "description": "Backend Connection messages (ADR 0109). Open a WebSocket to /api/v1/org/backend/ws with the tidb-link.backend.v1 subprotocol and an Organization API Key in the Authorization header. Each text frame carries one JSON-RPC 2.0 message; binary frames and batches are not used. The core sends hello first, and the Application Server sends nothing before it. This revision defines the messages the core serves today: session.attach, session.detach, tool.claim and tool.result (SessionAttachRequest, SessionDetachRequest, ToolClaimRequest, ToolResultRequest) and the notifications in CoreMessage, including session.event and tool.call; session.send is reserved and currently answers error -32601.",
+    "description": "Backend Connection messages (ADR 0109). Open a WebSocket to /api/v1/org/backend/ws with the tidb-link.backend.v1 subprotocol and an Organization API Key in the Authorization header. Each text frame carries one JSON-RPC 2.0 message; binary frames and batches are not used. The core sends hello first, and the Application Server sends nothing before it. The Application Server sends the requests session.attach, session.detach, session.send, tool.claim and tool.result (SessionAttachRequest, SessionDetachRequest, SessionSendRequest, ToolClaimRequest, ToolResultRequest); the core sends the notifications and responses in CoreMessage, including session.event and tool.call.",
     "x-subprotocol": "tidb-link.backend.v1",
     "x-path": "/api/v1/org/backend/ws",
     "x-close-codes": {
@@ -21,10 +21,10 @@
     "x-error-codes": {
       "-32700": "Parse error: the frame is not JSON. The response id is null.",
       "-32600": "Invalid Request: not a single JSON-RPC 2.0 request, notification or response object, or a string id longer than 256 characters (answered with id null).",
-      "-32601": "Method not found, or not served by this core yet (session.send).",
+      "-32601": "Method not found.",
       "-32602": "Invalid params: the params do not match the method's definition, including unknown members and invalid Client Tool declarations.",
       "-32603": "Internal error: the core could not complete the request, the connection is closing, or this connection has more than twice maxSessions requests unanswered; retry, on a new connection if this one closes.",
-      "-32000": "Refused: error.data.reason is connection_full (this connection already holds or is acquiring maxSessions attachments; open another connection), connection_draining (the core sent connection.drain; attach on a new connection), session_not_found (no active Session of that ordinary End User in the Key's Organization), session_read_only (the Session cannot be continued, so its tools cannot be replaced) or authentication_required (the Key or its Organization is no longer valid; the connection closes with 4001). tool.result answers it too; other tool.claim and tool.result refusals are results, not errors."
+      "-32000": "Refused: error.data.reason is connection_full (this connection already holds or is acquiring maxSessions attachments; open another connection), connection_draining (the core sent connection.drain; attach or send on a new connection), session_not_found (no active Session of that ordinary End User in the Key's Organization), session_read_only (the Session cannot be continued, so its tools cannot be replaced) or authentication_required (the Key or its Organization is no longer valid; the connection closes with 4001). tool.result answers it too; other tool.claim and tool.result refusals are results, not errors. session.send also answers session_not_attached (this connection holds no attachment of the Session) and every refusal of the REST message command, with the ErrorEnvelope's code as reason, its message as error.message and its details as error.data.details."
     },
     "definitions": {
       "CoreMessage": {
@@ -56,6 +56,9 @@
           },
           {
             "$ref": "#/definitions/ToolResultResponse"
+          },
+          {
+            "$ref": "#/definitions/SessionSendResponse"
           },
           {
             "$ref": "#/definitions/ErrorResponse"
@@ -406,6 +409,159 @@
                 }
               }
             ]
+          }
+        }
+      },
+      "SessionSendRequest": {
+        "description": "Submit a user message to a Session this connection holds an attachment of, of either kind. It is the REST message command POST /api/v1/org/users/{userId}/sessions/{sessionId}/events with type agent.session.input.message, submitted by this connection's Organization API Key for the End User named in that attachment's session.attach: the same validation, Key, End User and Session authority and audit, clientEventId idempotency in the same namespace as REST commands, admission refusals and Client Tool freezing. A message to an idle Session starts a Turn, which runs on the core replica that received the request; a message to a Session with an active Turn steers that Turn. The reply is the acceptance receipt, not the Turn result: follow the Turn through session.event, matching its turnId; events of the Turn can arrive before the reply. Repeating the same clientEventId and data returns the original receipt with replayed true and starts nothing; the same clientEventId with different data is refused with interaction_input_conflict. A frame over 1 MiB, the REST request body limit, answers -32602. A request after connection.drain is refused with connection_draining; send it again with the same clientEventId on a new connection.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "session.send"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "sessionId",
+              "clientEventId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "clientEventId": {
+                "description": "Stable identity of this message in the Session's command namespace, shared with REST commands.",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "data": {
+                "description": "The data of the REST message command: content (a string or text parts) or text, and optionally userFileIds, clarificationSourceTurnId and billingTag.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "text"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "type": {
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "text": {
+                    "description": "Ordinary Turns require readable string text. A linked single-select clarification accepts a string or one-element string array; a linked multi-select clarification requires a non-empty string array.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 9,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    ]
+                  },
+                  "userFileIds": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "clarificationSourceTurnId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "billingTag": {
+                    "description": "A Billing Tag snapshot for a Turn this message starts; null means untagged. The value is normalized to NFC and limited to 1-128 UTF-8 bytes, without leading or trailing whitespace or control or format characters.",
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "key",
+                          "value"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "content"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "text"
+                    ]
+                  }
+                ]
+              }
+            }
           }
         }
       },
@@ -889,6 +1045,178 @@
           }
         }
       },
+      "SessionSendResponse": {
+        "description": "Result of session.send: the acceptance receipt.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "interaction",
+              "replayed"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "interaction": {
+                "description": "The REST interaction receipt, as in SessionInteractionResponse of the customer OpenAPI.",
+                "type": "object",
+                "required": [
+                  "inputId",
+                  "sequence",
+                  "kind",
+                  "mode",
+                  "turnId",
+                  "message",
+                  "createdAt",
+                  "appliedAt",
+                  "rejection",
+                  "result"
+                ],
+                "properties": {
+                  "inputId": {
+                    "type": "string"
+                  },
+                  "sequence": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "message",
+                      "cancel",
+                      "retry",
+                      "client_tool_output"
+                    ]
+                  },
+                  "mode": {
+                    "description": "started: the message started the Turn turnId. steered: it joined the active Turn turnId. rejected: see rejection.",
+                    "type": "string",
+                    "enum": [
+                      "started",
+                      "steered",
+                      "cancelled",
+                      "accepted",
+                      "rejected"
+                    ]
+                  },
+                  "turnId": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "const": "user"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "appliedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rejection": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "code"
+                        ],
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "interaction_admission_closed",
+                              "interaction_target_conflict",
+                              "client_tool_call_unavailable",
+                              "client_tool_call_settled"
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "result": {
+                    "description": "The original execution generation's settlement.",
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "completedAt"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "running",
+                          "succeeded",
+                          "failed",
+                          "interrupted"
+                        ]
+                      },
+                      "completedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "replayed": {
+                "description": "True when this repeats an already accepted clientEventId (REST answers 200); false for a new admission (REST 202).",
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
       "ErrorResponse": {
         "description": "The core's answer to a request it cannot serve.",
         "type": "object",
@@ -940,14 +1268,11 @@
                 "additionalProperties": false,
                 "properties": {
                   "reason": {
-                    "type": "string",
-                    "enum": [
-                      "connection_full",
-                      "connection_draining",
-                      "session_not_found",
-                      "session_read_only",
-                      "authentication_required"
-                    ]
+                    "description": "Why the core refused: one of the reasons in x-error-codes -32000; for session.send, also the REST ErrorEnvelope code.",
+                    "type": "string"
+                  },
+                  "details": {
+                    "description": "session.send only: the REST ErrorEnvelope details, when present."
                   }
                 }
               }

@@ -59,3 +59,31 @@ test("JSON-RPC errors carry the refusal reasons the SDK reacts to", () => {
   // A request the core does not serve is answered, which the liveness probe relies on.
   assert.match(schema["x-error-codes"]["-32601"], /Method not found/);
 });
+
+test("attach, detach and the core's connection notices keep the shape the pool uses", () => {
+  const attach = params("SessionAttachRequest");
+  assert.deepEqual(attach.required, ["userId", "sessionId"]);
+  assert.deepEqual(Object.keys(attach.properties).sort(), [
+    "cursor",
+    "kind",
+    "sessionId",
+    "tools",
+    "userId",
+  ]);
+  assert.deepEqual(attach.properties.kind.enum, ["executing", "observing"]);
+  assert.equal(attach.properties.cursor.pattern, "^(0|[1-9][0-9]{0,14})$");
+  assert.deepEqual(
+    definitions.SessionAttachResponse.properties.result.required,
+    ["generation", "cursor"],
+  );
+  assert.deepEqual(params("SessionDetachRequest").required, ["sessionId"]);
+  assert.deepEqual(params("ConnectionDrain").required, ["closeAfterMs"]);
+  assert.deepEqual(params("SessionDetached").properties.reason.enum, [
+    "superseded",
+    "session_deleted",
+  ]);
+  // Refusals that send the attach to another connection.
+  assert.match(schema["x-error-codes"]["-32000"], /connection_full/);
+  assert.match(schema["x-error-codes"]["-32000"], /connection_draining/);
+  assert.match(schema["x-error-codes"]["-32603"], /retry/);
+});

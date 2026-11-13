@@ -11,8 +11,11 @@ import { Templates } from "./templates.js";
 import { Skills } from "./skills.js";
 import { Connectors } from "./connectors.js";
 import { OutcomeUnknownError } from "./errors.js";
+import { BackendConnectionPool } from "./backend-pool.js";
+import type { WebSocketConstructor } from "./backend-connection.js";
 import {
   HttpClient,
+  normalizeBaseUrl,
   type FetchFunction,
   isOrganizationApiKey,
   requireKnownKeys,
@@ -28,6 +31,13 @@ export interface OrganizationClientOptions {
    * instrumentation or tests. Defaults to `globalThis.fetch`.
    */
   fetch?: FetchFunction;
+  /**
+   * WebSocket constructor for Backend Connections (`session.connect()`).
+   * Defaults to the global `WebSocket` of Node.js 22, which sends the
+   * Organization API Key in the upgrade's Authorization header. A
+   * replacement must accept `new WebSocket(url, { protocols, headers })`.
+   */
+  WebSocket?: WebSocketConstructor;
 }
 
 export interface Organization {
@@ -67,6 +77,7 @@ export interface RequestOptions {
 /** Customer operations authorized by an Organization API Key. */
 export class OrganizationClient {
   readonly #http: HttpClient;
+  readonly #backend: BackendConnectionPool;
   readonly #templates: Templates;
   readonly #skills: Skills;
   readonly #connectors: Connectors;
@@ -89,7 +100,7 @@ export class OrganizationClient {
   constructor(options: OrganizationClientOptions) {
     requireKnownKeys(
       options,
-      ["baseUrl", "apiKey", "fetch"],
+      ["baseUrl", "apiKey", "fetch", "WebSocket"],
       "OrganizationClient options",
     );
     if (!isOrganizationApiKey(options.apiKey)) {
@@ -97,10 +108,31 @@ export class OrganizationClient {
         "OrganizationClient requires an Organization API Key",
       );
     }
-    this.#http = new HttpClient(options);
+    if (options.WebSocket !== undefined && typeof options.WebSocket !== "function")
+      throw new TypeError("WebSocket must be a constructor");
+    this.#backend = new BackendConnectionPool({
+      baseUrl: normalizeBaseUrl(options.baseUrl),
+      apiKey: options.apiKey,
+      WebSocket: options.WebSocket,
+    });
+    this.#http = new HttpClient({
+      baseUrl: options.baseUrl,
+      apiKey: options.apiKey,
+      fetch: options.fetch,
+      backend: this.#backend,
+    });
     this.#templates = new Templates(this.#http);
     this.#skills = new Skills(this.#http);
     this.#connectors = new Connectors(this.#http);
+  }
+
+  /**
+   * Close every Session connection opened through this client, with reason
+   * `closed`, and its Backend Connections. Later `connect()` calls are
+   * refused; REST calls keep working.
+   */
+  close(): Promise<void> {
+    return this.#backend.close();
   }
 
   /** Select the End User who owns the resources; the Organization API Key remains the caller. */

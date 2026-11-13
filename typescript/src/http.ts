@@ -1,3 +1,4 @@
+import type { BackendConnectionPool } from "./backend-pool.js";
 import {
   TiDBLinkApiError,
   TiDBLinkError,
@@ -180,7 +181,7 @@ const errorInput = async (
   };
 };
 
-const normalizeBaseUrl = (value: string): string => {
+export const normalizeBaseUrl = (value: string): string => {
   const url = new URL(value);
   if (
     (url.protocol !== "http:" && url.protocol !== "https:") ||
@@ -233,12 +234,18 @@ export class HttpClient {
   readonly #baseUrl: string;
   readonly #scope: string;
   readonly #fetch: FetchFunction;
+  /** The OrganizationClient's Backend Connections, shared by every scope. */
+  readonly backend: BackendConnectionPool | undefined;
+  /** The End User this scope selects, if any. */
+  readonly userId: string | undefined;
 
   constructor(input: {
     baseUrl: string;
     apiKey: string;
     scope?: string;
     fetch?: FetchFunction | undefined;
+    backend?: BackendConnectionPool | undefined;
+    userId?: string | undefined;
   }) {
     if (input.fetch !== undefined && typeof input.fetch !== "function")
       throw new TypeError("fetch must be a function");
@@ -246,6 +253,8 @@ export class HttpClient {
     this.#apiKey = input.apiKey;
     this.#scope = input.scope ?? "/api/v1/org";
     this.#fetch = input.fetch ?? ((url, init) => fetch(url, init));
+    this.backend = input.backend;
+    this.userId = input.userId;
   }
 
   /**
@@ -266,6 +275,8 @@ export class HttpClient {
       apiKey: this.#apiKey,
       scope: `${this.#scope}/users/${encodeURIComponent(userId)}`,
       fetch: this.#fetch,
+      backend: this.backend,
+      userId,
     });
   }
 

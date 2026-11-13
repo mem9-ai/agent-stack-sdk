@@ -43,6 +43,11 @@ import {
 } from "./subscription.js";
 import type { RequestOptions } from "./organization.js";
 import {
+  connectSession,
+  type ConnectOptions,
+  type SessionConnection,
+} from "./session-connection.js";
+import {
   requestOptions,
   HttpClient,
   requireEtag,
@@ -410,6 +415,17 @@ export class Session {
    * Follow the event stream until `options.signal` aborts, reconnecting from
    * the last cursor, and deliver each pending Client Tool call once.
    */
+  /**
+   * Attach this Session to the process's Backend Connection: receive its
+   * events and, unless `observe` is set, declare and execute its Client
+   * Tools. Resolves once the attach took effect. One connection per Session
+   * per OrganizationClient; a connection on another process or client takes
+   * the Session over and this one ends with `superseded`.
+   */
+  connect(options?: ConnectOptions): Promise<SessionConnection> {
+    return connectSession(this.#http.backend, this.#http.userId, this.id, options);
+  }
+
   subscribe(options?: SubscribeOptions): AsyncGenerator<SubscriptionItem> {
     return subscribe(this.#http, this.id, options);
   }

@@ -87,3 +87,16 @@ test("attach, detach and the core's connection notices keep the shape the pool u
   assert.match(schema["x-error-codes"]["-32000"], /connection_draining/);
   assert.match(schema["x-error-codes"]["-32603"], /retry/);
 });
+
+test("session.event carries the subscription's envelope with its cursor", () => {
+  const event = params("SessionEvent");
+  assert.deepEqual(event.required, ["sessionId", "cursor", "event"]);
+  assert.deepEqual(event.properties.event.required, [
+    "type",
+    "sessionId",
+    "turnId",
+    "createdAt",
+    "data",
+  ]);
+  assert.match(definitions.SessionEvent.description, /strictly in order/);
+});

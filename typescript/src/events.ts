@@ -286,10 +286,21 @@ export function parseSessionEvent(
       cause,
     });
   }
+  return sessionEventFrom(value, frame.id, options);
+}
+
+/** Check one event envelope and attach its cursor. */
+export function sessionEventFrom(
+  value: unknown,
+  cursor: unknown,
+  options: { sessionId?: string; requestId?: string } = {},
+): SessionEvent {
+  const requestId =
+    options.requestId === undefined ? {} : { requestId: options.requestId };
   const event = value as Partial<SessionEvent> | null;
   if (
-    !isString(frame.id) ||
-    !frame.id ||
+    !isString(cursor) ||
+    !cursor ||
     !isObject(event) ||
     !isString(event.type) ||
     !event.type ||
@@ -300,5 +311,5 @@ export function parseSessionEvent(
     !isObject(event.data)
   )
     throw new TiDBLinkError("Session event has an invalid envelope", requestId);
-  return { ...(event as Omit<SessionEvent, "cursor">), cursor: frame.id };
+  return { ...(event as Omit<SessionEvent, "cursor">), cursor };
 }

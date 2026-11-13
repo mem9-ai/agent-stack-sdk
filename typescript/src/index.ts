@@ -16,8 +16,24 @@ export {
   StreamIdleError,
   TurnFailedError,
   TurnInterruptedError,
+  BackendConnectionClosedError,
+  BackendRequestError,
 } from "./errors.js";
 export { OrganizationClient } from "./organization.js";
+export { SessionConnection } from "./session-connection.js";
+export type {
+  ConnectOptions,
+  ClientToolHandler,
+  ClientToolHandlers,
+  ClientToolCallContext,
+  RealtimeTranscript,
+  RealtimeResponse,
+  SessionConnectionEnd,
+} from "./session-connection.js";
+export type {
+  BackendWebSocket,
+  WebSocketConstructor,
+} from "./backend-connection.js";
 export type {
   Organization,
   EndUser,

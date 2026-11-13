@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Add `session.connect(options)`, which attaches a Session to this process's
+  Backend Connection (service ADR 0109) and returns a `SessionConnection`.
+  Callbacks `onEvent`, `onTranscript`, `onResponse` and `onCursor` receive the
+  Session's events in order; `cursor` resumes after a saved event. The SDK keeps
+  one WebSocket per `maxSessions` attachments, re-attaches after a lost or
+  draining connection without gaps or repeats, and closes idle connections.
+  `observe: true` attaches for events only. `closed` resolves with why the
+  connection ended (`closed`, `superseded`, `session_deleted` or `error`);
+  `close()` releases the Session and `OrganizationClient.close()` closes every
+  connection. `OrganizationClient` accepts a `WebSocket` constructor. New
+  exports: `SessionConnection`, `ConnectOptions`, `ClientToolHandler`,
+  `ClientToolHandlers`, `ClientToolCallContext`, `RealtimeTranscript`,
+  `RealtimeResponse`, `SessionConnectionEnd`, `BackendWebSocket`,
+  `WebSocketConstructor`, `BackendConnectionClosedError` and
+  `BackendRequestError`.
 - Pin the supported contract to service
   `89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6` and OpenAPI SHA-256
   `ea42230bf77c1ba21a2490e5b8a92e0a4ea4bd6acbf284e9d27b771dd3f86756`. The

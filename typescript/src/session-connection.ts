@@ -9,6 +9,7 @@ import {
   validateClientTools,
   type ClientToolDeclaration,
 } from "./client-tools.js";
+import { ClientToolExecutor } from "./client-tool-executor.js";
 import { TiDBLinkError } from "./errors.js";
 import {
   asKnownSessionEvent,
@@ -133,6 +134,7 @@ export class SessionConnection {
   #ended: SessionConnectionEnd | undefined;
   #settle!: (end: SessionConnectionEnd) => void;
   #queue: Promise<void> = Promise.resolve();
+  readonly #executor: ClientToolExecutor | undefined;
 
   /** @internal Use `session.connect()`. */
   constructor(
@@ -151,6 +153,15 @@ export class SessionConnection {
     this.closed = new Promise((resolve) => {
       this.#settle = resolve;
     });
+    // An executing connection runs the Session's calls, declared here or not.
+    this.#executor = options.observe
+      ? undefined
+      : new ClientToolExecutor({
+          pool,
+          sessionId,
+          handlers: options.tools ?? {},
+          report: (error) => this.#report(error),
+        });
     this.#attachment = {
       sessionId,
       attachParams: () => this.#attachParams(),
@@ -173,7 +184,11 @@ export class SessionConnection {
     return this.#generation;
   }
 
-  /** Release the Session. Events stop; later calls go to no one until another connection attaches. */
+  /**
+   * Release the Session. Events stop, and calls published later go to no one
+   * until another connection attaches. Calls already running finish and
+   * their results are still submitted.
+   */
   async close(): Promise<void> {
     if (this.#ended) return;
     this.#end({ reason: "closed" });
@@ -216,9 +231,12 @@ export class SessionConnection {
     this.#cursor ??= result.cursor;
   }
 
-  #notify(method: string, params: Record<string, unknown>, _link: BackendLink): void {
+  #notify(method: string, params: Record<string, unknown>, link: BackendLink): void {
     if (this.#ended) return;
-    // Client Tool calls are not executed yet; unclaimed, they are reported as not performed.
+    if (method === "tool.call") {
+      this.#executor?.receive(params, link);
+      return;
+    }
     if (method !== "session.event") return;
     let event: SessionEvent;
     try {

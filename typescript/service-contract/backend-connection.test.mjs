@@ -100,3 +100,38 @@ test("session.event carries the subscription's envelope with its cursor", () => 
   ]);
   assert.match(definitions.SessionEvent.description, /strictly in order/);
 });
+
+test("tool.call, tool.claim and tool.result keep the shape the executor uses", () => {
+  assert.deepEqual(params("ToolCall").required, [
+    "callId",
+    "sessionId",
+    "userId",
+    "turnId",
+    "name",
+    "arguments",
+    "claimBy",
+    "deadlineAt",
+  ]);
+  assert.match(definitions.ToolCall.description, /deduplicate by callId/);
+  assert.deepEqual(params("ToolClaimRequest").required, ["callId"]);
+  assert.match(definitions.ToolClaimRequest.description, /submit an error result/);
+  const claim = definitions.ToolClaimResponse.properties.result.oneOf;
+  assert.deepEqual(claim[1].properties.reason.enum, [
+    "call_not_found",
+    "superseded",
+    "claim_window_closed",
+    "call_settled",
+  ]);
+  const [output, error] = params("ToolResultRequest").oneOf;
+  assert.deepEqual(output.required, ["callId", "output"]);
+  assert.equal(output.properties.output.maxLength, 65536);
+  assert.deepEqual(error.required, ["callId", "error"]);
+  assert.equal(error.properties.error.properties.message.maxLength, 4096);
+  assert.match(definitions.ToolResultRequest.description, /Any Backend Connection/);
+  const result = definitions.ToolResultResponse.properties.result.oneOf;
+  assert.deepEqual(result[1].properties.reason.enum, [
+    "call_not_found",
+    "not_claimed",
+    "call_settled",
+  ]);
+});

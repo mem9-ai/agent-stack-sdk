@@ -161,3 +161,43 @@ export class StreamIdleError extends ConnectionError {
     this.idleTimeoutMs = options.idleTimeoutMs;
   }
 }
+
+/**
+ * A Backend Connection closed, or could not be opened. `code` is the
+ * WebSocket close code: 4001 means the Organization API Key is missing,
+ * invalid, revoked or rotated, or its Organization is inactive, and
+ * reconnecting cannot help (`retryable` is false). Other closes, such as a
+ * drained or restarted replica, are retryable.
+ */
+export class BackendConnectionClosedError extends ConnectionError {
+  readonly code: number;
+  readonly reason: string;
+  readonly retryable: boolean;
+
+  constructor(input: { code: number; reason?: string; message?: string; cause?: unknown }) {
+    super(
+      input.message ??
+        `Backend Connection closed with code ${input.code}${input.reason ? `: ${input.reason}` : ""}`,
+      input.cause === undefined ? undefined : { cause: input.cause },
+    );
+    this.code = input.code;
+    this.reason = input.reason ?? "";
+    this.retryable = input.code !== 4001 && input.code !== 4009;
+  }
+}
+
+/**
+ * The core answered a Backend Connection request with a JSON-RPC error.
+ * `code` is the JSON-RPC error code; for -32000 (refused), `reason` names
+ * why, for example `session_not_found` or `connection_full`.
+ */
+export class BackendRequestError extends TiDBLinkError {
+  readonly code: number;
+  readonly reason: string | undefined;
+
+  constructor(input: { code: number; message: string; reason?: string }) {
+    super(input.message);
+    this.code = input.code;
+    this.reason = input.reason;
+  }
+}

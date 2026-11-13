@@ -1,0 +1,960 @@
+{
+  "revision": "89fca0b3ecd4207aa96fea64cfe9ae583b8f21d6",
+  "sourceSchemaSha256": "beaba46768424c494814cc3076928139e4f7d2216e97ac0874b1e7b89415cc3b",
+  "schema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "tidb-link.backend.v1",
+    "description": "Backend Connection messages (ADR 0109). Open a WebSocket to /api/v1/org/backend/ws with the tidb-link.backend.v1 subprotocol and an Organization API Key in the Authorization header. Each text frame carries one JSON-RPC 2.0 message; binary frames and batches are not used. The core sends hello first, and the Application Server sends nothing before it. This revision defines the messages the core serves today: session.attach, session.detach, tool.claim and tool.result (SessionAttachRequest, SessionDetachRequest, ToolClaimRequest, ToolResultRequest) and the notifications in CoreMessage, including session.event and tool.call; session.send is reserved and currently answers error -32601.",
+    "x-subprotocol": "tidb-link.backend.v1",
+    "x-path": "/api/v1/org/backend/ws",
+    "x-close-codes": {
+      "1001": "Heartbeat timeout: consecutive core pings went unanswered.",
+      "1002": "Protocol error detected by the WebSocket layer.",
+      "1007": "A text frame was not valid UTF-8.",
+      "1009": "A frame exceeded maxFrameBytes.",
+      "1011": "Internal error, or the Application Server stopped reading its frames: more than 8 MiB of frames waited for it beyond the events already on the socket. A peer that stops reading may observe 1006 instead. Reconnect and re-attach with the cursor of the last session.event processed.",
+      "1012": "Closed after connection.drain; open a new connection.",
+      "1013": "This replica lost the connection's lease or could not confirm its Organization API Key; reconnect.",
+      "4001": "The Organization API Key is missing, invalid, revoked or rotated, or its Organization is inactive.",
+      "4009": "Protocol error: a binary frame, or a frame sent before hello."
+    },
+    "x-error-codes": {
+      "-32700": "Parse error: the frame is not JSON. The response id is null.",
+      "-32600": "Invalid Request: not a single JSON-RPC 2.0 request, notification or response object, or a string id longer than 256 characters (answered with id null).",
+      "-32601": "Method not found, or not served by this core yet (session.send).",
+      "-32602": "Invalid params: the params do not match the method's definition, including unknown members and invalid Client Tool declarations.",
+      "-32603": "Internal error: the core could not complete the request, the connection is closing, or this connection has more than twice maxSessions requests unanswered; retry, on a new connection if this one closes.",
+      "-32000": "Refused: error.data.reason is connection_full (this connection already holds or is acquiring maxSessions attachments; open another connection), connection_draining (the core sent connection.drain; attach on a new connection), session_not_found (no active Session of that ordinary End User in the Key's Organization), session_read_only (the Session cannot be continued, so its tools cannot be replaced) or authentication_required (the Key or its Organization is no longer valid; the connection closes with 4001). tool.result answers it too; other tool.claim and tool.result refusals are results, not errors."
+    },
+    "definitions": {
+      "CoreMessage": {
+        "description": "A message the core sends to the Application Server.",
+        "oneOf": [
+          {
+            "$ref": "#/definitions/Hello"
+          },
+          {
+            "$ref": "#/definitions/ConnectionDrain"
+          },
+          {
+            "$ref": "#/definitions/SessionEvent"
+          },
+          {
+            "$ref": "#/definitions/ToolCall"
+          },
+          {
+            "$ref": "#/definitions/SessionDetached"
+          },
+          {
+            "$ref": "#/definitions/SessionAttachResponse"
+          },
+          {
+            "$ref": "#/definitions/SessionDetachResponse"
+          },
+          {
+            "$ref": "#/definitions/ToolClaimResponse"
+          },
+          {
+            "$ref": "#/definitions/ToolResultResponse"
+          },
+          {
+            "$ref": "#/definitions/ErrorResponse"
+          }
+        ]
+      },
+      "ApplicationServerMessage": {
+        "description": "A message the Application Server sends to the core: a request (with id), a notification (without id), or a response to a core request.",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "jsonrpc",
+              "id",
+              "method"
+            ],
+            "properties": {
+              "jsonrpc": {
+                "const": "2.0"
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ],
+                "maxLength": 256
+              },
+              "method": {
+                "type": "string"
+              },
+              "params": {
+                "type": [
+                  "object",
+                  "array"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "jsonrpc",
+              "method"
+            ],
+            "not": {
+              "required": [
+                "id"
+              ]
+            },
+            "properties": {
+              "jsonrpc": {
+                "const": "2.0"
+              },
+              "method": {
+                "type": "string"
+              },
+              "params": {
+                "type": [
+                  "object",
+                  "array"
+                ]
+              }
+            }
+          },
+          {
+            "description": "A response to a core request; the core sends none yet, so it ignores responses.",
+            "type": "object",
+            "required": [
+              "jsonrpc",
+              "id"
+            ],
+            "not": {
+              "required": [
+                "method"
+              ]
+            },
+            "properties": {
+              "jsonrpc": {
+                "const": "2.0"
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ],
+                "maxLength": 256
+              },
+              "result": {},
+              "error": {
+                "type": "object"
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "result"
+                ]
+              },
+              {
+                "required": [
+                  "error"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "SessionAttachRequest": {
+        "description": "Take or replace this connection's Session Attachment of one Session. The Session must be active, belong to the Key's Organization and be owned by the named ordinary End User; each attach is audited. An executing attachment (the default) is the Session's only one: it supersedes the executing attachment on any other connection, which receives session.detached with reason superseded, and advances the Session's generation. An observing attachment receives events only; it never supersedes, never advances generation and does not make the Session attached for Client Tool calls. A connection holds at most one attachment per Session: attaching again replaces its kind. Re-attaching executing on the connection that already holds the executing attachment keeps its generation; switching executing to observing leaves the Session without an executing attachment. Each Session this connection holds or is attaching counts toward maxSessions. The connection then receives session.event for every event of the Session after the attach's position, or after cursor when given; a re-attach of a Session this connection already holds, without cursor, instead continues the delivery it had, so events at or before the reply's cursor may still follow it. The reply precedes the events of the attachment it answers. An attachment lapses when its connection's lease ends, within 10 seconds of the core losing the connection, unless the core already ended it. Authority is checked inside the attach, before it writes; an attach can still commit just after a revocation or Organization deactivation, and it then ends with its connection within about a second.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "session.attach"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "userId",
+              "sessionId"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "userId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "The Session's ordinary End User owner."
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "executing",
+                  "observing"
+                ],
+                "default": "executing"
+              },
+              "tools": {
+                "description": "Executing attachments only: replaces the Session's whole Client Tool set, like PUT /api/v1/org/users/{userId}/sessions/{id}/tools without If-Match; the last writer wins and an identical set keeps its revision. Omit to keep the current set.",
+                "$ref": "#/definitions/ClientToolDeclarations"
+              },
+              "cursor": {
+                "description": "Resume point: the cursor of the last session.event processed for this Session. The core first replays every event after it, then continues live, with nothing missing or repeated at the handoff. Without it, delivery starts after the Session's latest event at the attach (the reply's cursor), and history is not replayed; re-attaching a Session this connection already holds, for example to replace tools, continues its delivery without gap or repeat. A cursor ahead of the Session's latest event answers -32602. Events recorded before positions existed are never replayed.",
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,14})$"
+              }
+            },
+            "if": {
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "observing"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "tools"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "SessionDetachRequest": {
+        "description": "Release this connection's attachment of the Session, if any. Answers an empty result even when the connection holds none.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "session.detach"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "sessionId"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              }
+            }
+          }
+        }
+      },
+      "ToolClaimRequest": {
+        "description": "Ask to execute one tool.call. Only the connection holding the Session's current executing attachment is granted a call, while the call awaits its outcome and its claim window is open; the claim binds the call to that attachment's generation. Repeating the claim from the same connection and generation answers claimed: true again. Execute only after claimed: true. If the answer is lost, do not execute; submit an error result instead, since the claim may have been granted.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "tool.claim"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "callId"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "callId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            }
+          }
+        }
+      },
+      "ToolResultRequest": {
+        "description": "Submit a claimed call's result: output, or error when execution failed. Any Backend Connection of the call's Organization may submit it, so a result survives a connection change. The first valid result settles the call; submitting the same result again answers accepted: true, a different one is refused. Its accepted result appears in the Session's interaction list under the input ID tool.result#<callId>, which no REST clientEventId can take or look up. A Key or Organization that is no longer valid is refused with error -32000, reason authentication_required, and the connection closes with 4001; submit the result again through a connection of a valid Key. Lengths count UTF-16 code units, as the REST client_tool_output body does; JSON Schema maxLength counts code points.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "tool.result"
+          },
+          "params": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "callId",
+                  "output"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "callId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "output": {
+                    "description": "The result text the model receives; serialize structured results yourself.",
+                    "type": "string",
+                    "maxLength": 65536
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "callId",
+                  "error"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "callId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "error": {
+                    "type": "object",
+                    "required": [
+                      "message"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ClientToolDeclarations": {
+        "type": "array",
+        "maxItems": 64,
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "function"
+              ]
+            },
+            "name": {
+              "description": "Client function name; platform tool names, the mcp_ prefix and double underscores are reserved.",
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "parameters": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "description",
+            "parameters"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "Hello": {
+        "description": "First message on every connection. Parameters may change without a new subprotocol version.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "method": {
+            "const": "hello"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "connectionId",
+              "maxSessions",
+              "claimWindowMs",
+              "heartbeatMs",
+              "maxFrameBytes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "connectionId": {
+                "description": "Identity of this Backend Connection.",
+                "type": "string",
+                "pattern": "^bconn_[a-f0-9]{32}$"
+              },
+              "maxSessions": {
+                "description": "Most Session Attachments this connection may hold.",
+                "type": "integer",
+                "minimum": 1
+              },
+              "claimWindowMs": {
+                "description": "How long a published Client Tool call waits for its claim.",
+                "type": "integer",
+                "minimum": 1
+              },
+              "heartbeatMs": {
+                "description": "Interval of the core's WebSocket pings.",
+                "type": "integer",
+                "minimum": 1
+              },
+              "maxFrameBytes": {
+                "description": "Largest frame the core accepts; a larger frame closes the connection with 1009. Frames the core sends, such as session.event, are not bounded by it.",
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "ConnectionDrain": {
+        "description": "The core will close this connection after closeAfterMs. Open a new connection, move the work there, then close this one.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "method": {
+            "const": "connection.drain"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "closeAfterMs"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "closeAfterMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "SessionDetached": {
+        "description": "The core ended this connection's attachment of the Session: superseded by an executing attach on another connection, or the Session was deleted. Attach again to resume.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "method": {
+            "const": "session.detached"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "sessionId",
+              "reason"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "superseded",
+                  "session_deleted"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "SessionEvent": {
+        "description": "One event of an attached Session, for executing and observing attachments alike. Events of one Session arrive strictly in order, without gaps or repeats; events of different Sessions are unordered. While the Application Server reads too slowly the core may drop an assistant output snapshot (agent.session.turn.output_text.snapshot) that a later snapshot of the same Turn directly follows; it drops nothing else, and closes the connection with 1011 instead. A requires_action event authorizes nothing on a Backend Connection; execute Client Tool calls only from tool.call after a granted tool.claim.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "method": {
+            "const": "session.event"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "sessionId",
+              "cursor",
+              "event"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "cursor": {
+                "description": "Opaque position of this event; pass the last one processed as session.attach cursor to resume.",
+                "type": "string"
+              },
+              "event": {
+                "description": "The envelope a data frame of the per-Session event subscription (GET /api/v1/org/users/{userId}/sessions/{id}/events?stream=true) carries: type (agent.session.turn.*, agent.session.realtime.*, agent.session.template_switch.*), sessionId, turnId, createdAt and data.",
+                "type": "object",
+                "required": [
+                  "type",
+                  "sessionId",
+                  "turnId",
+                  "createdAt",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "turnId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "data": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ToolCall": {
+        "description": "One Client Tool call published to the Session's executing attachment (ADR 0109). Execute it only after tool.claim answers claimed: true; the requires_action Session event that records the same calls authorizes nothing. The core sends a call to the attachment that was executing when the call was published, and to a later executing attachment of the Session (after a reconnect or a move to another connection) while the call is still unclaimed and its claim window open; a call whose claim window has just passed, or that an earlier attachment generation claimed, may still arrive, and its claim is refused; it sends each call at most once per attachment, so deduplicate by callId. An attachment superseded moments earlier may still receive a call; its claim is refused. Calls published while the Session had no executing attachment follow the per-Session subscription and are never sent here. If its Turn ends first, an unclaimed call is reported not performed and a claimed one without a result unknown.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method",
+          "params"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "method": {
+            "const": "tool.call"
+          },
+          "params": {
+            "type": "object",
+            "required": [
+              "callId",
+              "sessionId",
+              "userId",
+              "turnId",
+              "name",
+              "arguments",
+              "claimBy",
+              "deadlineAt"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "callId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "userId": {
+                "description": "The Session's End User owner.",
+                "type": "string"
+              },
+              "turnId": {
+                "type": "string"
+              },
+              "name": {
+                "description": "A Client Tool the Session declared.",
+                "type": "string"
+              },
+              "arguments": {
+                "description": "The model's arguments, without the reserved async choice.",
+                "type": "object"
+              },
+              "claimBy": {
+                "description": "Claim before this time (claimWindowMs after publication). Unclaimed by then, the call was not performed and the model is told so.",
+                "type": "string"
+              },
+              "deadlineAt": {
+                "description": "Submit the result before this time, 60 seconds after publication. Claimed without a result by then, the model is told its effect is unknown.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SessionAttachResponse": {
+        "description": "Result of session.attach.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "generation",
+              "cursor"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "generation": {
+                "description": "The Session's attachment generation. An executing attachment owns it; an observing attachment reports it unchanged.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "cursor": {
+                "description": "Opaque position of the Session's latest event when the attachment took effect. Resume from the cursor of the last session.event processed, not from this one, which a replay may not have reached yet.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SessionDetachResponse": {
+        "description": "Result of session.detach.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "maxProperties": 0
+          }
+        }
+      },
+      "ToolClaimResponse": {
+        "description": "Result of tool.claim.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "claimed"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "claimed": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "claimed",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "claimed": {
+                    "const": false
+                  },
+                  "reason": {
+                    "description": "call_not_found: no such call in the Key's Organization, or one published while its Session had no executing attachment. superseded: this connection does not hold the Session's current executing attachment, or another attachment generation claimed the call. claim_window_closed: claimBy passed without a claim; the call was not performed. call_settled: the core already decided the call's outcome.",
+                    "type": "string",
+                    "enum": [
+                      "call_not_found",
+                      "superseded",
+                      "claim_window_closed",
+                      "call_settled"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ToolResultResponse": {
+        "description": "Result of tool.result.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "accepted"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "accepted": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "accepted",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "accepted": {
+                    "const": false
+                  },
+                  "reason": {
+                    "description": "call_not_found: no such call in the Key's Organization or visible to the Key, or one published while its Session had no executing attachment (answer those through the per-Session subscription's REST input). not_claimed: no attachment claimed the call. call_settled: the call already has an outcome, from an earlier different result, its deadline or the end of its Turn.",
+                    "type": "string",
+                    "enum": [
+                      "call_not_found",
+                      "not_claimed",
+                      "call_settled"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "description": "The core's answer to a request it cannot serve.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "error"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "integer",
+                "enum": [
+                  -32700,
+                  -32600,
+                  -32601,
+                  -32602,
+                  -32603,
+                  -32000
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "data": {
+                "description": "Present with code -32000.",
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "connection_full",
+                      "connection_draining",
+                      "session_not_found",
+                      "session_read_only",
+                      "authentication_required"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

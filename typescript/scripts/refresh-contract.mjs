@@ -5,7 +5,7 @@
 //   AGENT_SERVICE_ROOT=/path/to/agent-stack node scripts/refresh-contract.mjs
 //
 // The checkout must be clean and at the revision to pin. The script writes
-// each selected OpenAPI subset, `metadata.json`, and the baseline in
+// each selected OpenAPI subset, the Backend Connection protocol schema, `metadata.json`, and the baseline in
 // `package.json`, `src/index.ts` and the README links. Review the diff and the contract tests
 // before committing.
 import { execFileSync } from "node:child_process";
@@ -18,8 +18,16 @@ const root = process.env.AGENT_SERVICE_ROOT;
 if (!root) throw new Error("Set AGENT_SERVICE_ROOT to a service checkout");
 const git = (...args) =>
   execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
-if (git("status", "--porcelain", "--", "docs/openapi.yaml"))
-  throw new Error("docs/openapi.yaml has local changes");
+if (
+  git(
+    "status",
+    "--porcelain",
+    "--",
+    "docs/openapi.yaml",
+    "docs/backend-connection-v1.schema.json",
+  )
+)
+  throw new Error("The selected service contracts have local changes");
 const revision = git("rev-parse", "HEAD");
 
 const { parse } = createRequire(join(root, "package.json"))("yaml");
@@ -125,6 +133,18 @@ for (const [name, selection] of Object.entries(snapshots)) {
   await write(name, snapshot);
 }
 
+// The Backend Connection protocol is published beside the OpenAPI as JSON Schema.
+const backendSchema = JSON.parse(
+  await readFile(join(root, "docs/backend-connection-v1.schema.json"), "utf8"),
+);
+await write("backend-connection.json", {
+  revision,
+  sourceSchemaSha256: sha256(
+    await readFile(join(root, "docs/backend-connection-v1.schema.json")),
+  ),
+  schema: backendSchema,
+});
+
 const metadataPath = new URL("../service-contract/metadata.json", import.meta.url);
 const metadata = {
   tidbLinkRevision: revision,
@@ -132,7 +152,7 @@ const metadata = {
   sourceOpenApiSha256: sourceSha256,
   snapshots: {},
 };
-for (const name of Object.keys(snapshots))
+for (const name of [...Object.keys(snapshots), "backend-connection.json"])
   metadata.snapshots[name] = sha256(
     await readFile(new URL(`../service-contract/${name}`, import.meta.url)),
   );

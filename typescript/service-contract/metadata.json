@@ -7,6 +7,7 @@
     "files.json": "1bcde5b59a81aa67f1b6dcbb0c01a166c2a8fa9b7937cd28b1b41fa8f6c32a49",
     "management.json": "c50c54d72da49756bb66ab581f29619e54a681b04f793fade5401a49def46bdf",
     "connectors.json": "c8356901c9dda18a01c9414bc54265886948c5cabf363dab5385e982aa1c11d0",
-    "audio.json": "73a8abf610af9024dd3e9d36ea0d122271342d57c294a8a144dd2515babc7c4e"
+    "audio.json": "73a8abf610af9024dd3e9d36ea0d122271342d57c294a8a144dd2515babc7c4e",
+    "backend-connection.json": "c033d9b11444c5e8260c6c2f4c63ff0696b743decf0d2c77b031e0cca571b05e"
   }
 }

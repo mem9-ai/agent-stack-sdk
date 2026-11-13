@@ -31,6 +31,7 @@ export type {
   RealtimeResponse,
   SessionConnectionEnd,
 } from "./session-connection.js";
+export type { SendOptions } from "./session-send.js";
 export type {
   BackendWebSocket,
   WebSocketConstructor,

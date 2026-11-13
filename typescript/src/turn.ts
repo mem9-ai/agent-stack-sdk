@@ -90,26 +90,11 @@ export const validClarification = (value: unknown): value is ClarificationItem =
   );
 };
 
-export const submitMessage = async (
-  http: HttpClient,
-  sessionId: string,
-  input: CreateTurnInput,
-): Promise<SessionInteraction> => {
-  requireKnownKeys(
-    input,
-    [
-      "clientEventId",
-      "text",
-      "userFileIds",
-      "clarificationSourceTurnId",
-      "billingTag",
-      "requestId",
-      "signal",
-    ],
-    "Message input",
-  );
-  requireCreationKey(input.clientEventId);
-  const { clientEventId, requestId, signal, ...data } = input;
+/** The message command's data the REST route and `session.send` share. */
+export type MessageData = Omit<CreateTurnInput, "clientEventId" | "requestId" | "signal">;
+
+/** Check message data before dispatch. */
+export function validateMessageData(data: MessageData): void {
   const texts = typeof data.text === "string" ? [data.text] : data.text;
   if (
     !Array.isArray(texts) ||
@@ -136,6 +121,29 @@ export const submitMessage = async (
     throw new TypeError(
       "clarificationSourceTurnId must contain 1-64 characters",
     );
+}
+
+export const submitMessage = async (
+  http: HttpClient,
+  sessionId: string,
+  input: CreateTurnInput,
+): Promise<SessionInteraction> => {
+  requireKnownKeys(
+    input,
+    [
+      "clientEventId",
+      "text",
+      "userFileIds",
+      "clarificationSourceTurnId",
+      "billingTag",
+      "requestId",
+      "signal",
+    ],
+    "Message input",
+  );
+  requireCreationKey(input.clientEventId);
+  const { clientEventId, requestId, signal, ...data } = input;
+  validateMessageData(data);
   signal?.throwIfAborted();
   try {
     const result = await http.postResponse<{ interaction?: unknown }>(

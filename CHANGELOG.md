@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add `conn.send(text, options)` to Session connections: it sends a user
+  message over the Backend Connection (`session.send`) and resolves with the
+  `TurnResult` of the Turn it starts or steers. `onProgress` receives the
+  complete draft from pushed events; the settled result is read once over
+  REST. A message whose answer a reconnect lost is sent again with the same
+  `clientEventId`. Refusals raise `BackendRequestError`, now with `details`.
+- Add `conn.realtimeGrant({ audio?, metadata? })`, which returns the WebSocket
+  URL and connect token a device uses to join the Session's Realtime
+  connection, issuing a new token when one is already live. New export:
+  `SendOptions`.
 - Pin the supported contract to service
   `cadb1144fe2d450d45baf9a09f826a64258b8ada` and OpenAPI SHA-256
   `901c38fb353ada4bdaf9b27507f54e8455abf3ba3abd950c87c82cfea5c8744e`. The

@@ -423,7 +423,7 @@ export class Session {
    * the Session over and this one ends with `superseded`.
    */
   connect(options?: ConnectOptions): Promise<SessionConnection> {
-    return connectSession(this.#http.backend, this.#http.userId, this.id, options);
+    return connectSession(this.#http, this.#http.backend, this.#http.userId, this.id, options);
   }
 
   subscribe(options?: SubscribeOptions): AsyncGenerator<SubscriptionItem> {

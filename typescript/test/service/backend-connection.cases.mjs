@@ -141,3 +141,48 @@ test("attaching another End User's Session is refused", async () => {
     await org.close();
   }
 });
+
+test("send() starts a Turn over the connection and returns its answer; the tool runs in between", async () => {
+  const org = client();
+  try {
+    const session = await freshSession(org);
+    const runs = [];
+    const conn = await org
+      .user(process.env.SDK_USER_ID)
+      .session(session.id)
+      .connect({ tools: lookupOrder(runs, "SDK_SEND_ORDER_SHIPPED") });
+    const clientEventId = randomUUID();
+    const reply = await conn.send("SDK_FIXTURE_CLIENT_TOOL", { clientEventId, timeoutMs: 20000 });
+    assert.equal(reply.type, "answer");
+    assert(reply.text.includes("SDK_SEND_ORDER_SHIPPED"), reply.text);
+    assert.equal(reply.inputId, clientEventId);
+    assert.equal(runs.length, 1);
+    assert.equal(runs[0].context.turnId, reply.turnId);
+    // The same clientEventId is the REST command identity.
+    assert.equal((await session.getInteraction(clientEventId)).turnId, reply.turnId);
+    const again = await conn.send("SDK_FIXTURE_CLIENT_TOOL", { clientEventId, timeoutMs: 20000 });
+    assert.equal(again.turnId, reply.turnId);
+    assert.equal(runs.length, 1);
+    await conn.close();
+  } finally {
+    await org.close();
+  }
+});
+
+test("realtimeGrant() prepares the Session's Realtime connection, then reissues a token for it", async () => {
+  const org = client();
+  try {
+    const session = await freshSession(org);
+    const conn = await org.user(process.env.SDK_USER_ID).session(session.id).connect({ observe: true });
+    const first = await conn.realtimeGrant({ metadata: { device: "sdk-lamp" } });
+    assert.match(first.connectToken, /^rct_/u);
+    assert.match(first.websocketUrl, /\/realtime\/ws$/u);
+    const second = await conn.realtimeGrant();
+    assert.match(second.connectToken, /^rct_/u);
+    assert.notEqual(second.connectToken, first.connectToken);
+    await session.endRealtimeConnection();
+    await conn.close();
+  } finally {
+    await org.close();
+  }
+});

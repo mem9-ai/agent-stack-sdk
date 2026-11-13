@@ -10,7 +10,7 @@ import {
   type ClientToolDeclaration,
 } from "./client-tools.js";
 import { ClientToolExecutor } from "./client-tool-executor.js";
-import { TiDBLinkError } from "./errors.js";
+import { TiDBLinkApiError, TiDBLinkError } from "./errors.js";
 import {
   asKnownSessionEvent,
   sessionEventFrom,
@@ -18,7 +18,19 @@ import {
   type RealtimeTranscriptEvent,
   type SessionEvent,
 } from "./events.js";
-import { requireKnownKeys } from "./http.js";
+import { HttpClient, requestOptions, requireKnownKeys } from "./http.js";
+import {
+  requireOpenRealtimeConnectionReceipt,
+  requireRealtimeConnectGrantReceipt,
+  type OpenRealtimeConnectionInput,
+  type RealtimeConnectGrant,
+} from "./realtime.js";
+import {
+  sendOverConnection,
+  type EventWatch,
+  type SendOptions,
+} from "./session-send.js";
+import type { TurnResult } from "./turn.js";
 
 /** What a Client Tool handler learns about the call it runs. */
 export interface ClientToolCallContext {
@@ -125,6 +137,7 @@ export class SessionConnection {
   readonly closed: Promise<SessionConnectionEnd>;
 
   readonly #pool: BackendConnectionPool;
+  readonly #http: HttpClient;
   readonly #options: ConnectOptions;
   readonly #declarations: ClientToolDeclaration[] | undefined;
   readonly #attachment: PoolAttachment;
@@ -135,16 +148,22 @@ export class SessionConnection {
   #settle!: (end: SessionConnectionEnd) => void;
   #queue: Promise<void> = Promise.resolve();
   readonly #executor: ClientToolExecutor | undefined;
+  /** Waiting for the next attach, or for the end. */
+  #linkWaiters: { resolve: () => void }[] = [];
+  /** Event buffers of `send()` calls in flight. */
+  readonly #watchers = new Set<{ events: SessionEvent[]; wake: () => void }>();
 
   /** @internal Use `session.connect()`. */
   constructor(
     pool: BackendConnectionPool,
+    http: HttpClient,
     userId: string,
     sessionId: string,
     options: ConnectOptions,
     declarations: ClientToolDeclaration[] | undefined,
   ) {
     this.#pool = pool;
+    this.#http = http;
     this.userId = userId;
     this.sessionId = sessionId;
     this.#options = options;
@@ -195,6 +214,67 @@ export class SessionConnection {
     await this.#pool.detach(this.#attachment);
   }
 
+  /**
+   * Send a user message over the connection and wait for the Turn it starts,
+   * or the active Turn it steers. `onProgress` receives the assistant's draft
+   * from the pushed events; the result is read once the Turn finished, with
+   * the same shape and errors as `session.turn()`. A message whose answer was
+   * lost to a reconnect is sent again with the same `clientEventId`, which
+   * the core deduplicates.
+   */
+  send(
+    text: string | [string, ...string[]],
+    options?: SendOptions,
+  ): Promise<TurnResult> {
+    return sendOverConnection(
+      {
+        sessionId: this.sessionId,
+        http: this.#http,
+        closed: this.closed,
+        link: (signal, after) => this.#nextLink(signal, after),
+        report: (error) => this.#report(error),
+        watch: () => this.#watch(),
+      },
+      text,
+      options,
+    );
+  }
+
+  /**
+   * Prepare the Session's Realtime connection and return what a device needs
+   * to join it directly: the WebSocket URL and a short-lived connect token.
+   * When a Realtime connection is already live, a new token for it is
+   * returned instead and `audio` is not applied.
+   */
+  async realtimeGrant(
+    input: OpenRealtimeConnectionInput = {},
+    options?: { signal?: AbortSignal },
+  ): Promise<RealtimeConnectGrant> {
+    requireKnownKeys(input, ["audio", "metadata"], "Realtime grant input");
+    const request = requestOptions(options);
+    const path = `/sessions/${encodeURIComponent(this.sessionId)}/realtime`;
+    try {
+      const result = await this.#http.postResponse<unknown>(path, input, {
+        ...request,
+        outcomeUnknown: true,
+      });
+      const opened = requireOpenRealtimeConnectionReceipt(result.data, result.requestId);
+      return {
+        websocketUrl: opened.websocketUrl,
+        connectToken: opened.connectToken,
+        connectTokenExpiresAt: opened.connectTokenExpiresAt,
+      };
+    } catch (error) {
+      if (!(error instanceof TiDBLinkApiError) || error.code !== "realtime_connection_live")
+        throw error;
+    }
+    const result = await this.#http.postResponse<unknown>(`${path}/connect-tokens`, undefined, {
+      ...request,
+      outcomeUnknown: true,
+    });
+    return requireRealtimeConnectGrantReceipt(result.data, result.requestId);
+  }
+
   /** @internal */
   async attach(): Promise<void> {
     await this.#pool.attach(this.#attachment);
@@ -229,6 +309,65 @@ export class SessionConnection {
     this.#generation = result.generation;
     // Without a resume point, delivery starts after the attach position.
     this.#cursor ??= result.cursor;
+    this.#wakeLinkWaiters();
+  }
+
+  #wakeLinkWaiters(): void {
+    const waiters = this.#linkWaiters;
+    this.#linkWaiters = [];
+    for (const waiter of waiters) waiter.resolve();
+  }
+
+  /** The open link holding the attachment, other than `after`; waits for a re-attach. */
+  async #nextLink(signal: AbortSignal, after?: BackendLink): Promise<BackendLink> {
+    for (;;) {
+      signal.throwIfAborted();
+      if (this.#ended)
+        throw new TiDBLinkError(
+          `The Session connection ended (${this.#ended.reason}); connect again to send`,
+        );
+      const link = this.#link;
+      if (link && link.open && link !== after) return link;
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => reject(signal.reason);
+        signal.addEventListener("abort", onAbort, { once: true });
+        this.#linkWaiters.push({
+          resolve: () => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+          },
+        });
+        // A link that closed without a re-attach yet: look again shortly.
+        if (link && !link.open) setTimeout(() => this.#wakeLinkWaiters(), 100);
+      });
+    }
+  }
+
+  #watch(): EventWatch {
+    const watcher = { events: [] as SessionEvent[], wake: () => undefined as void };
+    this.#watchers.add(watcher);
+    return {
+      next: async (signal) => {
+        for (;;) {
+          const event = watcher.events.shift();
+          if (event) return event;
+          if (this.#ended) return undefined;
+          signal.throwIfAborted();
+          await new Promise<void>((resolve, reject) => {
+            const onAbort = () => reject(signal.reason);
+            signal.addEventListener("abort", onAbort, { once: true });
+            watcher.wake = () => {
+              signal.removeEventListener("abort", onAbort);
+              watcher.wake = () => undefined;
+              resolve();
+            };
+          });
+        }
+      },
+      stop: () => {
+        this.#watchers.delete(watcher);
+      },
+    };
   }
 
   #notify(method: string, params: Record<string, unknown>, link: BackendLink): void {
@@ -262,6 +401,10 @@ export class SessionConnection {
     if (known?.type === "agent.session.realtime.response.completed")
       await this.#run(() => options.onResponse?.(known.data));
     this.#cursor = event.cursor;
+    for (const watcher of this.#watchers) {
+      watcher.events.push(event);
+      watcher.wake();
+    }
     await this.#run(() => options.onCursor?.(event.cursor));
   }
 
@@ -278,6 +421,8 @@ export class SessionConnection {
     this.#ended = end;
     this.#link = undefined;
     this.#settle(end);
+    this.#wakeLinkWaiters();
+    for (const watcher of this.#watchers) watcher.wake();
   }
 }
 
@@ -326,6 +471,7 @@ export function connectDeclarations(
 
 /** Open a Session connection; resolves once the first attach took effect. */
 export async function connectSession(
+  http: HttpClient,
   pool: BackendConnectionPool | undefined,
   userId: string | undefined,
   sessionId: string,
@@ -336,7 +482,7 @@ export async function connectSession(
       "connect() needs a Session selected through OrganizationClient.user(userId)",
     );
   const declarations = connectDeclarations(options);
-  const connection = new SessionConnection(pool, userId, sessionId, options, declarations);
+  const connection = new SessionConnection(pool, http, userId, sessionId, options, declarations);
   await connection.attach();
   return connection;
 }

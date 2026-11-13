@@ -189,15 +189,25 @@ export class BackendConnectionClosedError extends ConnectionError {
 /**
  * The core answered a Backend Connection request with a JSON-RPC error.
  * `code` is the JSON-RPC error code; for -32000 (refused), `reason` names
- * why, for example `session_not_found` or `connection_full`.
+ * why, for example `session_not_found` or `connection_full`. A refused
+ * `session.send` carries the REST message command's error code as `reason`,
+ * such as `session_read_only` or `turn_admission_closed`.
  */
 export class BackendRequestError extends TiDBLinkError {
   readonly code: number;
   readonly reason: string | undefined;
+  /** For a refused `session.send`, the REST error's `details`. */
+  readonly details: unknown;
 
-  constructor(input: { code: number; message: string; reason?: string }) {
+  constructor(input: {
+    code: number;
+    message: string;
+    reason?: string;
+    details?: unknown;
+  }) {
     super(input.message);
     this.code = input.code;
     this.reason = input.reason;
+    this.details = input.details;
   }
 }

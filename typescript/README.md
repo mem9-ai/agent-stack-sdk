@@ -705,6 +705,43 @@ Calls of a Session with an executing connection are answered only there: they
 carry `claimBy` in `requires_action` events, and REST `submitClientToolOutput()`
 cannot answer them.
 
+### Messages and voice on a connection
+
+`conn.send(text, options)` sends a user message over the connection and resolves
+with the same result as `session.turn()`, once the Turn finishes:
+
+```ts
+const reply = await conn.send(text, {
+  clientEventId: savedMessageId,              // optional; persist it to recover after a crash
+  onProgress: (draft) => app.show(deviceId, draft),
+});
+return reply.text;
+```
+
+- The message starts a Turn on an idle Session or steers the active one; the
+  call waits for that Turn either way. Rejections, failures, interruptions and
+  local timeouts raise the same errors as `session.turn()`: `InputNotAppliedError`,
+  `TurnFailedError`, `TurnInterruptedError` and `TurnWaitTimeoutError` (default
+  `timeoutMs` 60 seconds, which never cancels the Turn).
+- Progress comes from the pushed events, without polling. `onProgress` receives
+  the complete draft each time it grows (today every 1,024 characters): replace
+  what you showed, do not append. When the Turn finishes, the SDK reads the
+  settled result once over REST.
+- `clientEventId` shares the Session's command namespace with REST. Without
+  one the SDK generates a UUID. If a reconnect loses the core's answer, the SDK
+  sends the message again with the same `clientEventId`, which the core
+  deduplicates; if it cannot, the call raises `OutcomeUnknownError` with
+  `inputId`, and `session.waitForResult(inputId)` recovers the result.
+- A refusal of the message command, such as `session_read_only` or
+  `turn_admission_closed`, raises `BackendRequestError` with that code as
+  `reason` and the REST `details`.
+
+`conn.realtimeGrant({ audio?, metadata? })` prepares the Session's Realtime
+connection and returns `{ websocketUrl, connectToken, connectTokenExpiresAt }`
+for a device to join it directly. When a Realtime connection is already live it
+returns a new token for that one, and `audio` is not applied. The token is short
+lived; ask for a new grant each time the device wants to talk.
+
 The connection uses the global `WebSocket` of Node.js 22, which sends the
 Organization API Key in the upgrade's `Authorization` header and never in the
 URL. Pass `WebSocket` to `OrganizationClient` to use another implementation; it

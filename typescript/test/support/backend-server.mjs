@@ -23,10 +23,13 @@ export const hello = (overrides = {}) => ({
  * Start a server. `onConnection(peer)` runs for each upgraded socket; by
  * default the server sends `hello` first, unless `sendHello` is false.
  */
-export async function backendServer({ onConnection, sendHello = true, helloParams, reject } = {}) {
+export async function backendServer({ onConnection, sendHello = true, helloParams, reject, http } = {}) {
   const peers = [];
   const waiting = [];
-  const server = createServer((_, res) => res.writeHead(404).end());
+  // REST routes of the same core, for calls that go over HTTP.
+  const server = createServer((req, res) =>
+    http ? http(req, res) : res.writeHead(404).end(),
+  );
   server.on("upgrade", (request, socket) => {
     const status = reject?.(request);
     if (status) {

@@ -337,6 +337,7 @@ export class BackendTransport {
           code: typeof code === "number" ? code : -32603,
           message: typeof text === "string" && text ? text : "Backend Connection request failed",
           ...(reason === undefined ? {} : { reason }),
+          ...(isObject(data) && "details" in data ? { details: data.details } : {}),
         }),
       );
     } else pending.resolve(message.result);

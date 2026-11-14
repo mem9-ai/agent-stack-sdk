@@ -493,3 +493,9 @@ test("the core Agent is gone from the selected contract", () => {
     assert(read.parameters.some((p) => p.name === "agentTemplateId"));
   }
 });
+
+test("the Session event stream documents agent.session.idle as the release before the next Turn", () => {
+  const text = JSON.stringify(document.paths[`${sessionPath}/events`].get).replace(/\\n|\s+/g, " ");
+  assert.match(text, /agent\.session\.idle/);
+  assert.match(text, /Wait for it before submitting the next message, audio Turn or Template switch/);
+});

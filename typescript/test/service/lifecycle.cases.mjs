@@ -33,6 +33,17 @@ const refusal = (status, code) => (error) =>
   error.code === code &&
   !!error.requestId;
 
+/** The Session released its last Turn (agent.session.idle): the next Turn or switch may start. */
+const untilIdle = async (session) => {
+  const end = Date.now() + 15000;
+  for (;;) {
+    await session.refresh();
+    if (session.data.activeTurnId === null) return;
+    if (Date.now() > end) throw new Error("The Session did not release its Turn");
+    await delay(25);
+  }
+};
+
 test("the installed SDK selects Templates and creates Sessions with Session options", async () => {
   const templates = [];
   let cursor;
@@ -283,6 +294,8 @@ test("the installed SDK switches an idle Session's Template, through a Handoff T
     { clientEventId: randomUUID(), text: "SDK_FIXTURE_PAUSE before the switch" },
     { timeoutMs: 15000, pollIntervalMs: 25 },
   );
+  // The Turn's result is visible before the Session releases it.
+  await untilIdle(session);
   const back = { templateId, idempotencyKey: randomUUID(), ...ack };
   const pending = await session.switchTemplate(back);
   assert.equal(pending.status, "pending");
@@ -306,7 +319,7 @@ test("the installed SDK switches an idle Session's Template, through a Handoff T
   }
   assert.equal(handoff.kind, "template_handoff");
   assert.equal(handoff.agentTemplateId, templateId);
-  assert.equal(handoff.status, "succeeded");
+  assert.equal(handoff.status, "succeeded", JSON.stringify(handoff));
   await session.refresh();
   assert.equal(session.data.switching, false);
   assert.equal(session.data.template.templateId, templateId);

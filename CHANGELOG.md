@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Pin the supported contract to service
+  `4305ef67daebf23c416badf806217a7c11dcef37` and OpenAPI SHA-256
+  `6f5ff6f025eef80fbd9d5b80fb798e5db159aaa006e7d34866e9c3b6843dfe58`. The
+  Backend Connection now answers the SDK's `ping` liveness probe with
+  `{ time }`, and the Session event stream carries `agent.session.idle` once a
+  Session releases its Turn. Type it as `SessionIdleEvent`;
+  `asKnownSessionEvent()` narrows it. `conn.send()` now resolves only after
+  that release, so a follow-up message, audio Turn or Template switch is not
+  refused as busy. A Turn's result is visible before the release: callers of
+  `session.turn()` or `session.audio()` that start the next Turn or switch the
+  Template right away should wait for the event, or for
+  `session.data.activeTurnId` to become `null`.
 - Add `conn.send(text, options)` to Session connections: it sends a user
   message over the Backend Connection (`session.send`) and resolves with the
   `TurnResult` of the Turn it starts or steers. `onProgress` receives the

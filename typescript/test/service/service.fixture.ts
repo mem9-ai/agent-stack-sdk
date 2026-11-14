@@ -152,9 +152,12 @@ beforeAll(async () => {
       content: [
         {
           type: "text",
-          text: prompt.includes("SDK_FIXTURE")
-            ? "SDK final answer."
-            : "Trip planning",
+          // A Template switch's Handoff Turn must answer with the summary header.
+          text: prompt.includes("Write a handoff summary for the next stage")
+            ? "handoff: summary\nSDK handoff summary."
+            : prompt.includes("SDK_FIXTURE")
+              ? "SDK final answer."
+              : "Trip planning",
         },
       ],
       stopReason: fail ? "error" : "stop",

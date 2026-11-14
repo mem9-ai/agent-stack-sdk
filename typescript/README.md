@@ -13,7 +13,7 @@ text submission, steering, cancellation, checkpoint retry, original-result waiti
 continuous progress, Client Tools, Session connections over Backend Connections,
 conversation history, file attachments,
 Realtime Model/Connection preparation, prerecorded audio and User usage reads for [service revision
-cadb1144](https://github.com/mem9-ai/agent-stack/commit/cadb1144fe2d450d45baf9a09f826a64258b8ada).
+4305ef67](https://github.com/mem9-ai/agent-stack/commit/4305ef67daebf23c416badf806217a7c11dcef37).
 
 Text commands return durable receipts independently of execution. Waiting reads the
 original command's outcome. The service has no Agent: a Session is created
@@ -398,7 +398,7 @@ The Handoff Turn summarizes the Session so far for the target Template. History
 reads return it as a Turn with `kind: "template_handoff"`, no `userMessage` and
 an empty `userMessages`; when it succeeds, its assistant Message is the summary.
 The service's
-[ADR 0107](https://github.com/mem9-ai/agent-stack/blob/cadb1144fe2d450d45baf9a09f826a64258b8ada/docs/adr/0107-switch-session-template-baselines-through-configuration-epochs.md)
+[ADR 0107](https://github.com/mem9-ai/agent-stack/blob/4305ef67daebf23c416badf806217a7c11dcef37/docs/adr/0107-switch-session-template-baselines-through-configuration-epochs.md)
 describes what the Session keeps across a switch (models, Billing Tag, Client
 Tools and creation options) and that cancelling the Handoff Turn fails the
 switch.
@@ -723,6 +723,11 @@ return reply.text;
   local timeouts raise the same errors as `session.turn()`: `InputNotAppliedError`,
   `TurnFailedError`, `TurnInterruptedError` and `TurnWaitTimeoutError` (default
   `timeoutMs` 60 seconds, which never cancels the Turn).
+- The call resolves once the Session has also released the Turn
+  (`agent.session.idle`), so the next `send()`, audio Turn or Template switch
+  starts at once instead of steering a finished Turn or being refused as busy.
+  The release normally follows the result at once; after 5 seconds without it
+  the result is returned anyway.
 - Progress comes from the pushed events, without polling. `onProgress` receives
   the complete draft each time it grows (today every 1,024 characters): replace
   what you showed, do not append. When the Turn finishes, the SDK reads the
@@ -1185,7 +1190,7 @@ packed artifact in a clean ESM TypeScript consumer. To verify the packed SDK and
 its examples against the real service, use the service's Node.js 26 runtime, install its
 pinned dependencies, generate Prisma, build its Hardware contract and prepare its
 current schema in a **dedicated test database**. See the selected service's
-[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/cadb1144fe2d450d45baf9a09f826a64258b8ada/docs/prisma-first-tidb-validation-and-rollout.md).
+[current-schema setup](https://github.com/mem9-ai/agent-stack/blob/4305ef67daebf23c416badf806217a7c11dcef37/docs/prisma-first-tidb-validation-and-rollout.md).
 
 ```sh
 AGENT_SERVICE_ROOT=/path/to/agent-stack \
@@ -1246,7 +1251,7 @@ They cover recorded input, malformed/unsupported recordings, supplier refusals,
 model failure, active-response interruption and the installed audio example.
 The public Session projection exposes the frozen Template digest but hides the
 stored creation options. Those snapshots and active-Turn model freezing also rely
-on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/cadb1144fe2d450d45baf9a09f826a64258b8ada/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
+on the selected service's [existing persistence evidence](https://github.com/mem9-ai/agent-stack/blob/4305ef67daebf23c416badf806217a7c11dcef37/test/product/sessions/sessions-withorgstore.tidb.spec.ts); SDK reads alone do not
 prove those hidden values.
 Usage cases seed controlled facts and verify both public projections, exact filters,
 paging and authority without executing messages to manufacture billing data.

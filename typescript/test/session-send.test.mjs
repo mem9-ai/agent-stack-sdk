@@ -119,6 +119,21 @@ const draft = (cursor, text, turnId) =>
   turnEvent(cursor, "agent.session.turn.output_text.snapshot", "assistant_draft", { text }, turnId);
 const finished = (cursor, turnId) =>
   turnEvent(cursor, "agent.session.turn.completed", "turn_finished", { status: "succeeded" }, turnId);
+const idle = (cursor, turnId = "turn_1") => ({
+  jsonrpc: "2.0",
+  method: "session.event",
+  params: {
+    sessionId: "sess_1",
+    cursor,
+    event: {
+      type: "agent.session.idle",
+      sessionId: "sess_1",
+      turnId,
+      createdAt: done,
+      data: { id: `idle_${cursor}`, turnId, createdAt: done },
+    },
+  },
+});
 const methodOf = (peer, method) => peer.log.filter((m) => m.method === method);
 
 test("send() submits over the connection, streams drafts and returns the settled answer", async () => {
@@ -134,6 +149,7 @@ test("send() submits over the connection, streams drafts and returns the settled
         peer.send(draft("13", "other turn", "turn_9"));
         peer.send(draft("14", "Dimmed to 40%."));
         peer.send(finished("15"));
+        peer.send(idle("16"));
       }, 20);
       return { result: { interaction: receipt(), replayed: false } };
     },
@@ -171,7 +187,10 @@ test("a send whose answer was lost goes out again with the same clientEventId on
         peer.destroy();
         return "silent";
       }
-      setTimeout(() => peer.send(finished("20")), 10);
+      setTimeout(() => {
+        peer.send(finished("20"));
+        peer.send(idle("21"));
+      }, 10);
       return { result: { interaction: receipt(), replayed: true } };
     },
   });
@@ -208,7 +227,11 @@ test("refusals, rejected messages, failed Turns and timeouts surface like turn()
             replayed: false,
           },
         };
-      if (mode === "failed") setTimeout(() => peer.send(finished("30")), 10);
+      if (mode === "failed")
+        setTimeout(() => {
+          peer.send(finished("30"));
+          peer.send(idle("31"));
+        }, 10);
       return { result: { interaction: receipt(), replayed: false } };
     },
   });
@@ -309,4 +332,29 @@ test("realtimeGrant() opens the Realtime connection, or issues a token for a liv
     ["POST", "/api/v1/org/users/user_1/sessions/sess_1/realtime/connect-tokens", ""],
   ]);
   await assert.rejects(conn.realtimeGrant({ voice: "x" }), TypeError);
+});
+
+test("send() resolves only once the Session released the Turn, or with the result if the release is late", async () => {
+  const calls = [];
+  let release = true;
+  const server = await start({
+    http: rest(calls),
+    respond: (message, peer) => {
+      if (message.method !== "session.send") return undefined;
+      const base = release ? 40 : 50;
+      setTimeout(() => {
+        peer.send(finished(String(base)));
+        if (release) setTimeout(() => peer.send(idle(String(base + 1))), 80);
+      }, 10);
+      return { result: { interaction: receipt(), replayed: false } };
+    },
+  });
+  const conn = await sessionOf(server).connect();
+  const started = Date.now();
+  await conn.send("Too bright", { clientEventId: "msg_1" });
+  assert(Date.now() - started >= 80, "waited for agent.session.idle");
+  assert.equal(calls.length, 2, "the result is read after the release");
+  release = false;
+  const reply = await conn.send("Too bright", { clientEventId: "msg_1", timeoutMs: 300 });
+  assert.equal(reply.text, "Dimmed to 40%.");
 });

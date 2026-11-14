@@ -1,14 +1,14 @@
 {
-  "revision": "cadb1144fe2d450d45baf9a09f826a64258b8ada",
-  "sourceSchemaSha256": "ac7fdbedd25d19ff4b3d2d38ed760c53b70963a5566c7b321e12476f276082cc",
+  "revision": "4305ef67daebf23c416badf806217a7c11dcef37",
+  "sourceSchemaSha256": "8a24f59d26c23ee945a37eded23361e7a714f551bc44eb647a22765ac5023ac5",
   "schema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "tidb-link.backend.v1",
-    "description": "Backend Connection messages (ADR 0109). Open a WebSocket to /api/v1/org/backend/ws with the tidb-link.backend.v1 subprotocol and an Organization API Key in the Authorization header. Each text frame carries one JSON-RPC 2.0 message; binary frames and batches are not used. The core sends hello first, and the Application Server sends nothing before it. The Application Server sends the requests session.attach, session.detach, session.send, tool.claim and tool.result (SessionAttachRequest, SessionDetachRequest, SessionSendRequest, ToolClaimRequest, ToolResultRequest); the core sends the notifications and responses in CoreMessage, including session.event and tool.call.",
+    "description": "Backend Connection messages (ADR 0109). Open a WebSocket to /api/v1/org/backend/ws with the tidb-link.backend.v1 subprotocol and an Organization API Key in the Authorization header. Each text frame carries one JSON-RPC 2.0 message; binary frames and batches are not used. The core sends hello first, and the Application Server sends nothing before it. The Application Server sends the requests session.attach, session.detach, session.send, tool.claim, tool.result and ping (SessionAttachRequest, SessionDetachRequest, SessionSendRequest, ToolClaimRequest, ToolResultRequest, PingRequest); the core sends the notifications and responses in CoreMessage, including session.event and tool.call.",
     "x-subprotocol": "tidb-link.backend.v1",
     "x-path": "/api/v1/org/backend/ws",
     "x-close-codes": {
-      "1001": "Heartbeat timeout: consecutive core pings went unanswered.",
+      "1001": "Heartbeat timeout: consecutive core WebSocket pings went unanswered.",
       "1002": "Protocol error detected by the WebSocket layer.",
       "1007": "A text frame was not valid UTF-8.",
       "1009": "A frame exceeded maxFrameBytes.",
@@ -59,6 +59,9 @@
           },
           {
             "$ref": "#/definitions/SessionSendResponse"
+          },
+          {
+            "$ref": "#/definitions/PingResponse"
           },
           {
             "$ref": "#/definitions/ErrorResponse"
@@ -413,7 +416,7 @@
         }
       },
       "SessionSendRequest": {
-        "description": "Submit a user message to a Session this connection holds an attachment of, of either kind. It is the REST message command POST /api/v1/org/users/{userId}/sessions/{sessionId}/events with type agent.session.input.message, submitted by this connection's Organization API Key for the End User named in that attachment's session.attach: the same validation, Key, End User and Session authority and audit, clientEventId idempotency in the same namespace as REST commands, admission refusals and Client Tool freezing. A message to an idle Session starts a Turn, which runs on the core replica that received the request; a message to a Session with an active Turn steers that Turn. The reply is the acceptance receipt, not the Turn result: follow the Turn through session.event, matching its turnId; events of the Turn can arrive before the reply. Repeating the same clientEventId and data returns the original receipt with replayed true and starts nothing; the same clientEventId with different data is refused with interaction_input_conflict. A frame over 1 MiB, the REST request body limit, answers -32602. A request after connection.drain is refused with connection_draining; send it again with the same clientEventId on a new connection.",
+        "description": "Submit a user message to a Session this connection holds an attachment of, of either kind. It is the REST message command POST /api/v1/org/users/{userId}/sessions/{sessionId}/events with type agent.session.input.message, submitted by this connection's Organization API Key for the End User named in that attachment's session.attach: the same validation, Key, End User and Session authority and audit, clientEventId idempotency in the same namespace as REST commands, admission refusals and Client Tool freezing. A message to an idle Session starts a Turn, which runs on the core replica that received the request; a message to a Session with an active Turn steers that Turn. A Turn's terminal events arrive before the Session releases it, so a message sent between them steers or is refused; send the next message after the agent.session.idle event that follows the Turn. The reply is the acceptance receipt, not the Turn result: follow the Turn through session.event, matching its turnId; events of the Turn can arrive before the reply. Repeating the same clientEventId and data returns the original receipt with replayed true and starts nothing; the same clientEventId with different data is refused with interaction_input_conflict. A frame over 1 MiB, the REST request body limit, answers -32602. A request after connection.drain is refused with connection_draining; send it again with the same clientEventId on a new connection.",
         "type": "object",
         "required": [
           "jsonrpc",
@@ -565,6 +568,37 @@
           }
         }
       },
+      "PingRequest": {
+        "description": "Liveness probe for an Application Server whose WebSocket cannot send or observe ping frames. The core answers at once without database work, never behind other requests, and the request never counts toward the unanswered-request limit. The core's ping frames still need their pongs, which WebSocket clients send automatically.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "method"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "method": {
+            "const": "ping"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": false,
+            "maxProperties": 0
+          }
+        }
+      },
       "ClientToolDeclarations": {
         "type": "array",
         "maxItems": 64,
@@ -644,7 +678,7 @@
                 "minimum": 1
               },
               "heartbeatMs": {
-                "description": "Interval of the core's WebSocket pings.",
+                "description": "Interval of the core's WebSocket ping frames. A client that cannot observe them can send the ping request when nothing has arrived for this long.",
                 "type": "integer",
                 "minimum": 1
               },
@@ -759,7 +793,7 @@
                 "type": "string"
               },
               "event": {
-                "description": "The envelope a data frame of the per-Session event subscription (GET /api/v1/org/users/{userId}/sessions/{id}/events?stream=true) carries: type (agent.session.turn.*, agent.session.realtime.*, agent.session.template_switch.*), sessionId, turnId, createdAt and data.",
+                "description": "The envelope a data frame of the per-Session event subscription (GET /api/v1/org/users/{userId}/sessions/{id}/events?stream=true) carries: type (agent.session.turn.*, agent.session.realtime.*, agent.session.template_switch.*, agent.session.idle), sessionId, turnId, createdAt and data. agent.session.idle follows the terminal events of a Turn once the Session has released it; wait for it before session.send, an audio Turn or a Template switch.",
                 "type": "object",
                 "required": [
                   "type",
@@ -1212,6 +1246,41 @@
               "replayed": {
                 "description": "True when this repeats an already accepted clientEventId (REST answers 200); false for a new admission (REST 202).",
                 "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "PingResponse": {
+        "description": "Result of ping.",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "id",
+          "result"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "time"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "time": {
+                "description": "The answering replica's clock, in ISO 8601 UTC. Informational: claim windows and deadlines are judged by the database clock.",
+                "type": "string"
               }
             }
           }

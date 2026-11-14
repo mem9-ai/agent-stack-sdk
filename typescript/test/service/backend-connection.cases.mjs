@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
-import { BackendRequestError, OrganizationClient } from "@tidblink/server";
+import {
+  BackendRequestError,
+  OrganizationClient,
+  TurnFailedError,
+  TurnInterruptedError,
+  TurnWaitTimeoutError,
+} from "@tidblink/server";
 
 const baseUrl = process.env.SDK_SERVICE_URL;
 const apiKey = process.env.SDK_ORGANIZATION_KEY;
@@ -216,5 +222,95 @@ test("the packaged lamp backend binds a lamp, answers typed messages and hands t
     await lamps.onDeviceOffline(deviceId);
   } finally {
     await lamps.close();
+  }
+});
+
+/** A connected Session for one case, closed with its client. */
+const connected = async (options = {}) => {
+  const org = client();
+  const session = await freshSession(org);
+  const conn = await org.user(process.env.SDK_USER_ID).session(session.id).connect(options);
+  return { org, session, conn };
+};
+
+test("send() reports the growing draft from pushed events and replaces it with the final answer", async () => {
+  const { org, session, conn } = await connected();
+  try {
+    const drafts = [];
+    const reply = await conn.send("SDK_FIXTURE_PROGRESS SDK_FIXTURE_PAUSE", {
+      onProgress: (draft) => drafts.push(draft),
+      timeoutMs: 20000,
+    });
+    assert(drafts.includes("SDK draft."), JSON.stringify(drafts));
+    assert(drafts.indexOf("SDK revised draft.") > drafts.indexOf("SDK draft."), JSON.stringify(drafts));
+    assert.equal(reply.text, "SDK final answer.");
+    // send() returned after the release: the next message starts a new Turn at once.
+    await session.refresh();
+    assert.equal(session.data.activeTurnId, null);
+    const next = await conn.send("SDK_FIXTURE next", { timeoutMs: 20000 });
+    assert.notEqual(next.turnId, reply.turnId);
+    assert.equal(next.interaction.mode, "started");
+  } finally {
+    await org.close();
+  }
+});
+
+test("send() keeps a failed Turn's drafts provisional and raises TurnFailedError", async () => {
+  const { org, session, conn } = await connected();
+  try {
+    const drafts = [];
+    const clientEventId = randomUUID();
+    await assert.rejects(
+      conn.send("SDK_FIXTURE_PROGRESS SDK_FIXTURE_FAIL", {
+        clientEventId,
+        onProgress: (draft) => drafts.push(draft),
+        timeoutMs: 20000,
+      }),
+      (error) => error instanceof TurnFailedError && error.inputId === clientEventId,
+    );
+    assert(drafts.length > 0);
+    assert.equal((await session.getInteraction(clientEventId)).result.status, "failed");
+  } finally {
+    await org.close();
+  }
+});
+
+test("a local send() timeout keeps the message's identity and does not cancel the Turn", async () => {
+  const { org, session, conn } = await connected();
+  try {
+    const clientEventId = randomUUID();
+    await assert.rejects(
+      conn.send("SDK_FIXTURE_PROGRESS SDK_FIXTURE_PAUSE", { clientEventId, timeoutMs: 200 }),
+      (error) => error instanceof TurnWaitTimeoutError && error.inputId === clientEventId,
+    );
+    const result = await session.waitForResult(clientEventId, { timeoutMs: 20000, pollIntervalMs: 25 });
+    assert.equal(result.text, "SDK final answer.");
+    assert.equal((await session.listInteractions()).interactions.length, 1);
+  } finally {
+    await org.close();
+  }
+});
+
+test("cancelling the Turn while send() waits raises TurnInterruptedError", async () => {
+  const { org, session, conn } = await connected();
+  try {
+    const clientEventId = randomUUID();
+    let cancelled;
+    await assert.rejects(
+      conn.send("SDK_FIXTURE_PROGRESS SDK_FIXTURE_PAUSE", {
+        clientEventId,
+        timeoutMs: 20000,
+        onProgress: () => {
+          cancelled ??= session
+            .getInteraction(clientEventId)
+            .then((receipt) => session.cancel({ clientEventId: randomUUID(), turnId: receipt.turnId }));
+        },
+      }),
+      (error) => error instanceof TurnInterruptedError && error.inputId === clientEventId,
+    );
+    assert.equal((await cancelled).kind, "cancel");
+    assert.equal((await session.getInteraction(clientEventId)).result.status, "interrupted");
+  } finally {
+    await org.close();
   }
 });

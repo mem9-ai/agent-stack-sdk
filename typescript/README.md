@@ -1155,8 +1155,12 @@ abandoned-wait recovery, response-loss reconciliation, and paginated mixed
 history through public SDK methods. Client Tool cases declare and replace tools
 with ownership and stale-revision refusals. Backend Connection cases attach
 Sessions, run the real Runtime's Client Tool calls through claim and result,
-send messages, resume from a cursor, supersede connections and grant Realtime
-tokens. A forwarding proxy drops only an actual service response to prove
+send messages with drafts, failures, timeouts and cancellation, resume from a
+cursor, supersede connections and grant Realtime tokens. A second compiled
+fixture runs two replicas behind a local load balancer: a Turn on one replica
+calls the tool of an attachment on the other, a draining replica moves the
+attachment to the other one, a dropped connection replays its events, and
+another process supersedes the connection. A forwarding proxy drops only an actual service response to prove
 uncertain-submission recovery. Control cases
 verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture

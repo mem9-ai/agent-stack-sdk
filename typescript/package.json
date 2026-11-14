@@ -22,7 +22,8 @@
     "./examples/read-usage.mjs": "./examples/read-usage.mjs",
     "./examples/upload-file.mjs": "./examples/upload-file.mjs",
     "./examples/submit-audio.mjs": "./examples/submit-audio.mjs",
-    "./examples/http-connector.mjs": "./examples/http-connector.mjs"
+    "./examples/http-connector.mjs": "./examples/http-connector.mjs",
+    "./examples/lamp-backend.mjs": "./examples/lamp-backend.mjs"
   },
   "files": [
     "dist",
@@ -34,7 +35,8 @@
     "examples/read-usage.mjs",
     "examples/upload-file.mjs",
     "examples/submit-audio.mjs",
-    "examples/http-connector.mjs"
+    "examples/http-connector.mjs",
+    "examples/lamp-backend.mjs"
   ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",

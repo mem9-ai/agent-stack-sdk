@@ -649,6 +649,66 @@ for a device to join it directly. When a Realtime connection is already live it
 returns a new token for that one, and `audio` is not applied. The token is short
 lived; ask for a new grant each time the device wants to talk.
 
+### Example: a smart lamp
+
+The packaged `lamp-backend.mjs` example is the backend of a lamp that users talk
+to by typing in an app or by speaking to the lamp, with one Session per lamp so
+both share a conversation. `createLampBackend({ baseUrl, organizationApiKey,
+templateId, device, store })` returns:
+
+- `bindDevice(appUserId, deviceId)`: one End User per app user, one Session per lamp.
+- `onDeviceOnline(deviceId)` / `onDeviceOffline(deviceId)`: keep the lamp's Session
+  connected while it is online, with the lamp's tools `set_light`, `get_status`
+  and `set_timer`, which forward each call to the lamp over your device channel.
+- `onAppMessage(deviceId, text, { onDraft })`: a typed message; when the lamp is
+  offline a temporary connection is used and the lamp's tools fail at once.
+- `onDeviceWantsToTalk(deviceId)`: sends the lamp a Realtime grant.
+
+`device` is your channel to the lamps: `isOnline(deviceId)`,
+`request(deviceId, command, args, { signal })` and `send(deviceId, topic,
+payload)`. Wired to MQTT, with the lamp announcing itself through a retained
+presence message:
+
+```js
+const lamps = createLampBackend({ baseUrl, organizationApiKey, templateId, device: mqttDevices(broker) });
+broker.subscribe("lamp/+/presence");
+broker.subscribe("lamp/+/talk");
+broker.on("message", (topic, payload) => {
+  const [, deviceId, kind] = topic.split("/");
+  if (kind === "presence")
+    payload.toString() === "online" ? lamps.onDeviceOnline(deviceId) : lamps.onDeviceOffline(deviceId);
+  if (kind === "talk") lamps.onDeviceWantsToTalk(deviceId);
+});
+app.post("/devices/:id/messages", async (req, res) =>
+  res.json({ text: await lamps.onAppMessage(req.params.id, req.body.text) }));
+```
+
+The lamp itself does not use the SDK. Its firmware, in pseudo-code:
+
+```c
+mqtt_connect(broker, will = { "lamp/{id}/presence", "offline", retain });
+mqtt_publish("lamp/{id}/presence", "online", retain);
+
+on_message("lamp/{id}/cmd", msg) {            // a Client Tool call, forwarded
+  switch (msg.command) {
+    case "set_light":  apply(msg.args); reply(msg.requestId, ok, state()); break;
+    case "get_status": reply(msg.requestId, ok, { ...state(), ambientLux: lux() }); break;
+    case "set_timer":  timer_start(msg.args.minutes * 60, led_off); reply(msg.requestId, ok, {}); break;
+    default:           reply(msg.requestId, error, "unknown command");
+  }
+}
+
+on_button_press() { mqtt_publish("lamp/{id}/talk", ""); }
+
+on_message("lamp/{id}/voice_grant", grant) {  // audio goes to TiDB Link directly
+  ws = websocket_connect(grant.websocketUrl, grant.connectToken);
+  while (ws.open) { ws.send(mic_read(20ms)); if (ws.has_audio()) speaker_play(ws.recv()); }
+}
+```
+
+Cloud capabilities such as a warranty lookup belong in a Connector the
+Template references (see [Connectors](#connectors)), not in the lamp's tools.
+
 The connection uses the global `WebSocket` of Node.js 22, which sends the
 Organization API Key in the upgrade's `Authorization` header and never in the
 URL. Pass `WebSocket` to `OrganizationClient` to use another implementation; it

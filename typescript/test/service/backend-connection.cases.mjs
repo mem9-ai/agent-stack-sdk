@@ -184,3 +184,37 @@ test("realtimeGrant() prepares the Session's Realtime connection, then reissues 
     await org.close();
   }
 });
+
+test("the packaged lamp backend binds a lamp, answers typed messages and hands the lamp a voice grant", async () => {
+  const { createLampBackend } = await import("@tidblink/server/examples/lamp-backend.mjs");
+  const sent = [];
+  const lamps = createLampBackend({
+    baseUrl,
+    organizationApiKey: apiKey,
+    templateId: process.env.SDK_TEMPLATE_ID,
+    device: {
+      isOnline: () => true,
+      request: async () => ({ on: true, brightness: 40, colorTemp: 4000 }),
+      send: (deviceId, topic, payload) => sent.push([deviceId, topic, payload]),
+    },
+  });
+  try {
+    const deviceId = `lamp-${randomUUID()}`;
+    const sessionId = await lamps.bindDevice(`app-user-${randomUUID()}`, deviceId);
+    assert.match(sessionId, /^sess_/u);
+    // Offline: a temporary connection carries the message.
+    assert.equal(await lamps.onAppMessage(deviceId, "SDK_FIXTURE offline question"), "SDK final answer.");
+    await lamps.onDeviceOnline(deviceId);
+    const drafts = [];
+    assert.equal(
+      await lamps.onAppMessage(deviceId, "SDK_FIXTURE online question", { onDraft: (d) => drafts.push(d) }),
+      "SDK final answer.",
+    );
+    const grant = await lamps.onDeviceWantsToTalk(deviceId);
+    assert.match(grant.connectToken, /^rct_/u);
+    assert.deepEqual(sent, [[deviceId, "voice_grant", grant]]);
+    await lamps.onDeviceOffline(deviceId);
+  } finally {
+    await lamps.close();
+  }
+});

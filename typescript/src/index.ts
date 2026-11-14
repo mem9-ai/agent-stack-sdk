@@ -12,8 +12,6 @@ export {
   TurnWaitTimeoutError,
   InputNotAppliedError,
   OutcomeUnknownError,
-  ObservationStoppedError,
-  StreamIdleError,
   TurnFailedError,
   TurnInterruptedError,
   BackendConnectionClosedError,
@@ -178,12 +176,7 @@ export type {
   FileDownloadGrant,
   FileContent,
 } from "./files.js";
-export type {
-  SessionEventsOptions,
-  ObserveTurnOptions,
-  TurnObservation,
-} from "./progress.js";
-export { parseSessionEvent, asKnownSessionEvent } from "./events.js";
+export { asKnownSessionEvent } from "./events.js";
 export type {
   SessionEvent,
   KnownSessionEvent,
@@ -204,7 +197,6 @@ export type {
   TemplateSwitchEventData,
   SessionIdleEvent,
 } from "./events.js";
-export type { SubscribeOptions, SubscriptionItem } from "./subscription.js";
 
 export type {
   BillingUsageFactKind,
@@ -249,8 +241,6 @@ export type {
   ClientToolDeclaration,
   ClientToolSet,
   ReplaceClientToolsOptions,
-  PendingClientToolCall,
-  ClientToolOutputInput,
 } from "./client-tools.js";
 export { AudioTurnStoppedError } from "./audio.js";
 export type {

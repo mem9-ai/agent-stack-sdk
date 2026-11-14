@@ -26,8 +26,9 @@ export interface OrganizationClientOptions {
   baseUrl: string;
   apiKey: string;
   /**
-   * Replaces the global `fetch` for every request the client makes, including
-   * event streams and file transfers. Use it for proxies, custom agents,
+   * Replaces the global `fetch` for every HTTP request the client makes,
+   * including audio Turn streams and file transfers; Backend Connections use
+   * `WebSocket`. Use it for proxies, custom agents,
    * instrumentation or tests. Defaults to `globalThis.fetch`.
    */
   fetch?: FetchFunction;

@@ -13,7 +13,7 @@ const json = (value, init = {}) =>
   });
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-test("an injected fetch carries every request, including event streams and file transfers", async () => {
+test("an injected fetch carries every request, including file transfers", async () => {
   const calls = [];
   const fetch = async (input, init = {}) => {
     const url = new URL(String(input));
@@ -32,17 +32,6 @@ test("an injected fetch carries every request, including event streams and file 
     assert.equal(headers.get("authorization"), `Bearer ${apiKey}`);
     const path = url.pathname;
     if (path === "/api/v1/org/users") return json({ users: [] });
-    if (path.endsWith("/sessions/session_1/events"))
-      return new Response(
-        `id: c1\ndata: ${JSON.stringify({
-          type: "agent.session.turn.progress",
-          sessionId: "session_1",
-          turnId: "turn_1",
-          createdAt: "2026-11-11T00:00:00.000Z",
-          data: { payload: { text: "Working" } },
-        })}\n\n`,
-        { headers: { "content-type": "text/event-stream" } },
-      );
     if (path.endsWith("/drive/uploads"))
       return json({
         upload: {
@@ -92,14 +81,6 @@ test("an injected fetch carries every request, including event streams and file 
   assert.deepEqual(await organization.listEndUsers(), []);
 
   const user = organization.user("user_1");
-  const events = [];
-  for await (const event of user.session("session_1").events())
-    events.push(event);
-  assert.deepEqual(
-    events.map((event) => [event.cursor, event.type]),
-    [["c1", "agent.session.turn.progress"]],
-  );
-
   const uploaded = await user.files.upload({
     originalName: "note.txt",
     bytes,
@@ -119,7 +100,6 @@ test("an injected fetch carries every request, including event streams and file 
     calls.map(({ method, url }) => `${method} ${url}`),
     [
       `GET ${baseUrl}/api/v1/org/users`,
-      `GET ${baseUrl}/api/v1/org/users/user_1/sessions/session_1/events?stream=true`,
       `POST ${baseUrl}/api/v1/org/users/user_1/drive/uploads`,
       `POST ${baseUrl}/api/v1/org/users/user_1/drive/uploads/upload_1/parts/1/presign`,
       `PUT ${storage}/part`,
@@ -127,7 +107,7 @@ test("an injected fetch carries every request, including event streams and file 
       `GET ${storage}/download`,
     ],
   );
-  assert.equal(new TextDecoder().decode(calls[4].body), "abc");
+  assert.equal(new TextDecoder().decode(calls[3].body), "abc");
 });
 
 test("fetch must be a function", () => {

@@ -117,51 +117,6 @@ export class TurnInterruptedError extends TiDBLinkError {
   }
 }
 
-/** Observation stopped locally; the original command can still be queried or observed. */
-export class ObservationStoppedError extends OutcomeUnknownError {
-  readonly cursor: string | undefined;
-  readonly timedOut: boolean;
-
-  constructor(
-    message: string,
-    options: {
-      sessionId: string;
-      inputId: string;
-      turnId?: string;
-      cursor?: string;
-      requestId?: string;
-      timedOut?: boolean;
-      cause?: unknown;
-    },
-  ) {
-    super(message, options);
-    this.cursor = options.cursor;
-    this.timedOut = options.timedOut ?? false;
-  }
-}
-
-/**
- * The event stream received no bytes, not even a keep-alive, within the idle
- * timeout. The connection is treated as dead; reconnect from `cursor`.
- */
-export class StreamIdleError extends ConnectionError {
-  readonly cursor: string | undefined;
-  readonly idleTimeoutMs: number;
-
-  constructor(options: {
-    idleTimeoutMs: number;
-    cursor?: string;
-    requestId?: string;
-  }) {
-    super(
-      `Session event stream was silent for ${options.idleTimeoutMs} ms; reconnect from the last cursor`,
-      options.requestId === undefined ? undefined : { requestId: options.requestId },
-    );
-    this.cursor = options.cursor;
-    this.idleTimeoutMs = options.idleTimeoutMs;
-  }
-}
-
 /**
  * A Backend Connection closed, or could not be opened. `code` is the
  * WebSocket close code: 4001 means the Organization API Key is missing,

@@ -9,10 +9,6 @@ import {
   getClientTools,
   replaceClientTools,
   validateClientTools,
-  listPendingClientToolCalls,
-  submitClientToolOutput,
-  type PendingClientToolCall,
-  type ClientToolOutputInput,
   type ClientToolDeclaration,
   type ClientToolSet,
   type ReplaceClientToolsOptions,
@@ -22,25 +18,12 @@ import {
   type TurnCommandInput,
   type RetryReceipt,
 } from "./control.js";
-import {
-  sessionEvents,
-  observeTurn,
-  type SessionEvent,
-  type SessionEventsOptions,
-  type ObserveTurnOptions,
-  type TurnObservation,
-} from "./progress.js";
 import { OutcomeUnknownError } from "./errors.js";
 import {
   switchTemplate,
   type SwitchTemplateInput,
   type TemplateSwitchReceipt,
 } from "./template-switch.js";
-import {
-  subscribe,
-  type SubscribeOptions,
-  type SubscriptionItem,
-} from "./subscription.js";
 import type { RequestOptions } from "./organization.js";
 import {
   connectSession,
@@ -406,15 +389,6 @@ export class Session {
     return switchTemplate(this.#http, this.id, input);
   }
 
-  /** One connection to the event stream. See `subscribe` for a resilient one. */
-  events(options?: SessionEventsOptions): AsyncGenerator<SessionEvent> {
-    return sessionEvents(this.#http, this.id, options);
-  }
-
-  /**
-   * Follow the event stream until `options.signal` aborts, reconnecting from
-   * the last cursor, and deliver each pending Client Tool call once.
-   */
   /**
    * Attach this Session to the process's Backend Connection: receive its
    * events and, unless `observe` is set, declare and execute its Client
@@ -424,17 +398,6 @@ export class Session {
    */
   connect(options?: ConnectOptions): Promise<SessionConnection> {
     return connectSession(this.#http, this.#http.backend, this.#http.userId, this.id, options);
-  }
-
-  subscribe(options?: SubscribeOptions): AsyncGenerator<SubscriptionItem> {
-    return subscribe(this.#http, this.id, options);
-  }
-
-  observe(
-    inputId: string,
-    options?: ObserveTurnOptions,
-  ): AsyncGenerator<TurnObservation> {
-    return observeTurn(this.#http, this.id, inputId, options);
   }
 
   streamAudio(input: AudioTurnInput): AsyncGenerator<AudioTurnEvent> {
@@ -456,17 +419,7 @@ export class Session {
     return replaceClientTools(this.#http, this.id, tools, options);
   }
 
-  listPendingClientToolCalls(
-    options?: RequestOptions,
-  ): Promise<PendingClientToolCall[]> {
-    return listPendingClientToolCalls(this.#http, this.id, options);
-  }
 
-  submitClientToolOutput(
-    input: ClientToolOutputInput,
-  ): Promise<SessionInteraction> {
-    return submitClientToolOutput(this.#http, this.id, input);
-  }
 
   history(options?: ListOptions): Promise<TurnPage> {
     return history(this.#http, this.id, options);

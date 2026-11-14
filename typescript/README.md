@@ -488,118 +488,21 @@ final answer. Preserve the input across invocations; each new command identity
 can start new work. This slice replaces the obsolete response-owned NDJSON
 `streamTurn` API. Use the independent progress subscription below.
 
-## Continuous progress and reconnection
+## Progress and Session events
 
-Submit once with a persisted `clientEventId`, then observe that original receipt:
-
-```ts
-const savedCommandId = crypto.randomUUID();
-// Persist savedCommandId with this message before dispatch.
-const accepted = await session.submitMessage({
-  clientEventId: savedCommandId,
-  text: "Summarize the findings",
-});
-let cursor: string | undefined;
-let draft = "";
-for await (const update of session.observe(accepted.inputId, {
-  timeoutMs: 60_000,
-})) {
-  if (update.type === "result") {
-    console.log(update.result.text);
-  } else {
-    cursor = update.event.cursor; // Persist with session.id and accepted.inputId.
-    if (update.type === "draft") draft = update.text; // Replace, including an empty reset.
-    if (update.type === "progress") console.log(update.text);
-  }
-}
-```
-
-`draft` is provisional, and a progress update or saved-message event is not a
-successful result. Only `type: "result"` establishes the original command's
-successful outcome using its durable receipt and matching saved Turn. Failures,
-interruption and unincorporated inputs use the same errors as `waitForResult()`.
-A later explicit retry cannot replace the earlier command's result. `observe()`
-also accepts the separate retry command identity, using the same original-result
-checks as `waitForResult()`; cancellation receipts are not answer receipts.
-
-`ObservationStoppedError` retains `sessionId`, `inputId`, `turnId` when known,
-the last `cursor`, and `timedOut`. On disconnect, local abort or timeout, preserve
-those values. Reconnect with `session.observe(inputId, { cursor })`, or query
-`getInteraction(inputId)` / `waitForResult(inputId)`; do not submit another message.
-Breaking the loop stops only observation. EOF, a revoked observer credential,
-Session idleness and the absence of subscribers do not establish success or cancel
-execution. With revoked credentials, use another currently authorized credential
-for recovery. The SDK does not automatically reconnect or resubmit.
-
-`session.events({ cursor, signal })` exposes the independent Session-wide stream
-as raw envelopes with `cursor`, `type`, `sessionId`, `turnId`, `createdAt` and
-`data`, including Realtime and unfamiliar event types. It ends when its connection
-ends; it has no execution-result promise. `observe()` selects the original Turn,
-exposes typed draft/progress text and raw other events, and confirms its original
-receipt before reporting a result. A missing/expired cursor is the service's
-`validation_error` refusal; it does not silently start replay from the beginning.
-A resumed draft is a complete snapshot, usable without earlier frames.
-
-Both `events()` and `observe()` detect a dead connection: when no bytes arrive,
-not even the service's keep-alive (sent every 15 seconds), for `idleTimeoutMs`
-(default 45 000; `0` disables it), the stream ends with a `StreamIdleError`
-carrying the last `cursor`. Time your code spends between events does not count.
-
-### Following a Session
-
-`session.subscribe()` is the long-running form of `events()`, for a backend that
-stays attached to a Session, for example the one serving a voice device. It
-reconnects from the last cursor after network failures, server errors, silent
-connections and normal stream ends, reporting each as a `disconnected` item, and
-stops with the error when the service refuses the subscription (a revoked Key, a
-deleted Session, a refused cursor). Abort its `signal` to stop.
-
-```ts
-for await (const item of session.subscribe({ cursor: savedCursor, signal })) {
-  if (item.type === "event") {
-    forward(item.event);
-    await saveCursor(item.event.cursor); // Resume here after a restart.
-  } else if (item.type === "client_tool_call") {
-    const { call } = item;
-    await session.submitClientToolOutput({
-      clientEventId: `tool.${call.callId}`,
-      turnId: call.turnId,
-      callId: call.callId,
-      output: await runTool(call.name, call.arguments),
-    });
-  }
-}
-```
-
-Client Tool calls come from the service's pending list, read on every
-(re)connect and whenever a call event arrives. Each call is delivered once per
-subscription, and calls replayed from history that are already answered or past
-their deadline are not delivered. Two subscriptions on one Session each receive
-every call; answer it from one of them. Without a cursor the service replays the
-Session from its first event, so persist the cursor of each event you finish
-handling.
+Progress and events reach the application over a Session connection, not over
+a per-Session stream: `conn.send(text, { onProgress })` reports a message's draft,
+and `session.connect({ onEvent, cursor, onCursor })` follows every event of the
+Session with a resumable cursor (see [Connecting a Session](#connecting-a-session)).
+`waitForResult(inputId)` and `turn()` stay available over plain HTTP for a
+process that keeps no connection, for example to recover a result after a restart.
 
 `asKnownSessionEvent(event)` narrows an event to the types the SDK knows: Turn
 lifecycle, drafts, progress, saved messages and Operation steps, Client Tool
-calls, Realtime transcripts and responses, and Template switches. It returns
-`undefined` for anything else, which the stream still delivers unchanged.
-`parseSessionEvent({ id, data })` parses one raw Server-Sent Events frame, for a
-platform that receives or forwards the stream itself.
-
-The packaged `device-voice-session.mjs` example is the backend of a voice device:
-`connectDevice` prepares the Realtime connection and returns the WebSocket URL and
-short-lived connect token for the device, and `serveDeviceTools` subscribes to the
-Session and answers each Client Tool call through your device channel. Voice
-Turns use the Session's Client Tools like text Turns. For a new backend, prefer
-`session.connect()` (see [Connecting a Session](#connecting-a-session)).
-
-The packaged `observe-message.mjs` example observes an existing input and never
-submits it again. Run it with `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID` and
-`INPUT_ID`; supply `EVENT_CURSOR` to resume:
-
-```sh
-node node_modules/@tidblink/server/examples/observe-message.mjs
-```
+calls, Realtime transcripts and responses, Template switches and
+`agent.session.idle`. It returns `undefined` for anything else, which is still
+delivered unchanged. A draft (`agent.session.turn.output_text.snapshot`) is a
+complete snapshot: replace what you showed, including with an empty reset.
 
 ## Connecting a Session
 
@@ -701,9 +604,8 @@ const lampTools = (deviceId: string): ClientToolHandlers => ({
 
 A result the core does not accept, for example after the call's deadline,
 reaches `onError` as a `ClientToolResultRefusedError` with the core's `reason`.
-Calls of a Session with an executing connection are answered only there: they
-carry `claimBy` in `requires_action` events, and REST `submitClientToolOutput()`
-cannot answer them.
+Calls are answered only on the executing connection; the `claimBy` they carry in
+`requires_action` events marks them as such.
 
 ### Messages and voice on a connection
 
@@ -754,9 +656,9 @@ must accept `new WebSocket(url, { protocols, headers })`.
 
 ## Session Client Tools
 
-Declare the application functions that an ordinary text Turn may request. The
-application executes them itself; the SDK only declares tools and exchanges calls
-and results. Parameters are JSON Schema objects. The service validates reserved
+Declare the application functions that a Turn may request. `connect({ tools })`
+declares them on every attach; the REST methods below read or replace the set
+without a connection. Parameters are JSON Schema objects. The service validates reserved
 names, schema size/depth and combined tool limits; the `async` argument is reserved
 for the platform and is not part of application arguments.
 
@@ -788,51 +690,9 @@ set and decide again. A Turn retains the declarations admitted when it started.
 An identical replacement keeps its revision. Text, voice and prerecorded-audio Turns
 use the Session's declarations; Scheduler-started Turns do not.
 
-After submitting a message, retrieve pending calls independently of any progress
-subscription:
-
-```ts
-const calls = await session.listPendingClientToolCalls();
-const call = calls.find((call) => call.callId === savedCallId);
-if (!call || Date.parse(call.deadlineAt) <= Date.now()) {
-  throw new Error("The call is unavailable or expired; do not execute it again");
-}
-// The application obtains this value from its own business function.
-const output = JSON.stringify({ status: "shipped" });
-const receipt = await session.submitClientToolOutput({
-  clientEventId: savedOutputCommandId,
-  turnId: call.turnId,
-  callId: call.callId,
-  output,
-});
-// To report a business failure, supply error: { message: "Warehouse unavailable" }
-// instead of output.
-```
-
-The result command has its own stable `clientEventId`; it is distinct from the
-call's `callId` and the message's input identity. Its receipt confirms admission,
-not successful completion of the message. Continue with the original message's
-`waitForResult(inputId)` or `observe(inputId)`. An application-reported tool error
-may still produce a successful answer explaining that failure.
-
-Pending reads count as delivery and preserve `publishedAt`/`deadlineAt`. Calls
-have a 60-second deadline from publication. Retain the call identity and the
-application's result before submission; a disconnect does not authorize executing
-the business function again. After uncertain submission, reconcile its original
-command with `getInteraction(clientEventId)` or `reconcileInteraction(clientEventId)`.
-The SDK never retries output submission automatically. Repeating the exact command
-recovers its original receipt; a new command for a settled call is refused with
-`client_tool_call_settled`. Foreign, unknown and Hardware calls are unavailable
-through this endpoint. Hardware results belong to the device connection and are
-not an SDK Client Tool capability.
-
-The packaged `answer-client-tool.mjs` example submits one already produced result.
-Set `AGENT_SERVICE_URL`, `ORGANIZATION_API_KEY`, `END_USER_ID`, `SESSION_ID`, `TURN_ID`, `CALL_ID`,
-`CLIENT_EVENT_ID` and exactly one of `TOOL_OUTPUT` or `TOOL_ERROR`:
-
-```sh
-node node_modules/@tidblink/server/examples/answer-client-tool.mjs
-```
+An executing Session connection runs the calls of these tools; see
+[Client Tools on a connection](#client-tools-on-a-connection). There is no REST
+path to answer a call.
 
 ## Saved conversation history
 
@@ -1214,7 +1074,7 @@ separate process installs the tarball in a clean directory and calls only the
 installed SDK and packaged Organization example for its application workflow.
 It verifies Organization provisioning, discovery, Session
 creation replay, owner isolation, file upload/download and message attachment,
-text results, SSE/history, Client Tools, Connector registration and a Session's call
+text results and history, Client Tools on a Backend Connection, Connector registration and a Session's call
 to the example HTTP Connector, audio,
 Realtime HTTP grants, rotation/revocation and fresh-authority recovery. Management credential changes
 and controlled suppliers are fixture actions, not claimed SDK APIs. WebSocket
@@ -1232,12 +1092,12 @@ lifecycle updates, Template switches with and without a Handoff Turn, and Realti
 operations. Text cases
 exercise actual acceptance, final success/failure/interruption, local timeout and
 abandoned-wait recovery, response-loss reconciliation, and paginated mixed
-history through public SDK methods. Progress cases verify draft replacement, cursor
-reconnection/refusal, original-result confirmation and local observation timeout.
-Client Tool cases declare and replace tools, resume pending reads, explicitly return
-application output or errors, and observe those values in real Runtime answers, with
-ownership, stale revision, settled-call and unavailable-call refusals. A forwarding proxy drops only
-an actual service response to prove uncertain-submission recovery. Control cases
+history through public SDK methods. Client Tool cases declare and replace tools
+with ownership and stale-revision refusals. Backend Connection cases attach
+Sessions, run the real Runtime's Client Tool calls through claim and result,
+send messages, resume from a cursor, supersede connections and grant Realtime
+tokens. A forwarding proxy drops only an actual service response to prove
+uncertain-submission recovery. Control cases
 verify active-Turn steering, eventual cancellation, disabled retry and an explicitly
 enabled checkpoint retry with an unchanged original outcome. The enabled fixture
 uses the existing controlled Drive9 and model suppliers. File cases use a separate

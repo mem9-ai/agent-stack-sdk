@@ -117,12 +117,6 @@ assert(
   (await session.history()).turns.some((turn) => turn.id === result.turnId),
 );
 assert((await session.timeline()).entries.length > 0);
-for await (const event of session.events({
-  signal: AbortSignal.timeout(10000),
-})) {
-  assert.equal(typeof event.cursor, "string");
-  break;
-}
 
 await stage("tools");
 const tools = await session.getClientTools();
@@ -141,29 +135,23 @@ await session.replaceClientTools(
   ],
   { ifMatch: tools.etag },
 );
-const toolInput = await session.submitMessage({
-  clientEventId: randomUUID(),
-  text: "Look up my order",
+// The compiled backend serves Backend Connections: the tool runs on the connection.
+const events = [];
+const conn = await session.connect({
+  tools: {
+    lookup_order: {
+      description: "Get order",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+      run: async () => "SDK_ORDER_SHIPPED",
+    },
+  },
+  onEvent: (event) => events.push(event.type),
 });
-const [call] = await until(
-  () => session.listPendingClientToolCalls(),
-  (calls) => calls.length > 0,
-);
-await session.submitClientToolOutput({
-  clientEventId: randomUUID(),
-  turnId: call.turnId,
-  callId: call.callId,
-  output: "SDK_ORDER_SHIPPED",
-});
-assert.equal(
-  (
-    await session.waitForResult(toolInput.inputId, {
-      timeoutMs: 20000,
-      pollIntervalMs: 25,
-    })
-  ).text,
-  "Order shipped.",
-);
+const toolReply = await conn.send("Look up my order", { timeoutMs: 20000 });
+assert.equal(toolReply.text, "Order shipped.");
+assert(events.includes("agent.session.turn.requires_action"));
+assert(events.includes("agent.session.idle"));
+await conn.close();
 await until(
   () => session.refresh(),
   (current) => current.data.activeTurnId === null,
@@ -333,6 +321,7 @@ await stage("revoke");
 await assert.rejects(fresh.listSessions(), unauthorized);
 assert.equal((await other.getSession(session.id)).id, session.id);
 console.log(
-  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/SSE/history, Client Tools, an HTTP Connector call, audio, Realtime HTTP, and rotation/revocation recovery.",
+  "Packed Organization consumer passed: provisioning, discovery, creation replay, ownership, file transfer/attachment, text/history, Client Tools on a Backend Connection, an HTTP Connector call, audio, Realtime HTTP, and rotation/revocation recovery.",
 );
+await organization.close();
 process.disconnect();

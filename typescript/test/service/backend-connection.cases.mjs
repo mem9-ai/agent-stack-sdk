@@ -73,8 +73,6 @@ for (const outcome of ["success", "failure"])
       assert.equal(runs[0].context.turnId, message.turnId);
       assert.equal(runs[0].context.sessionId, session.id);
       assert.equal(runs[0].context.userId, process.env.SDK_USER_ID);
-      // Calls answered over the connection never reach the REST pending list.
-      assert.deepEqual(await session.listPendingClientToolCalls(), []);
       await until(() => events.some((event) => event.type === "agent.session.turn.completed"));
       const types = events.map((event) => event.type);
       assert.equal(types[0], "agent.session.turn.started");

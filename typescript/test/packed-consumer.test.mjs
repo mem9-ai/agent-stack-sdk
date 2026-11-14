@@ -33,6 +33,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
   assert(files.includes("examples/http-connector.mjs"));
+  assert(files.includes("examples/lamp-backend.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
@@ -47,6 +48,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
         file === "examples/http-connector.mjs" ||
+        file === "examples/lamp-backend.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/submit-audio.mjs" ||
@@ -511,6 +513,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof uploadFileWorkflow,"function");
     const { submitAudioWorkflow } = await import("@tidblink/server/examples/submit-audio.mjs");
     assert.equal(typeof submitAudioWorkflow,"function");
+    const { createLampBackend, memoryStore } = await import("@tidblink/server/examples/lamp-backend.mjs");
+    assert.equal(typeof createLampBackend, "function");
+    assert.equal(typeof memoryStore, "function");
     const { createSessionWorkflow } = await import("@tidblink/server/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");

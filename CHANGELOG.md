@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add the `lamp-backend.mjs` example: the backend of a smart lamp that users
+  talk to by typing or by voice, keeping the lamp's Session connected while it
+  is online, forwarding its Client Tools to the lamp and handing the lamp
+  Realtime grants. The README shows its MQTT wiring and the lamp's firmware in
+  pseudo-code.
 - **Breaking:** remove the APIs built on the per-Session event subscription,
   which Backend Connections replace (service ADR 0109):
   `session.events()`, `session.subscribe()`, `session.observe()`,

@@ -32,12 +32,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
   assert(files.includes("examples/send-message.mjs"));
   assert(files.includes("examples/read-usage.mjs"));
   assert(files.includes("examples/control-turn.mjs"));
-  assert(files.includes("examples/device-voice-session.mjs"));
   assert(files.includes("examples/http-connector.mjs"));
   assert(files.includes("examples/upload-file.mjs"));
   assert(files.includes("examples/submit-audio.mjs"));
-  assert(files.includes("examples/observe-message.mjs"));
-  assert(files.includes("examples/answer-client-tool.mjs"));
   assert(!files.some((file) => file.includes("workspace")));
   assert(
     files.every(
@@ -49,13 +46,10 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
         file === "examples/create-session.mjs" ||
         file === "examples/send-message.mjs" ||
         file === "examples/read-usage.mjs" ||
-        file === "examples/device-voice-session.mjs" ||
         file === "examples/http-connector.mjs" ||
         file === "examples/control-turn.mjs" ||
         file === "examples/upload-file.mjs" ||
         file === "examples/submit-audio.mjs" ||
-        file === "examples/observe-message.mjs" ||
-        file === "examples/answer-client-tool.mjs" ||
         /^dist\/.+\.(?:js|d\.ts|map)$/.test(file),
     ),
   );
@@ -112,8 +106,9 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       OrganizationUserUsageOptions, OrganizationUserUsageDetailsOptions,
       TurnCommandInput,
       RetryReceipt,
-      SessionEvent, SessionEventsOptions, ObserveTurnOptions, TurnObservation,
-      ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions, PendingClientToolCall, ClientToolOutputInput,
+      SessionEvent, SessionIdleEvent,
+      ClientToolDeclaration, ClientToolSet, ReplaceClientToolsOptions,
+      ConnectOptions, ClientToolHandlers, SendOptions, SessionConnectionEnd, SessionConnection,
       Template, TemplateContent, TemplateCatalog, TemplatePage, SkillUpload, SkillDetail,
       KnownSessionEvent,
       Connector, ConnectorCallbackClaims, ConnectorCallContext,
@@ -122,7 +117,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TIDB_LINK_API_VERSION,
       TIDB_LINK_REVISION,
       OutcomeUnknownError,
-      ObservationStoppedError,
       TurnWaitTimeoutError,
       TurnFailedError,
       TurnInterruptedError,
@@ -131,8 +125,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       TiDBLinkError,
       OrganizationClient,
       asKnownSessionEvent,
-      parseSessionEvent,
-      StreamIdleError,
       ConnectorKeySet,
       verifyConnectorCallback,
       readConnectorCallContext,
@@ -204,17 +196,41 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       void attempt;
       return context.userId;
     }
-    async function subscriptionWorkflow(session: Session, signal: AbortSignal) {
-      for await (const item of session.subscribe({ cursor: "saved", signal, idleTimeoutMs: 30_000 })) {
-        if (item.type === "client_tool_call") { const deadline: string = item.call.deadlineAt; void deadline; }
-        if (item.type === "event") {
-          const known: KnownSessionEvent | undefined = asKnownSessionEvent(item.event);
+    async function connectionWorkflow(session: Session) {
+      const tools: ClientToolHandlers = {
+        set_light: {
+          description: "Turn the lamp on or off",
+          parameters: { type: "object", properties: { on: { type: "boolean" } } },
+          run: async (args, context) => { const signal: AbortSignal = context.signal; void signal; return args.on ? "on" : "off"; },
+        },
+      };
+      const options: ConnectOptions = {
+        tools,
+        cursor: "12",
+        onCursor: async (cursor: string) => { void cursor; },
+        onTranscript: (transcript) => { const text: string = transcript.text; void text; },
+        onEvent: (event: SessionEvent) => {
+          const known: KnownSessionEvent | undefined = asKnownSessionEvent(event);
           if (known?.type === "agent.session.turn.requires_action") { const callId: string = known.data.payload.calls[0]!.callId; void callId; }
-          if (known?.type === "agent.session.realtime.input_transcript.completed") { const text: string = known.data.text; void text; }
-        }
-      }
-      const parsed: SessionEvent = parseSessionEvent({ id: "c", data: "{}" });
-      void parsed;
+          if (known?.type === "agent.session.idle") { const idle: SessionIdleEvent = known; const turnId: string | null = idle.data.turnId; void turnId; }
+        },
+      };
+      const conn: SessionConnection = await session.connect(options);
+      const send: SendOptions = { clientEventId: "msg-1", onProgress: (draft: string) => { void draft; } };
+      const reply: TurnResult = await conn.send("Too bright", send);
+      const grant = await conn.realtimeGrant({ metadata: { device: "lamp-1" } });
+      const token: string = grant.connectToken;
+      const end: SessionConnectionEnd = await conn.closed;
+      if (end.reason === "error") { const cause: unknown = end.error; void cause; }
+      // @ts-expect-error observe is a boolean.
+      await session.connect({ observe: "yes" });
+      // @ts-expect-error The SSE subscription APIs are removed; use connect().
+      session.subscribe();
+      // @ts-expect-error The SSE event stream is removed; use connect({ onEvent }).
+      session.events();
+      // @ts-expect-error REST Client Tool results are removed; tools run on a connection.
+      session.submitClientToolOutput({});
+      void reply; void token;
     }
     async function clientToolsWorkflow(session: Session, user: EndUserClient) {
       const tool: ClientToolDeclaration = {type:"function",name:"lookup_order",description:"Read an order",parameters:{type:"object",properties:{orderId:{type:"string"}}}};
@@ -222,13 +238,7 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       const set: ClientToolSet = await session.getClientTools();
       const options: ReplaceClientToolsOptions = {ifMatch:set.etag};
       const replaced: ClientToolSet = await session.replaceClientTools([],options);
-      const calls: PendingClientToolCall[] = await session.listPendingClientToolCalls();
-      const input: ClientToolOutputInput = {clientEventId:"output-1",turnId:calls[0]!.turnId,callId:calls[0]!.callId,output:"shipped"};
-      const receipt: SessionInteraction = await session.submitClientToolOutput(input);
-      await session.submitClientToolOutput({clientEventId:"failure-1",turnId:input.turnId,callId:input.callId,error:{message:"Unavailable"}});
-      // @ts-expect-error A result is either output or error.
-      const invalid: ClientToolOutputInput = {clientEventId:"bad",turnId:"turn",callId:"call",output:"ok",error:{message:"failed"}};
-      void created; void replaced; void receipt; void invalid;
+      void created; void replaced;
     }
     async function controlWorkflow(session: Session): Promise<TurnResult> {
       const input: TurnCommandInput = { clientEventId: "cancel-command", turnId: "turn" };
@@ -261,22 +271,6 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
       await user.files.cancelUpload(intent.uploadId);
       void capabilities; void status; void page;
       return user.files.upload({originalName:"empty",bytes:new Uint8Array(),idempotencyKey:"another-file"});
-    }
-    async function progressWorkflow(session: Session) {
-      const options: SessionEventsOptions = {cursor: "saved-position"};
-      for await (const event of session.events(options)) {
-        const typed: SessionEvent = event;
-        void typed;
-      }
-      const observation: ObserveTurnOptions = {timeoutMs: 15000};
-      for await (const update of session.observe("original-input", observation)) {
-        const typed: TurnObservation = update;
-        if (typed.type === "draft" || typed.type === "progress") {const text: string = typed.text; void text;}
-        if (typed.type === "result") {const result: TurnResult = typed.result; void result;}
-      }
-      const stopped = new ObservationStoppedError("Stopped", {sessionId: session.id, inputId: "original-input", cursor: "saved-position"});
-      const cursor: string | undefined = stopped.cursor;
-      void cursor;
     }
     async function usageWorkflow() {
       const range: OrganizationUserUsageOptions = {from:"2030-01-02T00:00:00.000Z",to:"2030-01-03T00:00:00.000Z",interval:"hour",templateId:"template_1"};
@@ -517,16 +511,14 @@ test("the packed SDK installs and typechecks in a clean ESM consumer", async (co
     assert.equal(typeof uploadFileWorkflow,"function");
     const { submitAudioWorkflow } = await import("@tidblink/server/examples/submit-audio.mjs");
     assert.equal(typeof submitAudioWorkflow,"function");
-    const { observeMessageWorkflow } = await import("@tidblink/server/examples/observe-message.mjs");
-    assert.equal(typeof observeMessageWorkflow,"function");
-    const { answerClientToolWorkflow } = await import("@tidblink/server/examples/answer-client-tool.mjs");
-    assert.equal(typeof answerClientToolWorkflow,"function");
     const { createSessionWorkflow } = await import("@tidblink/server/examples/create-session.mjs");
     assert.equal(typeof createSessionWorkflow, "function");
     assert.equal(typeof prepareRealtimeConnection, "function");
     assert.equal(sdk.ServiceUser, undefined);
     assert.equal(sdk.UserClient, undefined);
     assert.equal(sdk.Agent, undefined);
+    for (const name of ["parseSessionEvent", "StreamIdleError", "ObservationStoppedError"])
+      assert.equal(sdk[name], undefined, name);
     for (const name of ["AGENT_SERVICE_API_VERSION", "AGENT_SERVICE_REVISION", "AgentStackError", "AgentStackApiError", "TIDB_LINK_PROVISIONING_REVISION", "TIDB_LINK_REALTIME_REVISION", "TIDB_LINK_LIFECYCLE_REVISION", "TIDB_LINK_TEXT_REVISION"]) {
       assert.equal(sdk[name], undefined);
     }

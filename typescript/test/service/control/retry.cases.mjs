@@ -69,38 +69,50 @@ test("an explicit SDK retry produces its own result without rewriting the stoppe
   const retry = await session.retry(command);
   assert.equal(retry.disposition, "retrying");
   assert.equal(retry.turnId, accepted.turnId);
-  const observation = [];
+  // Follow the Session from its first event: the original terminal event replays first.
   let sawOriginalTerminal = false;
   let sawLiveRetryDraft = false;
-  for await (const update of session.observe(retry.clientEventId, {
+  let draftSeen;
+  const draft = new Promise((resolve) => (draftSeen = resolve));
+  const conn = await session.connect({
+    observe: true,
+    cursor: "0",
+    onEvent: async (event) => {
+      if (event.turnId !== accepted.turnId) return;
+      if (
+        event.data.event === "turn_finished" &&
+        event.data.payload.status === "interrupted"
+      )
+        sawOriginalTerminal = true;
+      if (
+        event.type === "agent.session.turn.output_text.snapshot" &&
+        event.data.payload.text === "Retried task " &&
+        !sawLiveRetryDraft
+      ) {
+        assert(
+          sawOriginalTerminal,
+          "The same Turn's original terminal event must be replayed first",
+        );
+        assert.equal(
+          (await session.getInteraction(command.clientEventId)).result.status,
+          "running",
+        );
+        sawLiveRetryDraft = true;
+        await writeFile(process.env.SDK_RETRY_OBSERVED_DRAFT_FILE, "observed");
+        draftSeen();
+      }
+    },
+  });
+  await draft;
+  const result = await session.waitForResult(retry.clientEventId, {
     timeoutMs: 15000,
-  })) {
-    observation.push(update);
-    if (
-      update.type === "event" &&
-      update.event.data.event === "turn_finished" &&
-      update.event.data.payload.status === "interrupted"
-    )
-      sawOriginalTerminal = true;
-    if (update.type === "draft" && update.text === "Retried task ") {
-      assert(
-        sawOriginalTerminal,
-        "The same Turn's original terminal event must be replayed first",
-      );
-      assert.equal(
-        (await session.getInteraction(command.clientEventId)).result.status,
-        "running",
-      );
-      sawLiveRetryDraft = true;
-      await writeFile(process.env.SDK_RETRY_OBSERVED_DRAFT_FILE, "observed");
-    }
-  }
+    pollIntervalMs: 25,
+  });
+  await conn.close();
   assert(
     sawLiveRetryDraft,
     "Live retry drafts must survive historical terminal replay",
   );
-  assert.equal(observation.at(-1).type, "result");
-  const result = observation.at(-1).result;
   const exampleResult = await controlTurnWorkflow({
     baseUrl: process.env.SDK_SERVICE_URL,
     organizationApiKey: process.env.SDK_ORGANIZATION_KEY,

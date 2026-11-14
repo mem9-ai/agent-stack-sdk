@@ -78,8 +78,7 @@ export interface ClientToolCallPayload {
   /**
    * Present when the call was published to the Session's executing Backend
    * Connection attachment. Only that attachment executes it, after claiming it
-   * before this time; this event authorizes nothing, and REST
-   * `submitClientToolOutput()` cannot answer it.
+   * before this time; this event authorizes nothing.
    */
   claimBy?: string;
 }
@@ -283,30 +282,6 @@ export function asKnownSessionEvent(
       ? (event as KnownSessionEvent)
       : undefined;
   return undefined;
-}
-
-/**
- * Parse one Server-Sent Events frame of a Session event stream: its `id`
- * (the cursor) and `data` (the JSON envelope). Use it when you receive the
- * frames yourself, for example when forwarding a stream. Throws a
- * TiDBLinkError for a malformed envelope.
- */
-export function parseSessionEvent(
-  frame: { id: string; data: string },
-  options: { sessionId?: string; requestId?: string } = {},
-): SessionEvent {
-  const requestId =
-    options.requestId === undefined ? {} : { requestId: options.requestId };
-  let value: unknown;
-  try {
-    value = JSON.parse(frame.data);
-  } catch (cause) {
-    throw new TiDBLinkError("Session event data is not valid JSON", {
-      ...requestId,
-      cause,
-    });
-  }
-  return sessionEventFrom(value, frame.id, options);
 }
 
 /** Check one event envelope and attach its cursor. */

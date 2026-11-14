@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Breaking:** remove the APIs built on the per-Session event subscription,
+  which Backend Connections replace (service ADR 0109):
+  `session.events()`, `session.subscribe()`, `session.observe()`,
+  `session.listPendingClientToolCalls()`, `session.submitClientToolOutput()`,
+  `parseSessionEvent()`, `StreamIdleError`, `ObservationStoppedError` and the
+  types `SessionEventsOptions`, `ObserveTurnOptions`, `TurnObservation`,
+  `SubscribeOptions`, `SubscriptionItem`, `PendingClientToolCall` and
+  `ClientToolOutputInput`. Follow events with `session.connect({ onEvent })`,
+  report progress with `conn.send(text, { onProgress })`, and run Client
+  Tools with `connect({ tools })`. `submitMessage()`, `waitForResult()` and
+  `turn()` remain over HTTP. The `observe-message.mjs`,
+  `answer-client-tool.mjs` and `device-voice-session.mjs` examples are removed.
 - Pin the supported contract to service
   `4305ef67daebf23c416badf806217a7c11dcef37` and OpenAPI SHA-256
   `6f5ff6f025eef80fbd9d5b80fb798e5db159aaa006e7d34866e9c3b6843dfe58`. The

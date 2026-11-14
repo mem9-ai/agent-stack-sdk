@@ -48,7 +48,6 @@ test("the selected commands and history reads require Organization authority", (
     ["/timeline", "get"],
     ["/tools", "get"],
     ["/tools", "put"],
-    ["/client-tool-calls", "get"],
   ];
   for (const [route, method] of operations) {
     const operation = document.paths[`${sessionPath}${route}`][method];
@@ -232,37 +231,6 @@ test("cancel and checkpoint retry keep exact command identities and distinct rec
     );
 });
 
-test("independent observation preserves the declared event position and snapshot contract", () => {
-  const subscription = document.paths[`${sessionPath}/events`].get;
-  assert.deepEqual(subscription.security, [{ OrganizationApiKey: [] }]);
-  assert(
-    subscription.parameters.some(
-      (parameter) => parameter.name === "cursor" && parameter.in === "query",
-    ),
-  );
-  assert(
-    subscription.parameters.some(
-      (parameter) => parameter.name === "stream" && parameter.required,
-    ),
-  );
-  assert(
-    subscription.parameters.some(
-      (parameter) =>
-        parameter.name === "Accept" &&
-        parameter.schema.enum.includes("text/event-stream"),
-    ),
-  );
-  const stream = subscription.responses["200"];
-  assert(stream.content["text/event-stream"]);
-  assert(stream.headers);
-  assert.match(stream.description, /complete provisional draft/);
-  assert.match(
-    stream.description,
-    /Disconnecting the subscription does not cancel/,
-  );
-  assert.match(stream.description, /agent\.session\.turn\.requires_action/);
-});
-
 test("target-User usage preserves Organization authority, exact ranges and its result projection", () => {
   const org = document.paths["/api/v1/org/users/{userId}/billing/usage"].get;
   const orgDetails =
@@ -295,7 +263,7 @@ test("target-User usage preserves Organization authority, exact ranges and its r
   ]);
 });
 
-test("Client Tools preserve declaration replacement, pending deadlines and explicit result command shapes", () => {
+test("Client Tools preserve declaration replacement", () => {
   const create = properties(schema("CreateTemplateSessionOpenApiDto"));
   assert(create.tools);
   const replace = document.paths[`${sessionPath}/tools`].put;
@@ -310,31 +278,7 @@ test("Client Tools preserve declaration replacement, pending deadlines and expli
   const set = properties(schema("SessionClientToolsResponseOpenApiDto"));
   assert.equal(set.revision.type, "integer");
   assert.equal(set.tools.type, "array");
-  const pending = properties(
-    schema("PendingClientToolCallsResponseOpenApiDto"),
-  ).calls;
-  for (const key of [
-    "callId",
-    "turnId",
-    "name",
-    "arguments",
-    "publishedAt",
-    "deadlineAt",
-  ])
-    assert(properties(pending.items)[key]);
-  const output = schema("SessionEventOpenApiDto").oneOf.find((variant) =>
-    properties(variant).type.enum.includes(
-      "agent.session.input.client_tool_output",
-    ),
-  );
-  assert(output.required.includes("clientEventId"));
-  const variants = properties(output).data.oneOf;
-  assert(
-    variants.some((variant) => properties(variant).output?.maxLength === 65536),
-  );
-  assert(variants.some((variant) => properties(variant).error));
 });
-
 
 test("supported Organization resources bind the explicit owner", () => {
   for (const [path, methods] of Object.entries(document.paths)) {

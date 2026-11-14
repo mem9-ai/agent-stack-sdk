@@ -64,7 +64,6 @@ const snapshots = {
       `${session}/turns/{turnId}`,
       `${session}/timeline`,
       `${session}/tools`,
-      `${session}/client-tool-calls`,
       `${session}/realtime`,
       `${session}/realtime/connect-tokens`,
       `${user}/billing/usage`,

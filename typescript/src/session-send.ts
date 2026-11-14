@@ -59,6 +59,9 @@ export interface EventWatch {
   stop(): void;
 }
 
+/** How long a finished Turn's result waits for the Session's release, and at least for its read. */
+const RELEASE_WAIT_MS = 5_000;
+
 const aborted = (signal: AbortSignal): Promise<never> =>
   new Promise((_, reject) => {
     if (signal.aborted) reject(signal.reason);
@@ -120,6 +123,7 @@ export async function sendOverConnection(
   const watch = channel.watch();
   let receipt: SessionInteraction | undefined;
   let ambiguous = false;
+  let turnFinished = false;
   try {
     receipt = await submit();
     if (receipt.rejection || receipt.mode === "rejected")
@@ -147,8 +151,10 @@ export async function sendOverConnection(
     watch.stop();
   }
   // The terminal event arrived (or the connection ended): read the settled result.
+  const remaining = Math.max(0, limit - (Date.now() - startedAt));
   return waitForResult(channel.http, sessionId, clientEventId, {
-    timeoutMs: Math.max(0, limit - (Date.now() - startedAt)),
+    // A finished Turn's result is read even when the local deadline just passed.
+    timeoutMs: turnFinished ? Math.max(remaining, RELEASE_WAIT_MS) : remaining,
     pollIntervalMs: 100,
     ...(signal ? { signal } : {}),
   });
@@ -193,11 +199,30 @@ export async function sendOverConnection(
     }
   }
 
+  /**
+   * Follow the Turn until it finished and the Session released it, so that
+   * the next message starts a new Turn instead of steering a finished one.
+   */
   async function untilFinished(turnId: string): Promise<void> {
+    let finished = false;
+    let release: AbortSignal | undefined;
     for (;;) {
-      const event = await watch.next(stop);
+      let event: SessionEvent | undefined;
+      try {
+        event = await watch.next(release ?? stop);
+      } catch (error) {
+        // The result exists; only the release is still outstanding.
+        if (finished) return;
+        throw error;
+      }
       // The connection ended; the REST read below still establishes the result.
       if (!event) return;
+      if (event.type === "agent.session.idle") {
+        const released = (event.data as { turnId?: unknown }).turnId;
+        // Released without a terminal event (kept for checkpoint recovery): the REST read decides.
+        if (released === turnId || event.turnId === turnId) return;
+        continue;
+      }
       if (event.turnId !== turnId) continue;
       const payload = event.data as { event?: unknown; payload?: { text?: unknown } };
       if (
@@ -211,7 +236,13 @@ export async function sendOverConnection(
           channel.report(error);
         }
       }
-      if (payload.event === "turn_finished") return;
+      if (payload.event === "turn_finished" && !finished) {
+        finished = true;
+        turnFinished = true;
+        // The release normally follows at once; do not hold a known result for long.
+        release = AbortSignal.any([stop, AbortSignal.timeout(RELEASE_WAIT_MS)]);
+      }
     }
   }
+
 }

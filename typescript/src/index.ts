@@ -2,7 +2,7 @@
 export const TIDB_LINK_API_VERSION = "0.0.1" as const;
 /** Exact service baseline for the supported refreshed SDK surface. */
 export const TIDB_LINK_REVISION =
-  "cadb1144fe2d450d45baf9a09f826a64258b8ada" as const;
+  "4305ef67daebf23c416badf806217a7c11dcef37" as const;
 
 export {
   TiDBLinkApiError,
@@ -202,6 +202,7 @@ export type {
   RealtimeResponseEvent,
   TemplateSwitchEvent,
   TemplateSwitchEventData,
+  SessionIdleEvent,
 } from "./events.js";
 export type { SubscribeOptions, SubscriptionItem } from "./subscription.js";
 

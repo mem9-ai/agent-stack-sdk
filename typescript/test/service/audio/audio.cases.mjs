@@ -41,6 +41,17 @@ const recording = (filename = "voice.wav") => ({
   bytes: wav(),
 });
 
+/** The Session released its last Turn (agent.session.idle): the next Turn or switch may start. */
+const untilIdle = async (session) => {
+  const end = Date.now() + 15000;
+  for (;;) {
+    await session.refresh();
+    if (session.data.activeTurnId === null) return;
+    if (Date.now() > end) throw new Error("The Session did not release its Turn");
+    await delay(25);
+  }
+};
+
 test("actual audio bytes become transcribed input and a successful saved Turn with correct Billing Tag semantics", async () => {
   const session = await newSession();
   const result = await session.audio({ ...recording(), billingTag: null });
@@ -54,11 +65,13 @@ test("actual audio bytes become transcribed input and a successful saved Turn wi
   assert.equal(turn.userMessage.inputContext.channel, "audio");
   assert.equal(turn.billingTag, null);
   assert.equal(turn.assistantMessage.id, result.messageId);
+  await untilIdle(session);
   const inherited = await session.audio(recording());
   assert.deepEqual((await session.getTurn(inherited.turnId)).billingTag, {
     key: "audio",
     value: "default",
   });
+  await untilIdle(session);
   const overridden = await session.audio({
     ...recording(),
     billingTag: { key: "audio", value: "override" },

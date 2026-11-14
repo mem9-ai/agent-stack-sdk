@@ -1,6 +1,6 @@
 {
-  "revision": "cadb1144fe2d450d45baf9a09f826a64258b8ada",
-  "sourceOpenApiSha256": "901c38fb353ada4bdaf9b27507f54e8455abf3ba3abd950c87c82cfea5c8744e",
+  "revision": "4305ef67daebf23c416badf806217a7c11dcef37",
+  "sourceOpenApiSha256": "6f5ff6f025eef80fbd9d5b80fb798e5db159aaa006e7d34866e9c3b6843dfe58",
   "paths": {
     "/api/v1/org/connectors": {
       "get": {

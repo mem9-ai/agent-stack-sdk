@@ -158,3 +158,10 @@ test("session.send submits the REST message command and answers its receipt", ()
     ["interaction", "replayed"],
   );
 });
+
+test("ping is a request the core answers at once, and Session idle reaches connections", () => {
+  assert.equal(definitions.PingRequest.properties.method.const, "ping");
+  assert.match(definitions.PingRequest.description, /answers at once/);
+  assert.deepEqual(definitions.PingResponse.properties.result.required, ["time"]);
+  assert.match(definitions.SessionSendRequest.description, /agent\.session\.idle/);
+});

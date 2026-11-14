@@ -135,6 +135,21 @@ export type TemplateSwitchEvent = KnownEvent<
   TemplateSwitchEventData
 >;
 
+/**
+ * The Session released its active Turn: the next message, audio Turn or
+ * Template switch can start. It follows that Turn's terminal events and
+ * does not establish its outcome; it can repeat for one Turn.
+ */
+export type SessionIdleEvent = KnownEvent<
+  "agent.session.idle",
+  {
+    id: string;
+    /** The released Turn, or null when it was never recorded. */
+    turnId: string | null;
+    createdAt: string;
+  }
+>;
+
 export type KnownSessionEvent =
   | TurnStartedEvent
   | TurnDraftEvent
@@ -146,7 +161,8 @@ export type KnownSessionEvent =
   | TurnFailedEvent
   | RealtimeTranscriptEvent
   | RealtimeResponseEvent
-  | TemplateSwitchEvent;
+  | TemplateSwitchEvent
+  | SessionIdleEvent;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -260,6 +276,10 @@ export function asKnownSessionEvent(
       isString(data.agentTemplateId) &&
       typeof data.configurationEpoch === "number" &&
       data.status === type.slice("agent.session.template_switch.".length)
+      ? (event as KnownSessionEvent)
+      : undefined;
+  if (type === "agent.session.idle")
+    return isString(data.id) && (data.turnId === null || isString(data.turnId))
       ? (event as KnownSessionEvent)
       : undefined;
   return undefined;
